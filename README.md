@@ -1,12 +1,14 @@
 # Real-time Chat
 
+[GitHub repository](https://github.com/MatteoMurcia/real-time-chat)
+
 A fullstack portfolio project focused on reliable team messaging: persistent
 conversations, explicit channel permissions, idempotent sends, and recovery after
 connection failures.
 
 ## Project status
 
-The local Git repository and initial project documentation are ready. The
+The GitHub repository and initial project documentation are ready. The
 application has not been implemented yet; there are no runnable services or
 Docker images at this stage.
 
