@@ -17,6 +17,9 @@ Product choices and scope are documented in
 [docs/ideas/real-time-chat.md](docs/ideas/real-time-chat.md).
 Planning documents are in Spanish; public project documentation is in English.
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch and commit conventions,
+pull request process, and verification requirements.
+
 ## Planned scope
 
 - Registration, login, logout, and server-side sessions.

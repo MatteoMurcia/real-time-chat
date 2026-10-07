@@ -1,12 +1,12 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-07 · Estado: tareas 0.0a y 0.0b completadas; aplicación pendiente.
+Revisión: 3 · Actualización: 2026-10-07 · Estado: tareas 0.0a–0.0c completadas; aplicación pendiente.
 
 ## 1. Cómo usar este plan
 
 Este archivo conserva el alcance del plan inicial y es la **única lista de tareas** del proyecto; no crear una segunda lista en `tasks/todo.md`. El razonamiento de producto está en [docs/ideas/real-time-chat.md](../docs/ideas/real-time-chat.md).
 
-Se incorporan 0.0a–0.0c para comenzar por GitHub. Los identificadores originales 0.1–6.4 se conservan como prefijos: por ejemplo, 3.2 se divide en 3.2a y 3.2b. Las casillas corresponden a trabajo verificable, no a intención. Las tareas 0.0a y 0.0b preparan Git y GitHub; la implementación de la aplicación sigue pendiente.
+Se incorporan 0.0a–0.0c para comenzar por GitHub. Los identificadores originales 0.1–6.4 se conservan como prefijos: por ejemplo, 3.2 se divide en 3.2a y 3.2b. Las casillas corresponden a trabajo verificable, no a intención. Git, GitHub y el flujo de contribución están preparados; la implementación de la aplicación sigue pendiente.
 
 Para cada sesión:
 1. Elegir la primera tarea cuyas dependencias estén completas.
@@ -308,7 +308,7 @@ S = cambio pequeño; M = sesión de hasta dos horas como objetivo. Los archivos 
   - Aceptación: origin apunta al repositorio acordado, main está sincronizada y contiene el plan; GitHub no ejecuta ni despliega la aplicación.
   - Verificar: remoto, rama por defecto, archivos en GitHub y clonación a un directorio temporal limpio.
   - Archivos: README.md con enlace del repositorio; configuración remota Git/GitHub.
-- [ ] **0.0c — Definir el flujo de trabajo de GitHub** · S · Depende de: 0.0b.
+- [x] **0.0c — Definir el flujo de trabajo de GitHub** · S · Depende de: 0.0b.
   - Trabajo: descripción/topics, plantilla breve de PR y convención de ramas/commits. Mantener tareas en este archivo; no duplicarlas en Projects o Issues. Añadir protección de main y checks cuando CI exista y la cuenta lo permita, sin exigir aprobador externo en un proyecto individual.
   - Aceptación: cambios pequeños revisables; se documenta cómo integrar una etapa y registrar evidencia. No crear workflows de despliegue ni credenciales de hosting.
   - Verificar: revisar ajustes y plantilla; distinguir reglas aplicadas de recomendaciones todavía pendientes.
@@ -733,6 +733,7 @@ Decisiones explícitas:
 | Revisión 3 | Ajuste de entorno y arranque | Solo local en Docker; GitHub al inicio; despliegue remoto fuera de alcance | 0.0a |
 | 2026-10-07 | 0.0a — Git local | Inicializado en main; identidad existente conservada; README inicial y .gitignore revisados; 14 exclusiones y 11 rutas permitidas comprobadas; primer commit local con planificación | 0.0b |
 | 2026-10-07 | 0.0b — GitHub | Repositorio público MatteoMurcia/real-time-chat; origin HTTPS y main sincronizada; README enlazado; clon limpio verificado con el mismo commit y documentos | 0.0c |
+| 2026-10-07 | 0.0c — Flujo GitHub | Descripción/topics revisados; CONTRIBUTING y plantilla PR añadidos; main protegida con PR, cero aprobaciones externas, conversaciones resueltas e historial lineal; squash y borrado de ramas fusionadas; force-push/borrado de main bloqueados también para admins. Configuración comprobada por API; checks CI pendientes de 0.3b | 0.1a |
 
 Plantilla para cada cierre:
 ```text
