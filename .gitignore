@@ -1,0 +1,47 @@
+# Dependencies and generated output
+node_modules/
+dist/
+build/
+out/
+.angular/
+.cache/
+*.tsbuildinfo
+
+# Local environment files; templates belong in version control
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Credentials and private keys
+secrets/
+credentials/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Test reports and browser artifacts
+coverage/
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Logs and temporary files
+*.log
+npm-debug.log*
+tmp/
+temp/
+
+# Local database files and Docker overrides
+/data/
+/postgres-data/
+compose.override.yaml
+compose.override.yml
+
+# Editor and operating system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
