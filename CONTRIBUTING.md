@@ -30,6 +30,11 @@ a solo portfolio project: an external approval is not required. Merge with
 **squash**, using a descriptive PR title as the final commit message; the source
 branch is deleted automatically after merge. Avoid mixing unrelated tasks.
 
+Agents must leave pull requests open for the repository owner to review and
+merge. They may prepare commits, push the task branch, and document verification,
+but must not merge a PR or enable automatic merging. The owner makes the final
+merge decision even though GitHub does not require an external approval.
+
 The initial repository bootstrap (0.0a–0.0c) is committed directly to `main`
 before enabling its protection. Subsequent changes use pull requests.
 
@@ -57,8 +62,9 @@ fix: reuse message identifiers when retrying unconfirmed sends
 - For documentation changes, verify links and consistency with the implemented
   state. Never describe planned commands or features as already working.
 
-At this stage there is no application, test runner, or CI workflow. Do not claim
-tests passed or add placeholder success checks. Task **0.3b** introduces the CI
+Run `npm test`, `npm run typecheck`, and `npm run build` for API changes. The API
+uses Node's built-in test runner, including real HTTP checks. CI is still pending;
+do not add placeholder success checks. Task **0.3b** introduces the CI
 workflow and registers its actual successful job names as required checks on
 `main`. Later tasks extend those checks with integration and E2E coverage.
 
