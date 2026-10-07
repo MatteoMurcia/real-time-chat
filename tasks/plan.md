@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-07 · Estado: tareas 0.0a–0.0c completadas; aplicación pendiente.
+Revisión: 3 · Actualización: 2026-10-07 · Estado: tareas 0.0a–0.0c y 0.1a completadas; scaffolds de aplicación pendientes.
 
 ## 1. Cómo usar este plan
 
@@ -316,11 +316,11 @@ S = cambio pequeño; M = sesión de hasta dos horas como objetivo. Los archivos 
 
 **Checkpoint CP0-G:** repositorio de GitHub creado o vinculado y plan versionado; el trabajo de aplicación empieza a continuación.
 
-- [ ] **0.1a — Fijar runtime y workspace** · S · Depende de: 0.0c.
+- [x] **0.1a — Fijar runtime y workspace** · S · Depende de: 0.0c.
   - Trabajo: elegir versiones compatibles, scripts comunes y gestor npm; documentar requisitos locales.
   - Aceptación: instalación reproducible con lockfile; configuración estricta y sin secretos.
   - Verificar: instalación limpia y lectura de versiones reales.
-  - Archivos: `package.json`, `package-lock.json`, `.node-version`, `.gitignore`, `README.md`.
+  - Archivos: `package.json`, `package-lock.json`, `.node-version`, `.npmrc`, `tsconfig.base.json`, `README.md`; `.gitignore` ya cubre node_modules. Configuración pequeña repartida por responsabilidad, sin scaffolds ni paquetes vacíos.
 - [ ] **0.1b — Arrancar la API** · M · Depende de: 0.1a.
   - Trabajo: scaffold NestJS mínimo, validación de configuración y endpoint live.
   - Aceptación: responde 200 y rechaza configuración obligatoria ausente con error comprensible.
@@ -734,6 +734,7 @@ Decisiones explícitas:
 | 2026-10-07 | 0.0a — Git local | Inicializado en main; identidad existente conservada; README inicial y .gitignore revisados; 14 exclusiones y 11 rutas permitidas comprobadas; primer commit local con planificación | 0.0b |
 | 2026-10-07 | 0.0b — GitHub | Repositorio público MatteoMurcia/real-time-chat; origin HTTPS y main sincronizada; README enlazado; clon limpio verificado con el mismo commit y documentos | 0.0c |
 | 2026-10-07 | 0.0c — Flujo GitHub | Descripción/topics revisados; CONTRIBUTING y plantilla PR añadidos; main protegida con PR, cero aprobaciones externas, conversaciones resueltas e historial lineal; squash y borrado de ramas fusionadas; force-push/borrado de main bloqueados también para admins. Configuración comprobada por API; checks CI pendientes de 0.3b | 0.1a |
+| 2026-10-07 | 0.1a — Runtime y workspace | Node 24.21.0, npm 12.1.0 y TypeScript 6.0.3 fijados; patrones npm apps/* y packages/*; engine-strict/save-exact activos; npm ci y toolchain:versions correctos, auditoría de instalación sin vulnerabilidades; smoke temporal de TypeScript válido e inválido confirma strict, noUncheckedIndexedAccess y exactOptionalPropertyTypes. Build/lint/tests de aplicación pendientes de sus scaffolds | 0.1b |
 
 Plantilla para cada cierre:
 ```text

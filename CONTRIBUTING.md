@@ -19,7 +19,7 @@ Start each task from an up-to-date `main` and use a short-lived branch:
 - `chore/<task-id>-<description>` for tooling and repository setup.
 - `docs/<task-id>-<description>` for documentation.
 
-For example, the next task can use `chore/0.1a-workspace`.
+For example, task 0.1a uses `chore/0.1a-workspace`.
 
 Open a pull request into `main` with a focused diff. Explain the resulting
 behavior, link the plan task, list the checks actually run, and identify any

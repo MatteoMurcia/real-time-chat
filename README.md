@@ -8,9 +8,9 @@ connection failures.
 
 ## Project status
 
-The GitHub repository and initial project documentation are ready. The
-application has not been implemented yet; there are no runnable services or
-Docker images at this stage.
+The GitHub repository, npm workspace configuration, and shared TypeScript settings
+are ready. Application development has not started; there are no runnable
+services or Docker images at this stage.
 
 The implementation checklist is maintained in [tasks/plan.md](tasks/plan.md).
 Product choices and scope are documented in
@@ -42,7 +42,44 @@ outside the initial scope.
 | Local runtime | Docker Compose |
 | Verification | Unit and integration tests, Playwright E2E, GitHub Actions |
 
-Versions and executable commands will be documented as the project is initialized.
+## Development toolchain
+
+| Tool | Pinned version |
+| --- | --- |
+| Node.js | 24.21.0 |
+| npm | 12.1.0 |
+| TypeScript | 6.0.3 |
+
+Node is pinned in `.node-version`; `package.json` declares the exact Node and npm
+versions, and `.npmrc` makes incompatible engines fail installation. Use your
+preferred version manager to select the pinned runtime. Do not override
+`engine-strict` to bypass a mismatch.
+
+With those versions available, run from the repository root:
+
+```text
+npm ci
+npm run toolchain:versions
+```
+
+Commit the root `package-lock.json`. Install dependencies from the root, target
+the relevant workspace when it exists, and avoid nested lockfiles. New direct
+dependencies are saved with exact versions.
+
+The workspace patterns reserve `apps/*` for the API/web applications and
+`packages/*` for shared contracts. These packages will be created by their plan
+tasks; no empty application packages are registered yet. Each future TypeScript
+project must extend `tsconfig.base.json`, with module, target, and framework
+options defined in its own configuration.
+
+TypeScript 6.0 was selected against the
+[Angular compatibility table](https://angular.dev/reference/versions) and the
+published Nest CLI 12.0.8 dependency on `~6.0.2`. Node 24 is compatible with the
+planned frameworks and npm 12.1.0. Framework dependencies and their exact versions
+will be installed and verified in the application tasks.
+
+There are no application build, test, or lint commands yet. Those commands will
+be introduced alongside the corresponding source code and tools.
 
 ## Local execution target
 
