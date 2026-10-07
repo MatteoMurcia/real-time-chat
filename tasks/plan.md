@@ -1,12 +1,12 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-07 · Estado: tareas 0.0a–0.0c y 0.1a completadas; scaffolds de aplicación pendientes.
+Revisión: 3 · Actualización: 2026-10-07 · Estado: tareas 0.0a–0.0c y 0.1a integradas; 0.1b implementada y verificada en su rama, pendiente de revisión y merge del propietario.
 
 ## 1. Cómo usar este plan
 
 Este archivo conserva el alcance del plan inicial y es la **única lista de tareas** del proyecto; no crear una segunda lista en `tasks/todo.md`. El razonamiento de producto está en [docs/ideas/real-time-chat.md](../docs/ideas/real-time-chat.md).
 
-Se incorporan 0.0a–0.0c para comenzar por GitHub. Los identificadores originales 0.1–6.4 se conservan como prefijos: por ejemplo, 3.2 se divide en 3.2a y 3.2b. Las casillas corresponden a trabajo verificable, no a intención. Git, GitHub y el flujo de contribución están preparados; la implementación de la aplicación sigue pendiente.
+Se incorporan 0.0a–0.0c para comenzar por GitHub. Los identificadores originales 0.1–6.4 se conservan como prefijos: por ejemplo, 3.2 se divide en 3.2a y 3.2b. Las casillas indican implementación verificada; el registro distingue una PR pendiente de cambios integrados. Los agentes dejan las PR abiertas: solo el propietario revisa y ejecuta el merge.
 
 Para cada sesión:
 1. Elegir la primera tarea cuyas dependencias estén completas.
@@ -321,11 +321,12 @@ S = cambio pequeño; M = sesión de hasta dos horas como objetivo. Los archivos 
   - Aceptación: instalación reproducible con lockfile; configuración estricta y sin secretos.
   - Verificar: instalación limpia y lectura de versiones reales.
   - Archivos: `package.json`, `package-lock.json`, `.node-version`, `.npmrc`, `tsconfig.base.json`, `README.md`; `.gitignore` ya cubre node_modules. Configuración pequeña repartida por responsabilidad, sin scaffolds ni paquetes vacíos.
-- [ ] **0.1b — Arrancar la API** · M · Depende de: 0.1a.
+- [x] **0.1b — Arrancar la API** · M · Depende de: 0.1a. Implementada en rama; merge pendiente del propietario.
   - Trabajo: scaffold NestJS mínimo, validación de configuración y endpoint live.
   - Aceptación: responde 200 y rechaza configuración obligatoria ausente con error comprensible.
   - Verificar: build API y prueba HTTP de live.
   - Archivos: `apps/api/package.json`, `src/main.ts`, `src/app.module.ts`, `src/health/live.controller.ts`, `test/health.spec.ts` dentro de apps/api salvo indicación.
+  - Evidencia: NestJS 12.1.2; GET /api/health/live → 200 con status=ok; NODE_ENV/PORT obligatorios y HOST validado; npm ci, 15 pruebas con node:test, build y typecheck correctos. Arranque con npm start y .env comprobado; sin BD ni Docker todavía.
 - [ ] **0.1c — Arrancar la web** · M · Depende de: 0.1a, 0.1b.
   - Trabajo: scaffold Angular, shell con navegación mínima y proxy de desarrollo a API.
   - Aceptación: pantalla inicial consume live bajo el mismo origen; estados de carga/error visibles.
@@ -735,6 +736,7 @@ Decisiones explícitas:
 | 2026-10-07 | 0.0b — GitHub | Repositorio público MatteoMurcia/real-time-chat; origin HTTPS y main sincronizada; README enlazado; clon limpio verificado con el mismo commit y documentos | 0.0c |
 | 2026-10-07 | 0.0c — Flujo GitHub | Descripción/topics revisados; CONTRIBUTING y plantilla PR añadidos; main protegida con PR, cero aprobaciones externas, conversaciones resueltas e historial lineal; squash y borrado de ramas fusionadas; force-push/borrado de main bloqueados también para admins. Configuración comprobada por API; checks CI pendientes de 0.3b | 0.1a |
 | 2026-10-07 | 0.1a — Runtime y workspace | Node 24.21.0, npm 12.1.0 y TypeScript 6.0.3 fijados; patrones npm apps/* y packages/*; engine-strict/save-exact activos; npm ci y toolchain:versions correctos, auditoría de instalación sin vulnerabilidades; smoke temporal de TypeScript válido e inválido confirma strict, noUncheckedIndexedAccess y exactOptionalPropertyTypes. Build/lint/tests de aplicación pendientes de sus scaffolds | 0.1b |
+| 2026-10-07 | 0.1b — API NestJS | Rama chore/0.1b-api: instalación limpia, 15 pruebas, build y typecheck correctos; npm start comprobado con .env y HTTP 200; proceso de prueba detenido. PR para revisión y merge manual del propietario; protocolo registrado en CONTRIBUTING | Revisar/mergear PR; después 0.1c |
 
 Plantilla para cada cierre:
 ```text

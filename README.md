@@ -8,9 +8,9 @@ connection failures.
 
 ## Project status
 
-The GitHub repository, npm workspace configuration, and shared TypeScript settings
-are ready. Application development has not started; there are no runnable
-services or Docker images at this stage.
+The NestJS API scaffold runs locally and exposes a liveness endpoint. Environment
+validation, HTTP tests, and strict TypeScript checks are available. The web app,
+database, chat features, and Docker setup are still pending.
 
 The implementation checklist is maintained in [tasks/plan.md](tasks/plan.md).
 Product choices and scope are documented in
@@ -66,20 +66,56 @@ Commit the root `package-lock.json`. Install dependencies from the root, target
 the relevant workspace when it exists, and avoid nested lockfiles. New direct
 dependencies are saved with exact versions.
 
-The workspace patterns reserve `apps/*` for the API/web applications and
-`packages/*` for shared contracts. These packages will be created by their plan
-tasks; no empty application packages are registered yet. Each future TypeScript
-project must extend `tsconfig.base.json`, with module, target, and framework
-options defined in its own configuration.
+The workspace patterns use `apps/*` for applications and `packages/*` for shared
+contracts. The first workspace is `@real-time-chat/api` in `apps/api`. TypeScript
+projects extend `tsconfig.base.json`, with module, target, and framework options
+defined in their own configuration.
 
 TypeScript 6.0 was selected against the
 [Angular compatibility table](https://angular.dev/reference/versions) and the
 published Nest CLI 12.0.8 dependency on `~6.0.2`. Node 24 is compatible with the
-planned frameworks and npm 12.1.0. Framework dependencies and their exact versions
-will be installed and verified in the application tasks.
+planned frameworks and npm 12.1.0. The API uses NestJS 12.1.2 with ESM and the
+Express adapter. Compilation uses TypeScript directly; tests use Node's built-in
+runner and real HTTP requests.
 
-There are no application build, test, or lint commands yet. Those commands will
-be introduced alongside the corresponding source code and tools.
+## Run the API
+
+Copy `.env.example` to `.env` in the repository root (`Copy-Item .env.example .env`
+in PowerShell, or `cp .env.example .env` on Unix). Then run:
+
+```text
+npm ci
+npm run build
+npm start
+```
+
+`GET http://127.0.0.1:3000/api/health/live` returns HTTP 200 with
+`{"status":"ok"}`. This checks that the HTTP process is alive; database readiness
+will be added when database integration exists. Stop the server with Ctrl+C.
+
+| Variable | Contract |
+| --- | --- |
+| `NODE_ENV` | Required: `development`, `test`, or `production` |
+| `PORT` | Required: integer from 1 through 65535 |
+| `HOST` | Optional IP address; defaults to `127.0.0.1`. Containers will use `0.0.0.0`. |
+
+Startup rejects missing/invalid configuration with a nonzero exit code.
+`npm start` loads the root `.env` if present; process environment variables take
+precedence. Validation errors name the variable without echoing its value.
+
+Verification commands (from the root):
+
+```text
+npm test
+npm run typecheck
+npm run build
+```
+
+Tests use isolated configuration and an ephemeral HTTP port, so they do not
+require `.env` or a running API. For development, run
+`npm run build:watch --workspace @real-time-chat/api` in one terminal and, after
+the first build, `npm run start:watch --workspace @real-time-chat/api` in another.
+Lint and CI will be configured in task 0.3b.
 
 ## Local execution target
 

@@ -1,0 +1,42 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { loadConfig } from '../src/config.js';
+
+test('loads a valid configuration with a loopback host by default', () => {
+  assert.deepEqual(loadConfig({ NODE_ENV: 'development', PORT: '3000' }), {
+    nodeEnv: 'development',
+    port: 3000,
+    host: '127.0.0.1',
+  });
+});
+
+test('accepts an explicit bind address for containers', () => {
+  assert.equal(
+    loadConfig({ NODE_ENV: 'production', PORT: '8080', HOST: '0.0.0.0' }).host,
+    '0.0.0.0',
+  );
+});
+
+test('rejects missing or invalid required configuration without exposing values', () => {
+  assert.throws(() => loadConfig({ PORT: '3000' }), /NODE_ENV is required/);
+  assert.throws(() => loadConfig({ NODE_ENV: 'test' }), /PORT is required/);
+  assert.throws(
+    () => loadConfig({ NODE_ENV: 'private-value', PORT: '3000' }),
+    { message: 'NODE_ENV must be development, test, or production' },
+  );
+});
+
+for (const port of ['', ' ', '0', '-1', '65536', '3.5', '3000oops', '1e3']) {
+  test(`rejects invalid port ${JSON.stringify(port)}`, () => {
+    assert.throws(() => loadConfig({ NODE_ENV: 'test', PORT: port }), /PORT/);
+  });
+}
+
+test('rejects an empty or invalid bind address', () => {
+  for (const host of ['', ' ', 'not-an-ip']) {
+    assert.throws(
+      () => loadConfig({ NODE_ENV: 'test', PORT: '3000', HOST: host }),
+      /HOST must be an IP address/,
+    );
+  }
+});
