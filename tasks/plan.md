@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-08 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c y CP0-A integrados; 0.2a implementada y verificada, pendiente de revisión y merge del propietario.
+Revisión: 3 · Actualización: 2026-10-08 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A y 0.2a integrados; 0.2b implementada y verificada, pendiente de revisión y merge del propietario.
 
 ## 1. Cómo usar este plan
 
@@ -345,17 +345,18 @@ Resultado (2026-10-08): **superado** sobre main `e6664d6`.
 - Revisión de scaffolds: sin Hello World, páginas de ejemplo, servicios vacíos ni artefactos generados versionados. Los archivos actuales soportan arranque, configuración, interfaz o pruebas; no hace falta eliminar código.
 - Docker y proxy de producción siguen en 0.2c; lint y CI en 0.3b. No bloquean este checkpoint de arranque local.
 
-- [x] **0.2a — Levantar PostgreSQL local** · S · Depende de: 0.1a. Implementada en rama; merge pendiente del propietario.
+- [x] **0.2a — Levantar PostgreSQL local** · S · Depende de: 0.1a. Integrada mediante PR #5 por el propietario.
   - Trabajo: Compose con volumen, health check y configuración ejemplo.
   - Aceptación: BD disponible, credenciales fuera del repositorio y reinicio sin perder datos.
   - Verificar: arranque, conexión y reinicio con un registro de prueba.
   - Archivos: `compose.yaml`, `.env.example`, `README.md`.
   - Evidencia: PostgreSQL 18.6-bookworm; health check healthy; conexión de red autenticada y rechazo de contraseña incorrecta; Compose rechaza contraseña vacía. Volumen real-time-chat_postgres_data conserva un registro tras down/up; tabla de prueba eliminada. Puerto solo 127.0.0.1:5432; credenciales generadas en .env ignorado. Base detenida conservando volumen al finalizar. Integración Prisma pendiente de 0.2b.
-- [ ] **0.2b — Integrar Prisma y la primera migración** · M · Depende de: 0.1b, 0.2a.
+- [x] **0.2b — Integrar Prisma y la primera migración** · M · Depende de: 0.1b, 0.2a. Implementada en rama; merge pendiente del propietario.
   - Trabajo: User y Session, servicio de BD, scripts de migración para local/despliegue y conexión de tests.
   - Aceptación: migración reproducible sobre BD vacía; conexión cerrada al finalizar tests.
   - Verificar: migrar y probar restricciones de email/tokenHash con PostgreSQL real.
   - Archivos: `apps/api/prisma/schema.prisma`, migración generada, `src/database/database.service.ts`, `test/database.spec.ts`, `apps/api/package.json`.
+  - Evidencia: Prisma 7.10.0, cliente ESM generado e ignorado; migración User/Session aplicada a BD vacía y repetida sin pendientes. Nest comprueba conexión al arrancar y libera pool al cerrar; DATABASE_URL validada sin exponer credenciales. 16 pruebas API, 3 web y 6 resultados de integración en BD separada real_time_chat_test (unicidad email/tokenHash, FK, rollback, cierre, fallo de conexión). npm ci, build y typecheck correctos; audit sin vulnerabilidades con overrides documentados del CLI. Pruebas en test/integration/database.spec.ts; datos de prueba eliminados y procesos detenidos.
 - [ ] **0.2c — Ejecutar toda la aplicación con Compose** · M · Depende de: 0.1c, 0.2b.
   - Trabajo: Dockerfiles web/API y Compose con red interna, volumen, proxy y tarea migrate; exponer solo web en loopback.
   - Aceptación: desde clon limpio, up --build --wait sirve la pantalla y conecta con BD sin Node/PostgreSQL en el host; un error de migración impide iniciar API.
@@ -754,6 +755,8 @@ Decisiones explícitas:
 | 2026-10-08 | CP0-A — Arranque y scaffolds | Superado sobre main e6664d6: comandos documentados arrancan API y web; live 200 directo y por proxy; error visible al detener API; build/typecheck y 18 pruebas correctos. Sin ejemplos sobrantes. Rama docs/cp0-a-scaffold-review; nombres descriptivos registrados en CONTRIBUTING; registro pendiente de merge manual | 0.2a tras revisión |
 
 | 2026-10-08 | 0.2a — PostgreSQL local | Rama chore/0.2a-postgresql-local: Compose validado, PostgreSQL 18.6 healthy, autenticación y persistencia tras recrear contenedor comprobadas. Configuración y documentación en commits separados; CP0-A integrado por propietario mediante PR #4. PR pendiente de revisión y merge manual | 0.2b tras revisión |
+
+| 2026-10-08 | 0.2b — Prisma y migración inicial | Rama feature/0.2b-prisma-user-sessions: commits incrementales de esquema/migración, ciclo de vida Nest, pruebas reales y documentación. Migración reproducible; 19 pruebas ordinarias y 6 resultados de integración correctos; instalación limpia, build/typecheck y arranque HTTP verificados. API y BD detenidas, volumen conservado. PR pendiente de revisión/merge manual | 0.2c tras revisión |
 
 Plantilla para cada cierre:
 ```text
