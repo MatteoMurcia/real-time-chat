@@ -11,7 +11,8 @@ connection failures.
 The Angular web scaffold and NestJS API run locally. The initial page checks API
 liveness and displays loading, failure, and recovery states. Environment
 validation, HTTP/component tests, and strict TypeScript checks are available.
-Database, chat features, and Docker setup are still pending.
+PostgreSQL runs locally through Docker Compose with persistent storage. API
+database integration, chat features, and application containers are still pending.
 
 The implementation checklist is maintained in [tasks/plan.md](tasks/plan.md).
 Product choices and scope are documented in
@@ -149,6 +150,74 @@ web-only checks. Component tests use Angular's HTTP testing backend and Vitest;
 no running API is required. Production web output is in `apps/web/dist/browser`.
 
 ## Local execution target
+
+### PostgreSQL now
+
+Use Docker Desktop with Linux containers (Windows/macOS) or Docker Engine with
+Compose on Linux. Copy `.env.example` to `.env` only if it does not already exist;
+otherwise add the new `POSTGRES_*` entries without overwriting your configuration.
+Set a non-empty, locally generated `POSTGRES_PASSWORD`; the example deliberately
+has no default password. For example, generate one using PowerShell:
+
+```powershell
+[Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(24))
+```
+
+Or on Unix: `openssl rand -hex 24`. Paste the result into your ignored `.env`.
+Do not commit it. Then run from the repository root:
+
+```text
+docker compose config --quiet
+docker compose up -d --wait db
+docker compose ps
+```
+
+The pinned [official PostgreSQL image](https://hub.docker.com/_/postgres) is
+`18.6-bookworm`. Its data volume mounts `/var/lib/postgresql`, the image's
+PostgreSQL 18+ layout. The health check waits for PostgreSQL to accept connections;
+it does not verify application migrations or readiness.
+
+| Variable | Local use |
+| --- | --- |
+| `POSTGRES_DB` | Required database name; example: `real_time_chat` |
+| `POSTGRES_USER` | Required bootstrap administrator; example: `chat_local` |
+| `POSTGRES_PASSWORD` | Required private password, no default |
+| `POSTGRES_PORT` | Host port, defaults to `5432`; change if occupied |
+
+Only `127.0.0.1` exposes the database port for host development. A SQL client can
+connect with these values. This bootstrap administrator is for local setup;
+application roles and Prisma integration will be handled with database integration.
+The complete container setup in 0.2c will move database access to the internal
+network. Changing initialization credentials in `.env` does not update an existing
+database; use SQL to change existing roles/passwords instead.
+
+Open an authenticated TCP session using the client inside the container (the
+single quotes work in PowerShell and Unix shells):
+
+```text
+docker compose exec db sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -h db -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
+The service hostname `db` exercises network password authentication; the official
+image trusts local connections inside the container.
+
+For a persistence check on your local database, create a disposable record:
+
+```sql
+CREATE TABLE persistence_check (id integer PRIMARY KEY, note text NOT NULL);
+INSERT INTO persistence_check VALUES (1, 'kept after recreation');
+```
+
+Exit with `\q`, run `docker compose down`, then `docker compose up -d --wait db`.
+Reconnect and run `SELECT * FROM persistence_check;` to confirm the row survived.
+Remove only this test table with `DROP TABLE persistence_check;` afterwards.
+
+`docker compose stop db` stops the database; `docker compose start db` resumes it.
+`docker compose down` removes the container/network but retains the named volume
+`real-time-chat_postgres_data`. **Do not use `down --volumes` to stop the stack:**
+it deletes the stored database. A volume provides persistence, not a backup.
+
+### Complete application (planned)
 
 The application will run locally in containers. The completed setup will include
 the frontend, API, database, migrations, and an explicit demo seed command.
