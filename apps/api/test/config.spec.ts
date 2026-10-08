@@ -2,19 +2,31 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { loadConfig } from '../src/config.js';
 
+const databaseUrl = 'postgresql://test:example@127.0.0.1:5432/chat_test';
+
 test('loads a valid configuration with a loopback host by default', () => {
-  assert.deepEqual(loadConfig({ NODE_ENV: 'development', PORT: '3000' }), {
+  assert.deepEqual(loadConfig({ NODE_ENV: 'development', PORT: '3000', DATABASE_URL: databaseUrl }), {
     nodeEnv: 'development',
     port: 3000,
     host: '127.0.0.1',
+    databaseUrl,
   });
 });
 
 test('accepts an explicit bind address for containers', () => {
   assert.equal(
-    loadConfig({ NODE_ENV: 'production', PORT: '8080', HOST: '0.0.0.0' }).host,
+    loadConfig({ NODE_ENV: 'production', PORT: '8080', HOST: '0.0.0.0', DATABASE_URL: databaseUrl }).host,
     '0.0.0.0',
   );
+});
+
+test('rejects absent or malformed database URLs without exposing credentials', () => {
+  assert.throws(() => loadConfig({ NODE_ENV: 'test', PORT: '3000' }), /DATABASE_URL is required/);
+  for (const value of ['private-password', 'https://user:private-password@host/db', 'postgresql://host']) {
+    assert.throws(() => loadConfig({ NODE_ENV: 'test', PORT: '3000', DATABASE_URL: value }), {
+      message: 'DATABASE_URL must be a PostgreSQL connection URL with a database name',
+    });
+  }
 });
 
 test('rejects missing or invalid required configuration without exposing values', () => {

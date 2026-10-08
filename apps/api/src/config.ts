@@ -17,5 +17,16 @@ export function loadConfig(env: NodeJS.ProcessEnv) {
   const host = env.HOST ?? '127.0.0.1';
   if (!isIP(host)) throw new Error('HOST must be an IP address');
 
-  return { nodeEnv, port, host };
+  const databaseUrl = env.DATABASE_URL;
+  if (!databaseUrl) throw new Error('DATABASE_URL is required');
+  try {
+    const url = new URL(databaseUrl);
+    if (!['postgresql:', 'postgres:'].includes(url.protocol) || !url.hostname || url.pathname.length < 2) {
+      throw new Error();
+    }
+  } catch {
+    throw new Error('DATABASE_URL must be a PostgreSQL connection URL with a database name');
+  }
+
+  return { nodeEnv, port, host, databaseUrl };
 }

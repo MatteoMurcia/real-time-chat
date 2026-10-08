@@ -5,7 +5,7 @@ import { loadConfig } from './config.js';
 
 export async function createApp(env: NodeJS.ProcessEnv) {
   const config = loadConfig(env);
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create(AppModule.register(config.databaseUrl), {
     abortOnError: false,
     logger: config.nodeEnv === 'test' ? false : ['log', 'warn', 'error'],
   });
