@@ -20,6 +20,8 @@ Start each task from an up-to-date `main` and use a short-lived branch:
 - `docs/<task-id>-<description>` for documentation.
 
 For example, task 0.1a uses `chore/0.1a-workspace`.
+Use descriptive task names following these prefixes; do not use agent names
+such as `codex/` as branch prefixes.
 
 Open a pull request into `main` with a focused diff. Explain the resulting
 behavior, link the plan task, list the checks actually run, and identify any
