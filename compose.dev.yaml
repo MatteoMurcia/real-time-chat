@@ -1,0 +1,27 @@
+services:
+  api:
+    build:
+      target: development
+    healthcheck:
+      start_period: 30s
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./apps/api/src
+          target: /app/apps/api/src
+          initial_sync: true
+          ignore: [generated/]
+
+  web:
+    build:
+      target: development
+    init: true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/health/live').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      start_period: 30s
+    develop:
+      watch:
+        - action: sync
+          path: ./apps/web/src
+          target: /app/apps/web/src
+          initial_sync: true
