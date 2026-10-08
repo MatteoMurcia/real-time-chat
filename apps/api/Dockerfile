@@ -25,7 +25,7 @@ ENTRYPOINT ["node", "--import", "./docker/database-env.mjs"]
 CMD ["node_modules/prisma/build/index.js", "migrate", "deploy", "--config", "apps/api/prisma.config.ts"]
 
 FROM base AS runtime
-RUN npm ci --omit=dev --workspace @real-time-chat/api --include-workspace-root
+RUN npm ci --omit=dev --omit=optional --workspace @real-time-chat/api --include-workspace-root
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY docker/database-env.mjs ./docker/database-env.mjs
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000

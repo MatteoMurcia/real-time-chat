@@ -18,7 +18,8 @@
     "start": "npm start --workspace @real-time-chat/api",
     "start:web": "npm start --workspace @real-time-chat/web",
     "typecheck": "npm run typecheck --workspaces",
-    "test": "npm test --workspaces"
+    "test": "npm test --workspaces",
+    "test:docker": "node --test docker/*.test.mjs"
   },
   "overrides": {
     "@prisma/config": { "deepmerge-ts": "8.0.2" },

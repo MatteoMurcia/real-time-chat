@@ -9,6 +9,10 @@
 **/.env
 **/.env.*
 **/*.log
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
 **/*.tsbuildinfo
 apps/api/src/generated
 secrets
