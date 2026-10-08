@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-08 · Estado: tareas 0.0a–0.0c y 0.1a–0.1c integradas; CP0-A verificado, registro pendiente de revisión y merge del propietario.
+Revisión: 3 · Actualización: 2026-10-08 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c y CP0-A integrados; 0.2a implementada y verificada, pendiente de revisión y merge del propietario.
 
 ## 1. Cómo usar este plan
 
@@ -345,11 +345,12 @@ Resultado (2026-10-08): **superado** sobre main `e6664d6`.
 - Revisión de scaffolds: sin Hello World, páginas de ejemplo, servicios vacíos ni artefactos generados versionados. Los archivos actuales soportan arranque, configuración, interfaz o pruebas; no hace falta eliminar código.
 - Docker y proxy de producción siguen en 0.2c; lint y CI en 0.3b. No bloquean este checkpoint de arranque local.
 
-- [ ] **0.2a — Levantar PostgreSQL local** · S · Depende de: 0.1a.
+- [x] **0.2a — Levantar PostgreSQL local** · S · Depende de: 0.1a. Implementada en rama; merge pendiente del propietario.
   - Trabajo: Compose con volumen, health check y configuración ejemplo.
   - Aceptación: BD disponible, credenciales fuera del repositorio y reinicio sin perder datos.
   - Verificar: arranque, conexión y reinicio con un registro de prueba.
   - Archivos: `compose.yaml`, `.env.example`, `README.md`.
+  - Evidencia: PostgreSQL 18.6-bookworm; health check healthy; conexión de red autenticada y rechazo de contraseña incorrecta; Compose rechaza contraseña vacía. Volumen real-time-chat_postgres_data conserva un registro tras down/up; tabla de prueba eliminada. Puerto solo 127.0.0.1:5432; credenciales generadas en .env ignorado. Base detenida conservando volumen al finalizar. Integración Prisma pendiente de 0.2b.
 - [ ] **0.2b — Integrar Prisma y la primera migración** · M · Depende de: 0.1b, 0.2a.
   - Trabajo: User y Session, servicio de BD, scripts de migración para local/despliegue y conexión de tests.
   - Aceptación: migración reproducible sobre BD vacía; conexión cerrada al finalizar tests.
@@ -751,6 +752,8 @@ Decisiones explícitas:
 | 2026-10-08 | 0.1c — Web Angular | Rama codex/0.1c-web con commits separados para scaffold, integración HTTP y documentación. Build y typecheck globales correctos; 18 pruebas pasan; Chrome verifica API detenida/disponible, reintento, teclado y anchuras 320–1440 px. 0.1b ya integrada por el propietario mediante PR #2. PR de 0.1c pendiente de revisión y merge manual | Revisar/mergear PR; después CP0-A |
 
 | 2026-10-08 | CP0-A — Arranque y scaffolds | Superado sobre main e6664d6: comandos documentados arrancan API y web; live 200 directo y por proxy; error visible al detener API; build/typecheck y 18 pruebas correctos. Sin ejemplos sobrantes. Rama docs/cp0-a-scaffold-review; nombres descriptivos registrados en CONTRIBUTING; registro pendiente de merge manual | 0.2a tras revisión |
+
+| 2026-10-08 | 0.2a — PostgreSQL local | Rama chore/0.2a-postgresql-local: Compose validado, PostgreSQL 18.6 healthy, autenticación y persistencia tras recrear contenedor comprobadas. Configuración y documentación en commits separados; CP0-A integrado por propietario mediante PR #4. PR pendiente de revisión y merge manual | 0.2b tras revisión |
 
 Plantilla para cada cierre:
 ```text
