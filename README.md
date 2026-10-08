@@ -13,7 +13,8 @@ liveness and displays loading, failure, and recovery states. Environment
 validation, HTTP/component tests, and strict TypeScript checks are available.
 The web, API, PostgreSQL and migration job run locally through Docker Compose.
 Prisma manages the User/Session schema and the API database connection lifecycle.
-Authentication/chat features and container hot reload are still pending.
+Container development supports automatic source reload. Authentication/chat
+features are still pending.
 
 The implementation checklist is maintained in [tasks/plan.md](tasks/plan.md).
 Product choices and scope are documented in
@@ -81,13 +82,51 @@ docker compose down
 Use `down` without `--volumes` to retain data. Images use pinned Node 24.21.0,
 npm 12.1.0, Nginx 1.30.5 and PostgreSQL 18.6 versions. API/web builds run their
 tests inside Linux; final API/web processes run as non-root users. Migration
-tools are in a separate image target. Source edits require rebuilding for now;
-the development hot-reload override belongs to 0.2d.
+tools are in a separate image target. Use the development override below for
+automatic source reload.
 
 `npm run test:docker` checks container URL construction (including reserved
 characters in credentials) without starting Docker. The images exclude local
 environment files, generated output, dependencies and private key files from
 their build context.
+
+## Develop inside Docker
+
+Use Docker Compose 2.32+ (verified with 5.5.1). The following commands work in
+PowerShell and Unix shells from the repository root, after configuring `.env`
+as above. Stop an existing stack before switching modes; data is retained.
+
+```text
+docker compose down
+docker compose -f compose.yaml -f compose.dev.yaml up --build --watch
+```
+
+Open <http://127.0.0.1:8080>. Keep this terminal running.
+[Compose Watch](https://docs.docker.com/compose/how-tos/file-watch/) synchronizes
+`apps/web/src` for Angular's live reload and `apps/api/src` for automatic API
+recompilation/restart. API requests can briefly fail during that restart; use
+**Check again** when it is ready. Source edits do not rebuild images.
+
+There are no host dependency mounts: Linux `node_modules` stays in each image,
+and the generated Prisma client is excluded from synchronization. Both app
+containers run as non-root. Only the web port is published, on loopback; the
+development proxy reaches the API through its internal service name.
+
+Changes outside these source directories (dependencies, lockfile, configuration,
+Dockerfiles or Prisma schema/migrations) require stopping Watch with Ctrl+C,
+then running the following commands. This also applies migrations before API
+startup and regenerates the client; Watch never resets or migrates your database.
+
+```text
+docker compose -f compose.yaml -f compose.dev.yaml down
+docker compose -f compose.yaml -f compose.dev.yaml up --build --watch
+```
+
+To verify reload, temporarily edit a heading in `apps/web/src/app/app.html` and
+the response in `apps/api/src/health/live.controller.ts`. Check the page and
+`/api/health/live`, then restore both edits and confirm recovery. To compare
+against the normal build, stop Watch, run the development `down` command, then
+`docker compose up --build --wait`. Never use `down --volumes` for switching modes.
 
 ## Optional host development toolchain
 
@@ -327,7 +366,7 @@ regenerate the lockfile and verify generation/migrations before doing so.
 
 ### Remaining delivery work
 
-Container hot reload, application features and demo seed data remain in the plan.
+Application features and demo seed data remain in the plan.
 Remote hosting is outside the current delivery scope.
 
 ## Repository hygiene

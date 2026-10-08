@@ -14,6 +14,17 @@ COPY tsconfig.base.json ./
 COPY apps/api ./apps/api
 RUN npm test --workspace @real-time-chat/api && npm run build --workspace @real-time-chat/api
 
+FROM dependencies AS development
+RUN node node_modules/@prisma/engines/scripts/postinstall.js
+COPY tsconfig.base.json ./
+COPY --chown=node:node apps/api ./apps/api
+RUN chown node:node /app/apps/api
+COPY docker/database-env.mjs ./docker/database-env.mjs
+ENV NODE_ENV=development HOST=0.0.0.0 PORT=3000
+USER node
+EXPOSE 3000
+CMD ["sh", "-c", "npm run build --workspace @real-time-chat/api && exec node --import ./docker/database-env.mjs apps/api/dist/main.js"]
+
 FROM dependencies AS migrate
 # Download the migration engine at build time, before entering the internal network.
 RUN node node_modules/@prisma/engines/scripts/postinstall.js
