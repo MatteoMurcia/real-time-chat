@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-07 · Estado: tareas 0.0a–0.0c y 0.1a integradas; 0.1b implementada y verificada en su rama, pendiente de revisión y merge del propietario.
+Revisión: 3 · Actualización: 2026-10-08 · Estado: tareas 0.0a–0.0c y 0.1a–0.1b integradas; 0.1c implementada y verificada en su rama, pendiente de revisión y merge del propietario.
 
 ## 1. Cómo usar este plan
 
@@ -321,17 +321,18 @@ S = cambio pequeño; M = sesión de hasta dos horas como objetivo. Los archivos 
   - Aceptación: instalación reproducible con lockfile; configuración estricta y sin secretos.
   - Verificar: instalación limpia y lectura de versiones reales.
   - Archivos: `package.json`, `package-lock.json`, `.node-version`, `.npmrc`, `tsconfig.base.json`, `README.md`; `.gitignore` ya cubre node_modules. Configuración pequeña repartida por responsabilidad, sin scaffolds ni paquetes vacíos.
-- [x] **0.1b — Arrancar la API** · M · Depende de: 0.1a. Implementada en rama; merge pendiente del propietario.
+- [x] **0.1b — Arrancar la API** · M · Depende de: 0.1a. Integrada mediante PR #2 por el propietario.
   - Trabajo: scaffold NestJS mínimo, validación de configuración y endpoint live.
   - Aceptación: responde 200 y rechaza configuración obligatoria ausente con error comprensible.
   - Verificar: build API y prueba HTTP de live.
   - Archivos: `apps/api/package.json`, `src/main.ts`, `src/app.module.ts`, `src/health/live.controller.ts`, `test/health.spec.ts` dentro de apps/api salvo indicación.
   - Evidencia: NestJS 12.1.2; GET /api/health/live → 200 con status=ok; NODE_ENV/PORT obligatorios y HOST validado; npm ci, 15 pruebas con node:test, build y typecheck correctos. Arranque con npm start y .env comprobado; sin BD ni Docker todavía.
-- [ ] **0.1c — Arrancar la web** · M · Depende de: 0.1a, 0.1b.
+- [x] **0.1c — Arrancar la web** · M · Depende de: 0.1a, 0.1b. Implementada en rama; merge pendiente del propietario.
   - Trabajo: scaffold Angular, shell con navegación mínima y proxy de desarrollo a API.
   - Aceptación: pantalla inicial consume live bajo el mismo origen; estados de carga/error visibles.
   - Verificar: build web y navegador con API disponible y detenida.
   - Archivos: `apps/web/package.json`, `angular.json`, `proxy.conf.json`, `src/app/app.ts`, `src/app/app.html` dentro de apps/web.
+  - Evidencia: Angular 22.2.1 con CLI/build 22.2.2; proxy /api/**; carga, error, reintento y timeout de 5 s; 3 pruebas web y 15 API; build y typecheck de ambos workspaces. Chrome confirma error con API detenida y recuperación al arrancarla; sin desbordamiento a 320/768/1024/1440 px; enlace de salto mueve el foco a main. Commits incrementales publicados para revisión.
 
 **Checkpoint CP0-A:** web y API arrancan por los comandos documentados; revisar scaffolds y eliminar ejemplos innecesarios.
 
@@ -737,6 +738,8 @@ Decisiones explícitas:
 | 2026-10-07 | 0.0c — Flujo GitHub | Descripción/topics revisados; CONTRIBUTING y plantilla PR añadidos; main protegida con PR, cero aprobaciones externas, conversaciones resueltas e historial lineal; squash y borrado de ramas fusionadas; force-push/borrado de main bloqueados también para admins. Configuración comprobada por API; checks CI pendientes de 0.3b | 0.1a |
 | 2026-10-07 | 0.1a — Runtime y workspace | Node 24.21.0, npm 12.1.0 y TypeScript 6.0.3 fijados; patrones npm apps/* y packages/*; engine-strict/save-exact activos; npm ci y toolchain:versions correctos, auditoría de instalación sin vulnerabilidades; smoke temporal de TypeScript válido e inválido confirma strict, noUncheckedIndexedAccess y exactOptionalPropertyTypes. Build/lint/tests de aplicación pendientes de sus scaffolds | 0.1b |
 | 2026-10-07 | 0.1b — API NestJS | Rama chore/0.1b-api: instalación limpia, 15 pruebas, build y typecheck correctos; npm start comprobado con .env y HTTP 200; proceso de prueba detenido. PR para revisión y merge manual del propietario; protocolo registrado en CONTRIBUTING | Revisar/mergear PR; después 0.1c |
+
+| 2026-10-08 | 0.1c — Web Angular | Rama codex/0.1c-web con commits separados para scaffold, integración HTTP y documentación. Build y typecheck globales correctos; 18 pruebas pasan; Chrome verifica API detenida/disponible, reintento, teclado y anchuras 320–1440 px. 0.1b ya integrada por el propietario mediante PR #2. PR de 0.1c pendiente de revisión y merge manual | Revisar/mergear PR; después CP0-A |
 
 Plantilla para cada cierre:
 ```text

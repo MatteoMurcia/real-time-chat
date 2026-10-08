@@ -8,9 +8,10 @@ connection failures.
 
 ## Project status
 
-The NestJS API scaffold runs locally and exposes a liveness endpoint. Environment
-validation, HTTP tests, and strict TypeScript checks are available. The web app,
-database, chat features, and Docker setup are still pending.
+The Angular web scaffold and NestJS API run locally. The initial page checks API
+liveness and displays loading, failure, and recovery states. Environment
+validation, HTTP/component tests, and strict TypeScript checks are available.
+Database, chat features, and Docker setup are still pending.
 
 The implementation checklist is maintained in [tasks/plan.md](tasks/plan.md).
 Product choices and scope are documented in
@@ -67,7 +68,8 @@ the relevant workspace when it exists, and avoid nested lockfiles. New direct
 dependencies are saved with exact versions.
 
 The workspace patterns use `apps/*` for applications and `packages/*` for shared
-contracts. The first workspace is `@real-time-chat/api` in `apps/api`. TypeScript
+contracts. Workspaces are `@real-time-chat/api` in `apps/api` and
+`@real-time-chat/web` in `apps/web`. TypeScript
 projects extend `tsconfig.base.json`, with module, target, and framework options
 defined in their own configuration.
 
@@ -116,6 +118,35 @@ require `.env` or a running API. For development, run
 `npm run build:watch --workspace @real-time-chat/api` in one terminal and, after
 the first build, `npm run start:watch --workspace @real-time-chat/api` in another.
 Lint and CI will be configured in task 0.3b.
+
+## Run the web
+
+With the API running in one terminal, open another at the repository root:
+
+```text
+npm run start:web
+```
+
+Open <http://127.0.0.1:4200>. The page requests `/api/health/live` on the same
+origin. Angular's development server proxies `/api/**` to `127.0.0.1:3000` using
+`apps/web/proxy.conf.json`. If you change the API port, update that target and
+restart the web server. This proxy only applies to development; serving the
+production build with an API reverse proxy belongs to the Docker setup in 0.2c.
+
+Stop the API and select **Check again** to see the error state. Restart it and
+select **Try again** to recover. A request times out after five seconds, and
+the button stays disabled while loading. This is a manual liveness check, not
+continuous monitoring or messaging readiness.
+
+Angular 22.2.1 uses standalone components, signals and strict template checking;
+the CLI/build tools are pinned to 22.2.2. The shell has a single Overview page,
+semantic navigation and a keyboard skip link. Routing will be added with the
+first additional screen.
+
+Root `npm run build`, `npm run typecheck` and `npm test` check both applications.
+Use `npm run build --workspace @real-time-chat/web` (or `typecheck` / `test`) for
+web-only checks. Component tests use Angular's HTTP testing backend and Vitest;
+no running API is required. Production web output is in `apps/web/dist/browser`.
 
 ## Local execution target
 
