@@ -10,6 +10,7 @@ export class DatabaseService extends PrismaClient implements OnModuleInit, OnMod
   async onModuleInit(): Promise<void> {
     try {
       await this.$connect();
+      await this.$queryRaw`SELECT 1`;
     } catch {
       await this.$disconnect();
       throw new Error('Database connection failed');

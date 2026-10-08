@@ -11,6 +11,8 @@
     "prebuild": "npm run db:generate",
     "pretypecheck": "npm run db:generate",
     "pretest": "npm run db:generate",
+    "pretest:integration": "npm run db:generate",
+    "test:integration": "tsc -p tsconfig.test.json && node --env-file-if-exists=../../.env --test dist-test/test/integration/*.spec.js",
     "build": "tsc -p tsconfig.build.json",
     "start": "node --env-file-if-exists=../../.env dist/main.js",
     "build:watch": "tsc -p tsconfig.build.json --watch",
