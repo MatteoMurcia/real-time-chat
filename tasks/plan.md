@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-08 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A y 0.2a–0.2c integrados; 0.2d implementada, pendiente de revisión y merge del propietario.
+Revisión: 3 · Actualización: 2026-10-08 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A y 0.2a–0.2d integrados; revisión CP0-D en curso.
 
 ## 1. Cómo usar este plan
 
@@ -363,12 +363,12 @@ Resultado (2026-10-08): **superado** sobre main `e6664d6`.
   - Verificar: config --quiet, arranque desde volumen nuevo, logs/health, down y nuevo up conservando datos.
   - Archivos: apps/web/Dockerfile, apps/api/Dockerfile, compose.yaml, docker/nginx.conf, .dockerignore.
   - Evidencia: imágenes multi-stage construidas con 16 pruebas API y 3 web en Linux; 2 pruebas de URL/credenciales. Stack healthy y live HTTP 200 en navegador mediante Nginx; solo web publicado en loopback, API/web no root. Clon local limpio sin dependencias del host y volumen nuevo verificados; migración exitosa antes de API; fallo controlado exit 17 bloquea API/web. Registro conserva datos tras down/up. Runtime sin Prisma CLI/TypeScript; motor de migración incluido al construir la imagen. Override compose.host.yaml explícito verificado con 6 resultados de integración. Stack detenido, volumen principal conservado y volumen de prueba eliminado.
-- [x] **0.2d — Preparar desarrollo en contenedores** · M · Depende de: 0.2c. Implementada en rama; merge pendiente del propietario.
+- [x] **0.2d — Preparar desarrollo en contenedores** · M · Depende de: 0.2c. Integrada mediante PR #8 por el propietario.
   - Trabajo: override de desarrollo con recarga de web/API y dependencias internas; instrucciones Windows y Unix.
   - Aceptación: editar código actualiza el servicio sin reconstruir todo; node_modules del host no pisa dependencias Linux.
   - Verificar: modificar un texto y un handler temporalmente, comprobar recarga y restaurar; comprobar paridad con build normal.
-    - Archivos: compose.dev.yaml, Dockerfiles web/API, README.md.
-    - Evidencia: Compose Watch 5.5.1 en Windows sincroniza texto Angular sin refrescar el navegador y reinicia/recompila API al editar su handler. Respuesta temporal HTTP confirmada; ambos cambios restaurados y recargados. Identificadores de imágenes iguales antes/después; API/web con usuario node y sin mounts del host. Typecheck de ambos servicios correcto dentro de Docker. Dependencias/configuración/esquema requieren down y up --build --watch explícitos; comandos compatibles con PowerShell y Unix documentados.
+  - Archivos: compose.dev.yaml, Dockerfiles web/API, README.md.
+  - Evidencia: Compose Watch 5.5.1 en Windows sincroniza texto Angular sin refrescar el navegador y reinicia/recompila API al editar su handler. Respuesta temporal HTTP confirmada; ambos cambios restaurados y recargados. Identificadores de imágenes iguales antes/después; API/web con usuario node y sin mounts del host. Typecheck de ambos servicios correcto dentro de Docker. Dependencias/configuración/esquema requieren down y up --build --watch explícitos; comandos compatibles con PowerShell y Unix documentados.
 
 **Checkpoint CP0-D:** demo base y desarrollo funcionan en Docker; el host no necesita instalar herramientas del stack.
 
