@@ -3,9 +3,16 @@ import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { createApp } from '../src/app.js';
+import { Module } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { LiveController } from '../src/health/live.controller.js';
+
+@Module({ controllers: [LiveController] })
+class HealthTestModule {}
 
 test('GET /api/health/live returns minimal JSON over HTTP', async (t) => {
-  const { app } = await createApp({ NODE_ENV: 'test', PORT: '3000' });
+  const app = await NestFactory.create(HealthTestModule, { logger: false });
+  app.setGlobalPrefix('api');
   t.after(() => app.close());
   await app.listen(0, '127.0.0.1');
 

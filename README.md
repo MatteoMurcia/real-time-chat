@@ -11,8 +11,9 @@ connection failures.
 The Angular web scaffold and NestJS API run locally. The initial page checks API
 liveness and displays loading, failure, and recovery states. Environment
 validation, HTTP/component tests, and strict TypeScript checks are available.
-PostgreSQL runs locally through Docker Compose with persistent storage. API
-database integration, chat features, and application containers are still pending.
+PostgreSQL runs locally through Docker Compose with persistent storage. Prisma
+manages the User/Session schema and the API database connection lifecycle.
+Authentication/chat features and application containers are still pending.
 
 The implementation checklist is maintained in [tasks/plan.md](tasks/plan.md).
 Product choices and scope are documented in
@@ -84,10 +85,13 @@ runner and real HTTP requests.
 ## Run the API
 
 Copy `.env.example` to `.env` in the repository root (`Copy-Item .env.example .env`
-in PowerShell, or `cp .env.example .env` on Unix). Then run:
+in PowerShell, or `cp .env.example .env` on Unix). Preserve an existing `.env`.
+Configure PostgreSQL as described below and set `DATABASE_URL` before running:
 
 ```text
 npm ci
+docker compose up -d --wait db
+npm run db:migrate:deploy --workspace @real-time-chat/api
 npm run build
 npm start
 ```
@@ -101,8 +105,10 @@ will be added when database integration exists. Stop the server with Ctrl+C.
 | `NODE_ENV` | Required: `development`, `test`, or `production` |
 | `PORT` | Required: integer from 1 through 65535 |
 | `HOST` | Optional IP address; defaults to `127.0.0.1`. Containers will use `0.0.0.0`. |
+| `DATABASE_URL` | Required PostgreSQL URL including a database name; keep credentials in `.env`. |
 
-Startup rejects missing/invalid configuration with a nonzero exit code.
+Startup rejects missing/invalid configuration or an unavailable database with a
+nonzero exit code. Nest closes the Prisma connection pool when the app closes.
 `npm start` loads the root `.env` if present; process environment variables take
 precedence. Validation errors name the variable without echoing its value.
 
@@ -185,8 +191,8 @@ it does not verify application migrations or readiness.
 | `POSTGRES_PORT` | Host port, defaults to `5432`; change if occupied |
 
 Only `127.0.0.1` exposes the database port for host development. A SQL client can
-connect with these values. This bootstrap administrator is for local setup;
-application roles and Prisma integration will be handled with database integration.
+connect with these values. The API uses this bootstrap administrator for local
+development; restricted application credentials belong to future deployment preparation.
 The complete container setup in 0.2c will move database access to the internal
 network. Changing initialization credentials in `.env` does not update an existing
 database; use SQL to change existing roles/passwords instead.
@@ -216,6 +222,59 @@ Remove only this test table with `DROP TABLE persistence_check;` afterwards.
 `docker compose down` removes the container/network but retains the named volume
 `real-time-chat_postgres_data`. **Do not use `down --volumes` to stop the stack:**
 it deletes the stored database. A volume provides persistence, not a backup.
+
+### Prisma and migrations
+
+Set `DATABASE_URL` in `.env` to
+`postgresql://USER:PASSWORD@127.0.0.1:5432/real_time_chat`, using your actual
+`POSTGRES_*` values and URL-encoding special characters in the credentials.
+The example intentionally leaves connection URLs empty; Compose interpolation
+does not apply to Node's environment loader. Prisma 7.10.0 uses the PostgreSQL
+driver adapter and an ESM client generated into ignored source files.
+
+```text
+npm run db:generate --workspace @real-time-chat/api
+npm run db:migrate:dev --workspace @real-time-chat/api -- --name describe_change
+npm run db:migrate:deploy --workspace @real-time-chat/api
+```
+
+Use `migrate:dev` only to create migrations on a development database (it needs
+permission to create a shadow database). Commit the schema and generated SQL
+migration together. Use `migrate:deploy` to apply committed migrations to a fresh
+database or later deployment; it never creates a migration or resets data. The
+API does not run migrations automatically. Build, typecheck and test commands
+generate the client first; after schema edits during watch mode, run
+`db:generate` again. Generation does not require a running database.
+
+The initial schema has UUID users, unique normalized email values, password
+hashes, and sessions with unique token hashes, expiry/user indexes and a foreign
+key that restricts user deletion. Email normalization and actual password/token
+hashing belong to the authentication tasks; these tables do not implement login.
+
+Integration tests use a **separate database whose name ends in `_test`**. Create
+it once in the local SQL session and set `TEST_DATABASE_URL` to its full URL:
+
+```sql
+CREATE DATABASE real_time_chat_test;
+```
+
+```text
+npm run test:integration --workspace @real-time-chat/api
+```
+
+The suite refuses a missing URL or the development database name, applies the
+committed migrations, checks constraints/rollback against real PostgreSQL, and
+removes only its own test records. It also checks that closing Nest releases its
+connection. The test database and migration history remain for subsequent runs.
+Ordinary `npm test` stays database-independent; integration tests are explicit
+and fail rather than skip when PostgreSQL/configuration is unavailable.
+
+CLI dependency overrides pin `deepmerge-ts` 8.0.2 and `mysql2` 3.24.5 to address
+[recursive merge exhaustion](https://github.com/advisories/GHSA-ggr8-5vv4-36mx),
+[MySQL authentication downgrade](https://github.com/advisories/GHSA-3f6p-5ww8-9rcr)
+and [decompression exhaustion](https://github.com/advisories/GHSA-rgwj-5xj2-c3m3).
+Remove these overrides when a stable Prisma release includes corrected versions;
+regenerate the lockfile and verify generation/migrations before doing so.
 
 ### Complete application (planned)
 
