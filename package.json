@@ -20,6 +20,10 @@
     "typecheck": "npm run typecheck --workspaces",
     "test": "npm test --workspaces"
   },
+  "overrides": {
+    "@prisma/config": { "deepmerge-ts": "8.0.2" },
+    "prisma": { "mysql2": "3.24.5" }
+  },
   "devDependencies": {
     "typescript": "6.0.3"
   }

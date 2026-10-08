@@ -7,6 +7,7 @@ out/
 .angular/
 .cache/
 *.tsbuildinfo
+apps/api/src/generated/prisma/
 
 # Local environment files; templates belong in version control
 .env
