@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-08 · Estado: tareas 0.0a–0.0c y 0.1a–0.1b integradas; 0.1c implementada y verificada en su rama, pendiente de revisión y merge del propietario.
+Revisión: 3 · Actualización: 2026-10-08 · Estado: tareas 0.0a–0.0c y 0.1a–0.1c integradas; CP0-A verificado, registro pendiente de revisión y merge del propietario.
 
 ## 1. Cómo usar este plan
 
@@ -327,7 +327,7 @@ S = cambio pequeño; M = sesión de hasta dos horas como objetivo. Los archivos 
   - Verificar: build API y prueba HTTP de live.
   - Archivos: `apps/api/package.json`, `src/main.ts`, `src/app.module.ts`, `src/health/live.controller.ts`, `test/health.spec.ts` dentro de apps/api salvo indicación.
   - Evidencia: NestJS 12.1.2; GET /api/health/live → 200 con status=ok; NODE_ENV/PORT obligatorios y HOST validado; npm ci, 15 pruebas con node:test, build y typecheck correctos. Arranque con npm start y .env comprobado; sin BD ni Docker todavía.
-- [x] **0.1c — Arrancar la web** · M · Depende de: 0.1a, 0.1b. Implementada en rama; merge pendiente del propietario.
+- [x] **0.1c — Arrancar la web** · M · Depende de: 0.1a, 0.1b. Integrada mediante PR #3 por el propietario.
   - Trabajo: scaffold Angular, shell con navegación mínima y proxy de desarrollo a API.
   - Aceptación: pantalla inicial consume live bajo el mismo origen; estados de carga/error visibles.
   - Verificar: build web y navegador con API disponible y detenida.
@@ -335,6 +335,15 @@ S = cambio pequeño; M = sesión de hasta dos horas como objetivo. Los archivos 
   - Evidencia: Angular 22.2.1 con CLI/build 22.2.2; proxy /api/**; carga, error, reintento y timeout de 5 s; 3 pruebas web y 15 API; build y typecheck de ambos workspaces. Chrome confirma error con API detenida y recuperación al arrancarla; sin desbordamiento a 320/768/1024/1440 px; enlace de salto mueve el foco a main. Commits incrementales publicados para revisión.
 
 **Checkpoint CP0-A:** web y API arrancan por los comandos documentados; revisar scaffolds y eliminar ejemplos innecesarios.
+
+Resultado (2026-10-08): **superado** sobre main `e6664d6`.
+- `npm run toolchain:versions`: Node 24.21.0, npm 12.1.0, TypeScript 6.0.3.
+- `npm run build`, `npm run typecheck` y `npm test`: correctos; 15 pruebas API y 3 web.
+- Comprobación de las pruebas: invertir temporalmente la condición de status provocó dos fallos esperados; código original restaurado sin cambios de aplicación.
+- `npm start` y `npm run start:web`: arranque correcto con la configuración local; live devuelve 200 y `{"status":"ok"}` tanto en el puerto 3000 como mediante el proxy del 4200.
+- Chrome muestra API disponible; al detener la API y repetir la comprobación muestra error y permite reintentar. Servidores de comprobación detenidos al finalizar.
+- Revisión de scaffolds: sin Hello World, páginas de ejemplo, servicios vacíos ni artefactos generados versionados. Los archivos actuales soportan arranque, configuración, interfaz o pruebas; no hace falta eliminar código.
+- Docker y proxy de producción siguen en 0.2c; lint y CI en 0.3b. No bloquean este checkpoint de arranque local.
 
 - [ ] **0.2a — Levantar PostgreSQL local** · S · Depende de: 0.1a.
   - Trabajo: Compose con volumen, health check y configuración ejemplo.
@@ -740,6 +749,8 @@ Decisiones explícitas:
 | 2026-10-07 | 0.1b — API NestJS | Rama chore/0.1b-api: instalación limpia, 15 pruebas, build y typecheck correctos; npm start comprobado con .env y HTTP 200; proceso de prueba detenido. PR para revisión y merge manual del propietario; protocolo registrado en CONTRIBUTING | Revisar/mergear PR; después 0.1c |
 
 | 2026-10-08 | 0.1c — Web Angular | Rama codex/0.1c-web con commits separados para scaffold, integración HTTP y documentación. Build y typecheck globales correctos; 18 pruebas pasan; Chrome verifica API detenida/disponible, reintento, teclado y anchuras 320–1440 px. 0.1b ya integrada por el propietario mediante PR #2. PR de 0.1c pendiente de revisión y merge manual | Revisar/mergear PR; después CP0-A |
+
+| 2026-10-08 | CP0-A — Arranque y scaffolds | Superado sobre main e6664d6: comandos documentados arrancan API y web; live 200 directo y por proxy; error visible al detener API; build/typecheck y 18 pruebas correctos. Sin ejemplos sobrantes. Rama docs/cp0-a-scaffold-review; nombres descriptivos registrados en CONTRIBUTING; registro pendiente de merge manual | 0.2a tras revisión |
 
 Plantilla para cada cierre:
 ```text
