@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-08 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A y 0.2a–0.2b integrados; 0.2c implementada y verificada, pendiente de revisión y merge del propietario.
+Revisión: 3 · Actualización: 2026-10-08 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A y 0.2a–0.2c integrados; 0.2d implementada, pendiente de revisión y merge del propietario.
 
 ## 1. Cómo usar este plan
 
@@ -357,17 +357,18 @@ Resultado (2026-10-08): **superado** sobre main `e6664d6`.
   - Verificar: migrar y probar restricciones de email/tokenHash con PostgreSQL real.
   - Archivos: `apps/api/prisma/schema.prisma`, migración generada, `src/database/database.service.ts`, `test/database.spec.ts`, `apps/api/package.json`.
   - Evidencia: Prisma 7.10.0, cliente ESM generado e ignorado; migración User/Session aplicada a BD vacía y repetida sin pendientes. Nest comprueba conexión al arrancar y libera pool al cerrar; DATABASE_URL validada sin exponer credenciales. 16 pruebas API, 3 web y 6 resultados de integración en BD separada real_time_chat_test (unicidad email/tokenHash, FK, rollback, cierre, fallo de conexión). npm ci, build y typecheck correctos; audit sin vulnerabilidades con overrides documentados del CLI. Pruebas en test/integration/database.spec.ts; datos de prueba eliminados y procesos detenidos.
-- [x] **0.2c — Ejecutar toda la aplicación con Compose** · M · Depende de: 0.1c, 0.2b. Implementada en rama; merge pendiente del propietario.
+- [x] **0.2c — Ejecutar toda la aplicación con Compose** · M · Depende de: 0.1c, 0.2b. Integrada mediante PR #7 por el propietario.
   - Trabajo: Dockerfiles web/API y Compose con red interna, volumen, proxy y tarea migrate; exponer solo web en loopback.
   - Aceptación: desde clon limpio, up --build --wait sirve la pantalla y conecta con BD sin Node/PostgreSQL en el host; un error de migración impide iniciar API.
   - Verificar: config --quiet, arranque desde volumen nuevo, logs/health, down y nuevo up conservando datos.
   - Archivos: apps/web/Dockerfile, apps/api/Dockerfile, compose.yaml, docker/nginx.conf, .dockerignore.
   - Evidencia: imágenes multi-stage construidas con 16 pruebas API y 3 web en Linux; 2 pruebas de URL/credenciales. Stack healthy y live HTTP 200 en navegador mediante Nginx; solo web publicado en loopback, API/web no root. Clon local limpio sin dependencias del host y volumen nuevo verificados; migración exitosa antes de API; fallo controlado exit 17 bloquea API/web. Registro conserva datos tras down/up. Runtime sin Prisma CLI/TypeScript; motor de migración incluido al construir la imagen. Override compose.host.yaml explícito verificado con 6 resultados de integración. Stack detenido, volumen principal conservado y volumen de prueba eliminado.
-- [ ] **0.2d — Preparar desarrollo en contenedores** · M · Depende de: 0.2c.
+- [x] **0.2d — Preparar desarrollo en contenedores** · M · Depende de: 0.2c. Implementada en rama; merge pendiente del propietario.
   - Trabajo: override de desarrollo con recarga de web/API y dependencias internas; instrucciones Windows y Unix.
   - Aceptación: editar código actualiza el servicio sin reconstruir todo; node_modules del host no pisa dependencias Linux.
   - Verificar: modificar un texto y un handler temporalmente, comprobar recarga y restaurar; comprobar paridad con build normal.
-  - Archivos: compose.dev.yaml, Dockerfiles web/API, README.md.
+    - Archivos: compose.dev.yaml, Dockerfiles web/API, README.md.
+    - Evidencia: Compose Watch 5.5.1 en Windows sincroniza texto Angular sin refrescar el navegador y reinicia/recompila API al editar su handler. Respuesta temporal HTTP confirmada; ambos cambios restaurados y recargados. Identificadores de imágenes iguales antes/después; API/web con usuario node y sin mounts del host. Typecheck de ambos servicios correcto dentro de Docker. Dependencias/configuración/esquema requieren down y up --build --watch explícitos; comandos compatibles con PowerShell y Unix documentados.
 
 **Checkpoint CP0-D:** demo base y desarrollo funcionan en Docker; el host no necesita instalar herramientas del stack.
 
@@ -760,6 +761,8 @@ Decisiones explícitas:
 | 2026-10-08 | 0.2b — Prisma y migración inicial | Rama feature/0.2b-prisma-user-sessions: commits incrementales de esquema/migración, ciclo de vida Nest, pruebas reales y documentación. Migración reproducible; 19 pruebas ordinarias y 6 resultados de integración correctos; instalación limpia, build/typecheck y arranque HTTP verificados. API y BD detenidas, volumen conservado. PR pendiente de revisión/merge manual | 0.2c tras revisión |
 
 | 2026-10-08 | 0.2c — Aplicación en Compose | Rama chore/0.2c-compose-application: imágenes, proxy y gate de migración verificados desde checkout limpio. Persistencia y bloqueo ante fallo comprobados; cinco commits incrementales de implementación/correcciones/documentación. Sin puertos API/BD en configuración base; override host opt-in probado. PR pendiente de revisión y merge manual | 0.2d tras revisión |
+
+| 2026-10-08 | 0.2d — Desarrollo en contenedores | Rama chore/0.2d-container-hot-reload: targets de desarrollo no root, proxy interno y Compose Watch sin montar dependencias del host. Recarga real de texto/handler y restauración comprobadas sin reconstruir imágenes. Typecheck API/web en Docker, 16 pruebas API, 3 web y 2 Docker correctas. Build normal y navegador verificados tras cambiar de modo. Stack detenido conservando el volumen. PR pendiente de revisión y merge manual | CP0-D tras revisión |
 
 Plantilla para cada cierre:
 ```text
