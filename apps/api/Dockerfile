@@ -15,6 +15,8 @@ COPY apps/api ./apps/api
 RUN npm test --workspace @real-time-chat/api && npm run build --workspace @real-time-chat/api
 
 FROM dependencies AS migrate
+# Download the migration engine at build time, before entering the internal network.
+RUN node node_modules/@prisma/engines/scripts/postinstall.js
 COPY apps/api/prisma ./apps/api/prisma
 COPY apps/api/prisma.config.ts ./apps/api/prisma.config.ts
 COPY docker/database-env.mjs ./docker/database-env.mjs
