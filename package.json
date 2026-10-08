@@ -14,10 +14,11 @@
   ],
   "scripts": {
     "toolchain:versions": "node --version && npm --version && tsc --version",
-    "build": "npm run build --workspace @real-time-chat/api",
+    "build": "npm run build --workspaces",
     "start": "npm start --workspace @real-time-chat/api",
-    "typecheck": "npm run typecheck --workspace @real-time-chat/api",
-    "test": "npm test --workspace @real-time-chat/api"
+    "start:web": "npm start --workspace @real-time-chat/web",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm test --workspaces"
   },
   "devDependencies": {
     "typescript": "6.0.3"

@@ -40,6 +40,10 @@ before enabling its protection. Subsequent changes use pull requests.
 
 ## Commit messages
 
+Implement, verify, and commit each coherent increment before starting the next.
+Push those commits individually so the PR shows the development process. Do not
+collapse the task into one commit or rewrite its history before owner review.
+
 Use `<type>: <short description>` in English. Supported types are `feat`, `fix`,
 `refactor`, `test`, `docs`, and `chore`. Add a body when the reason or tradeoff is
 not clear from the title.
@@ -62,8 +66,10 @@ fix: reuse message identifiers when retrying unconfirmed sends
 - For documentation changes, verify links and consistency with the implemented
   state. Never describe planned commands or features as already working.
 
-Run `npm test`, `npm run typecheck`, and `npm run build` for API changes. The API
-uses Node's built-in test runner, including real HTTP checks. CI is still pending;
+Run `npm test`, `npm run typecheck`, and `npm run build` from the root to check
+both applications, or use `--workspace` to check one application during an
+increment. The API uses Node's built-in test runner, including real HTTP checks;
+the web uses Angular's Vitest runner with HTTP testing utilities. CI is still pending;
 do not add placeholder success checks. Task **0.3b** introduces the CI
 workflow and registers its actual successful job names as required checks on
 `main`. Later tasks extend those checks with integration and E2E coverage.
