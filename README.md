@@ -11,9 +11,9 @@ connection failures.
 The Angular web scaffold and NestJS API run locally. The initial page checks API
 liveness and displays loading, failure, and recovery states. Environment
 validation, HTTP/component tests, and strict TypeScript checks are available.
-PostgreSQL runs locally through Docker Compose with persistent storage. Prisma
-manages the User/Session schema and the API database connection lifecycle.
-Authentication/chat features and application containers are still pending.
+The web, API, PostgreSQL and migration job run locally through Docker Compose.
+Prisma manages the User/Session schema and the API database connection lifecycle.
+Authentication/chat features and container hot reload are still pending.
 
 The implementation checklist is maintained in [tasks/plan.md](tasks/plan.md).
 Product choices and scope are documented in
@@ -45,7 +45,51 @@ outside the initial scope.
 | Local runtime | Docker Compose |
 | Verification | Unit and integration tests, Playwright E2E, GitHub Actions |
 
-## Development toolchain
+## Run everything with Docker
+
+Only Git and Docker with Compose are required on the host. Use Linux containers
+in Docker Desktop on Windows/macOS. Copy `.env.example` to `.env` if it does not
+exist, fill `POSTGRES_PASSWORD` with a private password, and keep the example
+database/user names (or choose your own). See the password generation examples
+below. Preserve the credentials for an existing database volume.
+
+```text
+docker compose config --quiet
+docker compose up --build --wait
+```
+
+Open <http://127.0.0.1:8080>. The Angular page should show **API is reachable**.
+Change `WEB_PORT` in `.env` if port 8080 is occupied. Only this web port is
+published, on loopback. API and database communicate through an internal network.
+The containers build their database URL from `POSTGRES_*`, escaping credentials;
+host `DATABASE_URL`, `NODE_ENV`, `HOST` and `PORT` values do not configure them.
+You may leave `DATABASE_URL` and `TEST_DATABASE_URL` blank for this Docker flow.
+
+Startup order is database healthy → migration exits successfully → API healthy
+→ web healthy. `migrate` showing **Exited (0)** is expected. If it fails, API/web
+do not start; inspect `docker compose logs migrate` and fix the cause before
+retrying. An already running API must be stopped before applying a new migration:
+run `docker compose down` followed by the startup command for an updated build.
+This preserves the database volume and ensures the startup gate applies.
+
+```text
+docker compose ps -a
+docker compose logs --tail 50 migrate api web
+docker compose down
+```
+
+Use `down` without `--volumes` to retain data. Images use pinned Node 24.21.0,
+npm 12.1.0, Nginx 1.30.5 and PostgreSQL 18.6 versions. API/web builds run their
+tests inside Linux; final API/web processes run as non-root users. Migration
+tools are in a separate image target. Source edits require rebuilding for now;
+the development hot-reload override belongs to 0.2d.
+
+`npm run test:docker` checks container URL construction (including reserved
+characters in credentials) without starting Docker. The images exclude local
+environment files, generated output, dependencies and private key files from
+their build context.
+
+## Optional host development toolchain
 
 | Tool | Pinned version |
 | --- | --- |
@@ -82,7 +126,7 @@ planned frameworks and npm 12.1.0. The API uses NestJS 12.1.2 with ESM and the
 Express adapter. Compilation uses TypeScript directly; tests use Node's built-in
 runner and real HTTP requests.
 
-## Run the API
+## Run the API on the host
 
 Copy `.env.example` to `.env` in the repository root (`Copy-Item .env.example .env`
 in PowerShell, or `cp .env.example .env` on Unix). Preserve an existing `.env`.
@@ -90,7 +134,7 @@ Configure PostgreSQL as described below and set `DATABASE_URL` before running:
 
 ```text
 npm ci
-docker compose up -d --wait db
+docker compose -f compose.yaml -f compose.host.yaml up -d --wait db
 npm run db:migrate:deploy --workspace @real-time-chat/api
 npm run build
 npm start
@@ -126,7 +170,7 @@ require `.env` or a running API. For development, run
 the first build, `npm run start:watch --workspace @real-time-chat/api` in another.
 Lint and CI will be configured in task 0.3b.
 
-## Run the web
+## Run the web on the host
 
 With the API running in one terminal, open another at the repository root:
 
@@ -138,7 +182,7 @@ Open <http://127.0.0.1:4200>. The page requests `/api/health/live` on the same
 origin. Angular's development server proxies `/api/**` to `127.0.0.1:3000` using
 `apps/web/proxy.conf.json`. If you change the API port, update that target and
 restart the web server. This proxy only applies to development; serving the
-production build with an API reverse proxy belongs to the Docker setup in 0.2c.
+production build uses the Nginx API reverse proxy in the Docker setup above.
 
 Stop the API and select **Check again** to see the error state. Restart it and
 select **Try again** to recover. A request times out after five seconds, and
@@ -188,13 +232,17 @@ it does not verify application migrations or readiness.
 | `POSTGRES_DB` | Required database name; example: `real_time_chat` |
 | `POSTGRES_USER` | Required bootstrap administrator; example: `chat_local` |
 | `POSTGRES_PASSWORD` | Required private password, no default |
-| `POSTGRES_PORT` | Host port, defaults to `5432`; change if occupied |
+| `POSTGRES_PORT` | Optional host development port, defaults to `5432`; only used by `compose.host.yaml` |
+| `WEB_PORT` | Docker web port, defaults to `8080` |
 
-Only `127.0.0.1` exposes the database port for host development. A SQL client can
-connect with these values. The API uses this bootstrap administrator for local
+By default PostgreSQL has no published port. To use a host SQL client, Prisma or
+the host API, explicitly start it with
+`docker compose -f compose.yaml -f compose.host.yaml up -d --wait db`.
+That override publishes `127.0.0.1:${POSTGRES_PORT}` only. Use the same `-f` pair
+for subsequent host-development Compose commands; the default stack needs no
+override. The API uses this bootstrap administrator for local
 development; restricted application credentials belong to future deployment preparation.
-The complete container setup in 0.2c will move database access to the internal
-network. Changing initialization credentials in `.env` does not update an existing
+Changing initialization credentials in `.env` does not update an existing
 database; use SQL to change existing roles/passwords instead.
 
 Open an authenticated TCP session using the client inside the container (the
@@ -242,7 +290,8 @@ Use `migrate:dev` only to create migrations on a development database (it needs
 permission to create a shadow database). Commit the schema and generated SQL
 migration together. Use `migrate:deploy` to apply committed migrations to a fresh
 database or later deployment; it never creates a migration or resets data. The
-API does not run migrations automatically. Build, typecheck and test commands
+API does not run migrations itself; Compose runs the separate migration job.
+Build, typecheck and test commands
 generate the client first; after schema edits during watch mode, run
 `db:generate` again. Generation does not require a running database.
 
@@ -276,15 +325,10 @@ and [decompression exhaustion](https://github.com/advisories/GHSA-rgwj-5xj2-c3m3
 Remove these overrides when a stable Prisma release includes corrected versions;
 regenerate the lockfile and verify generation/migrations before doing so.
 
-### Complete application (planned)
+### Remaining delivery work
 
-The application will run locally in containers. The completed setup will include
-the frontend, API, database, migrations, and an explicit demo seed command.
-Running the demo should require Git and Docker with Compose, without installing
-Node.js or PostgreSQL on the host.
-
-Containers, environment configuration, and documented migrations will make a
-later deployment easier. Remote hosting is outside the current delivery scope.
+Container hot reload, application features and demo seed data remain in the plan.
+Remote hosting is outside the current delivery scope.
 
 ## Repository hygiene
 
