@@ -24,7 +24,10 @@
         },
         "serve": {
           "builder": "@angular/build:dev-server",
-          "options": { "buildTarget": "web:build:development" }
+          "options": { "buildTarget": "web:build:development", "proxyConfig": "proxy.conf.json" }
+        },
+        "test": {
+          "builder": "@angular/build:unit-test"
         }
       }
     }

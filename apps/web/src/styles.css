@@ -23,3 +23,8 @@ p { color: var(--muted); line-height: 1.6; }
 :focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
 .skip-link { position: absolute; top: -5rem; left: 1rem; padding: 1rem; background: var(--surface); }
 .skip-link:focus { top: .5rem; }
+section { margin-top: 2rem; padding: 1.5rem; border: 1px solid var(--line); border-radius: .5rem; background: var(--surface); }
+h2 { margin-top: 0; font-size: 1.25rem; }
+button { min-height: 2.75rem; padding: .75rem 1rem; border: 0; border-radius: .25rem; background: var(--accent); color: var(--surface); font: inherit; font-weight: 600; cursor: pointer; }
+button:disabled { background: var(--muted); cursor: wait; }
+.note { font-size: .875rem; margin-bottom: 0; }
