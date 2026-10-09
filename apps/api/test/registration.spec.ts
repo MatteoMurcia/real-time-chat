@@ -48,6 +48,8 @@ test('preauth CSRF binds signed tokens to a cookie, origin and expiry', () => {
     assert.throws(() => csrf.verify(invalid), /Forbidden/);
   }
   assert.throws(() => new CsrfService(origin).verify(headers), /Forbidden/);
+  const forged = `${issued.csrfToken.slice(0, -1)}${issued.csrfToken.endsWith('0') ? '1' : '0'}`;
+  assert.throws(() => csrf.verify({ ...headers, cookie: `chat_preauth=${forged}`, 'x-csrf-token': forged }), /Forbidden/);
   const other = csrf.issue({ origin });
   assert.throws(() => csrf.verify({ ...headers, 'x-csrf-token': other.csrfToken }), /Forbidden/);
   now += 600_000;

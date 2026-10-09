@@ -33,7 +33,9 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
       target: runtime
-    environment: *database-environment
+    environment:
+      <<: *database-environment
+      APP_ORIGIN: ${APP_ORIGIN:-http://127.0.0.1:8080}
     networks: [backend]
     init: true
     depends_on:

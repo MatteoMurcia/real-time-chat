@@ -1,3 +1,5 @@
+import type { FieldErrors } from './auth.js';
+
 export const errorCodes = [
   'VALIDATION_ERROR', 'UNAUTHENTICATED', 'FORBIDDEN', 'NOT_FOUND',
   'CONFLICT', 'RATE_LIMITED', 'INTERNAL_ERROR',
@@ -9,11 +11,19 @@ export interface ApiError {
   code: ErrorCode;
   message: string;
   requestId: string;
+  fieldErrors?: FieldErrors;
 }
 
 export function isApiError(value: unknown): value is ApiError {
   if (typeof value !== 'object' || value === null) return false;
   const error = value as Record<string, unknown>;
+  if (error.fieldErrors !== undefined) {
+    if (error.code !== 'VALIDATION_ERROR' || !error.fieldErrors || typeof error.fieldErrors !== 'object'
+      || Array.isArray(error.fieldErrors)
+      || !Object.entries(error.fieldErrors).every(([field, message]) =>
+        ['email', 'password', 'displayName'].includes(field)
+        && typeof message === 'string' && message.length > 0 && message.length <= 200)) return false;
+  }
   return typeof error.code === 'string'
     && errorCodes.some(code => code === error.code)
     && typeof error.message === 'string' && error.message.length > 0
