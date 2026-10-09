@@ -95,6 +95,9 @@ their build context.
 Use Docker Compose 2.32+ (verified with 5.5.1). The following commands work in
 PowerShell and Unix shells from the repository root, after configuring `.env`
 as above. Stop an existing stack before switching modes; data is retained.
+If this origin was opened with an older image, hard-refresh the browser once
+(Ctrl+Shift+R on Windows/Linux, Cmd+Shift+R on macOS) to discard previously cached
+bundles. The base server requires revalidation of its unversioned assets.
 
 ```text
 docker compose down
