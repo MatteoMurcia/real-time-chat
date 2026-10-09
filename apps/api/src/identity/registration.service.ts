@@ -1,10 +1,9 @@
-import { argon2, randomBytes } from 'node:crypto';
-import { promisify } from 'node:util';
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import type { FieldErrors, RegistrationRequest, RegistrationResponse } from '@real-time-chat/contracts/auth';
 import { DatabaseService } from '../database/database.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { ValidationError } from '../http/validation-error.js';
+import { hashPassword } from './password.js';
 
 export function validateRegistration(value: unknown): RegistrationRequest {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new BadRequestException();
@@ -29,15 +28,6 @@ export function validateRegistration(value: unknown): RegistrationRequest {
   }
   if (Object.keys(fields).length) throw new ValidationError(fields);
   return { email, displayName, password };
-}
-
-export async function hashPassword(password: string): Promise<string> {
-  const salt = randomBytes(16);
-  const hash = await promisify(argon2)('argon2id', {
-    message: password, nonce: salt, memory: 19456, passes: 2, parallelism: 1, tagLength: 32,
-  });
-  const base64 = (bytes: Buffer) => bytes.toString('base64').replace(/=+$/, '');
-  return `$argon2id$v=19$m=19456,t=2,p=1$${base64(salt)}$${base64(hash)}`;
 }
 
 @Injectable()

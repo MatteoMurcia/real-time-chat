@@ -8,7 +8,7 @@ import type { ErrorRequestHandler } from 'express';
 
 export async function createApp(env: NodeJS.ProcessEnv) {
   const config = loadConfig(env);
-  const app = await NestFactory.create<NestExpressApplication>(AppModule.register(config.databaseUrl, config.appOrigin), {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule.register(config.databaseUrl, config.appOrigin, config.sessionTtlSeconds), {
     abortOnError: false,
     bodyParser: false,
     logger: config.nodeEnv === 'test' ? false : ['log', 'warn', 'error'],
