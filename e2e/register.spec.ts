@@ -42,7 +42,16 @@ test('registers once through the real API, redirects, and handles duplicates and
   await page.keyboard.press('Enter');
   await expect(page.getByRole('button', { name: 'Creating account…' })).toBeDisabled();
   await page.keyboard.press('Enter');
+  const registered = page.waitForResponse(response => response.url().endsWith('/api/auth/register') && response.status() === 201);
   release();
+  const response = await registered;
+  const account = await response.json();
+  expect(Object.keys(account)).toEqual(['user']);
+  expect(Object.keys(account.user).sort()).toEqual(['createdAt', 'displayName', 'email', 'id']);
+  expect(account.user.email).toBe(email);
+  expect(JSON.stringify(account)).not.toContain('a unique test passphrase');
+  expect(response.headers()['cache-control']).toBe('no-store');
+  expect(response.headers()['set-cookie']).toBeUndefined();
   await expect(page).toHaveURL(/\/login\?registered=1$/);
   expect(attempts).toBe(1);
   await expect(page.getByRole('heading', { name: 'Account created' })).toBeFocused();
@@ -51,7 +60,12 @@ test('registers once through the real API, redirects, and handles duplicates and
 
   await page.goto('/register');
   await fill();
+  const rejected = page.waitForResponse(response => response.url().endsWith('/api/auth/register') && response.status() === 409);
   await page.getByRole('button', { name: 'Create account', exact: true }).click();
+  const duplicate = await (await rejected).json();
+  expect(Object.keys(duplicate).sort()).toEqual(['code', 'message', 'requestId']);
+  expect(duplicate.code).toBe('CONFLICT');
+  expect(JSON.stringify(duplicate)).not.toContain('a unique test passphrase');
   await expect(page.getByRole('alert')).toHaveText('An account already uses this email address.');
   await expect(page.getByRole('alert')).toBeFocused();
   await expect(page.getByLabel('Email address', { exact: true })).toHaveAttribute('aria-invalid', 'true');
