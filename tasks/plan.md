@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-09 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b y 1.1a integradas; 1.1b implementada y verificada, pendiente de revisión y merge del propietario. CP0-C y CP1-A pendientes.
+Revisión: 3 · Actualización: 2026-10-09 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a y 1.1b integradas; CP1-A verificado, pendiente de revisión y merge del propietario. CP0-C pendiente.
 
 ## 1. Cómo usar este plan
 
@@ -422,13 +422,13 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
   - Aceptación: cuenta persistida, duplicado controlado y ningún hash expuesto.
   - Verificar: integración válida, inválida, duplicada y petición sin protección CSRF.
   - Archivos: `packages/contracts/src/auth.ts`, `apps/api/src/identity/registration.service.ts`, `registration.controller.ts`, `csrf.service.ts`, `apps/api/test/registration.spec.ts`.
-- [x] **1.1b — Completar registro desde Angular** · M · Depende de: 1.1a, 0.1c. Implementada en rama; revisión y merge pendientes del propietario.
+- [x] **1.1b — Completar registro desde Angular** · M · Depende de: 1.1a, 0.1c. Integrada mediante PR #14.
   - Trabajo: formulario accesible y cliente de identidad; tras éxito dirigir a login.
   - Aceptación: validaciones comprensibles, estado de envío y prevención de doble submit.
   - Verificar: navegador/primer E2E de registro, incluyendo error servidor.
   - Archivos: `apps/web/src/app/features/auth/register.ts`, `register.html`, `apps/web/src/app/core/auth-client.ts`, rutas web, `e2e/register.spec.ts`.
 
-**Checkpoint CP1-A:** cuenta creada desde navegador; BD y respuesta no filtran credenciales.
+**Checkpoint CP1-A — VERIFICADO (2026-10-09):** cuenta creada desde navegador; PostgreSQL almacena hashes Argon2id y las respuestas solo exponen campos públicos. Evidencia detallada al final del documento; revisión y merge pendientes del propietario.
 
 - [ ] **1.2a — Crear y consultar sesiones** · M · Depende de: 1.1a.
   - Trabajo: login, cookie segura, hash de token, expiración absoluta y /me.
@@ -842,3 +842,17 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Diseño mantiene colores y tipografía existentes, formulario de una columna y controles nativos. Comprobados 320/768/1024/1440 px sin overflow; capturas de 320 y 1440 revisadas visualmente. No se afirma una auditoría completa WCAG ni pruebas con lector de pantalla.
 - El job Containers ejecuta ahora el primer E2E contra su stack temporal; README documenta la ejecución local aislada y sus cuentas sintéticas. Dependencias Angular forms/router fijadas a la versión existente; Playwright únicamente en desarrollo.
 - CP1-A queda pendiente de revisión explícita después del merge manual; CP0-C continúa pendiente. Sin despliegue remoto ni merge automático.
+
+### Evidencia CP1-A — Registro y protección de credenciales (2026-10-09)
+
+- Base revisada: `main` en `735dff7`, con PR #14 integrada. Rama `chore/cp1-a-registration-checkpoint`. Resultado: sin hallazgos bloqueantes para este checkpoint; no se modifican los flujos de aplicación.
+- Recorrido revisado: formulario → cliente HTTP/CSRF → controlador → validación/Argon2id → Prisma/PostgreSQL → respuesta pública. Se conserva validación autoritativa en API, selección explícita de campos, restricción única y errores seguros.
+- Stack aislado `cp1a-verification`, PostgreSQL nuevo `cp1a_test`, frontend por Nginx en puerto 18084. Build de Compose y arranque saludable; sin utilizar ni modificar el volumen principal.
+- E2E Chromium correcto: alta 201, redirección a login, doble submit bloqueado, duplicado 409, fallo 500 simulado y recuperación. Se añaden aserciones permanentes sobre las claves exactas de éxito/error, ausencia de contraseña, `Cache-Control: no-store` y ausencia de cookie de sesión al registrar. Almacenamiento local/de sesión vacío.
+- Control negativo: inversión temporal de la aserción de campos públicos; el E2E falló exactamente en esa comprobación. Restaurado el archivo, la ejecución completa pasó. No queda código mutado.
+- Consulta directa de la BD temporal: tres cuentas creadas desde navegador (una del control negativo y dos del E2E completo), tres hashes diferentes para la misma contraseña sintética, formato Argon2id con parámetros esperados y reproducción criptográfica de cada hash con su salt. Emails normalizados; cero sesiones. Solo se mostraron conteos/resultados de comprobación, nunca hashes ni credenciales de infraestructura.
+- Logs de ejecución observados del stack: no contienen la contraseña sintética ni ninguno de los hashes almacenados. Esta comprobación cubre las rutas ejercitadas; no constituye una auditoría exhaustiva de futuros logs.
+- Verificación adicional: lint, typecheck, 21 pruebas API, 8 web, 3 contratos, 7 resultados de integración con PostgreSQL real, build y audit sin vulnerabilidades conocidas. CI ejecuta Quality y Containers con el E2E reforzado en esta PR.
+- Límites conservados: login/sesiones en 1.2a y rate limiting en 4.1a; CSRF preauth para una instancia. CP0-C sigue pendiente y no se certifica un despliegue público.
+- Siguiente tarea: **1.2a — Crear y consultar sesiones**, después de revisión y merge manual de esta PR.
+- Limpieza final: stack y volumen temporales eliminados tras verificar su etiqueta de proyecto; `real-time-chat_postgres_data` conservado.
