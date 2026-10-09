@@ -13,8 +13,8 @@ liveness and displays loading, failure, and recovery states. Environment
 validation, HTTP/component tests, and strict TypeScript checks are available.
 The web, API, PostgreSQL and migration job run locally through Docker Compose.
 Prisma manages the User/Session schema and the API database connection lifecycle.
-Container development supports automatic source reload. Authentication/chat
-features are still pending.
+Container development supports automatic source reload. Account registration is
+available through the API; its Angular form, login/sessions and chat remain pending.
 
 The implementation checklist is maintained in [tasks/plan.md](tasks/plan.md).
 Product choices and scope are documented in
@@ -413,6 +413,60 @@ regenerate the lockfile and verify generation/migrations before doing so.
 
 Application features and demo seed data remain in the plan.
 Remote hosting is outside the current delivery scope.
+
+## Account registration API
+
+Set `APP_ORIGIN` to the exact browser origin, without a trailing slash. It defaults
+to `http://127.0.0.1:8080`; update it when changing `WEB_PORT`, using `localhost`
+instead of `127.0.0.1`, or running Angular on port 4200. HTTP is accepted only for
+loopback development; other origins require HTTPS. Restart the API after changes.
+
+1. `GET /api/auth/csrf` with the matching `Origin` (or same-origin browser
+   `Referer`) returns `{ "csrfToken": "…" }` and an HttpOnly pre-auth cookie.
+2. `POST /api/auth/register` with that cookie, matching `Origin`,
+   `X-CSRF-Token`, and `Content-Type: application/json` accepts:
+
+   ```json
+   { "email": "person@example.test", "displayName": "María", "password": "a long unique passphrase" }
+   ```
+
+3. Success is `201` with `{ "user": { "id": "…", "email": "…",
+   "displayName": "…", "createdAt": "…" } }`. No password hash or session is
+   returned. The UI will continue to login in the next task.
+
+Email is trimmed and lowercased (ASCII email addresses, at most 254 characters);
+provider-specific dot/plus rewriting is not performed. Display names are trimmed,
+NFC-normalized, and accept 2–80 Unicode characters: letters, marks, numbers, spaces,
+apostrophes, periods and hyphens. Passwords preserve their exact input and accept
+15–128 Unicode characters, without composition rules. Unknown fields are rejected.
+
+Errors use the shared `ApiError` contract: `400 VALIDATION_ERROR` (optional safe
+`fieldErrors` for email/displayName/password), `403 FORBIDDEN` for missing or invalid
+CSRF/origin, `409 CONFLICT` for an existing normalized email, and
+`413 VALIDATION_ERROR` for JSON over 8 KB. Unexpected failures remain generic.
+Registration and token responses use `Cache-Control: no-store`.
+
+Passwords use Node's asynchronous native Argon2id with a random 16-byte salt,
+19 MiB memory, two iterations, one lane and a 32-byte hash, stored in PHC format.
+These parameters follow the
+[OWASP password storage guidance](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html).
+The [Node crypto API](https://nodejs.org/api/crypto.html#cryptoargon2algorithm-parameters-callback)
+is currently release-candidate stability; the repository pins its Node runtime and
+tests hash reproduction. No additional hashing runtime dependency is installed.
+
+Pre-auth CSRF uses a random nonce and expiry signed with HMAC-SHA256, matched
+between cookie and header, plus an exact origin check. The cookie expires after
+10 minutes, uses `Path=/`, HttpOnly and SameSite=Lax; HTTPS additionally uses
+Secure and the `__Host-` prefix. The signing key lives in one API process, so
+restart requires a fresh bootstrap. Multiple API replicas require shared key
+management; authenticated session binding belongs to the session task, following
+the [OWASP CSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html).
+Host/forwarded headers do not determine the trusted origin. Rate limiting remains
+in task 4.1a. Database uniqueness resolves concurrent duplicate registrations.
+
+Integration tests exercise these endpoints against real PostgreSQL, including
+concurrent duplicates, invalid fields, malformed/oversized JSON, CSRF failures,
+public response fields, and absence of an automatically created session.
 
 ## Continuous integration
 

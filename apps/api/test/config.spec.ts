@@ -10,7 +10,19 @@ test('loads a valid configuration with a loopback host by default', () => {
     port: 3000,
     host: '127.0.0.1',
     databaseUrl,
+    appOrigin: 'http://127.0.0.1:8080',
   });
+});
+
+test('accepts explicit origins and rejects unsafe or ambiguous origin configuration', () => {
+  const env = { NODE_ENV: 'test', PORT: '3000', DATABASE_URL: databaseUrl };
+  for (const APP_ORIGIN of ['https://chat.example', 'http://localhost:4200']) {
+    assert.equal(loadConfig({ ...env, APP_ORIGIN }).appOrigin, APP_ORIGIN);
+  }
+  for (const APP_ORIGIN of ['*', 'null', 'http://chat.example', 'https://chat.example/',
+    'https://user:password@chat.example', 'https://chat.example/path', 'https://chat.example?query']) {
+    assert.throws(() => loadConfig({ ...env, APP_ORIGIN }), /APP_ORIGIN must/);
+  }
 });
 
 test('accepts an explicit bind address for containers', () => {

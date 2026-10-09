@@ -28,5 +28,14 @@ export function loadConfig(env: NodeJS.ProcessEnv) {
     throw new Error('DATABASE_URL must be a PostgreSQL connection URL with a database name');
   }
 
-  return { nodeEnv, port, host, databaseUrl };
+  const appOrigin = env.APP_ORIGIN ?? 'http://127.0.0.1:8080';
+  try {
+    const url = new URL(appOrigin);
+    if (url.origin !== appOrigin || (url.protocol !== 'https:'
+      && !(url.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)))) throw new Error();
+  } catch {
+    throw new Error('APP_ORIGIN must be an HTTPS origin or a loopback HTTP origin without a path');
+  }
+
+  return { nodeEnv, port, host, databaseUrl, appOrigin };
 }
