@@ -55,3 +55,38 @@ it('times out a stalled request and cancels the pending HTTP operation', () => {
   expect(request.cancelled).toBe(true);
   expect(fixture.nativeElement.textContent).toContain('Unable to reach the API');
 });
+
+it('uses a validated error code instead of server text and clears it on retry', () => {
+  const fixture = TestBed.createComponent(App);
+  const http = TestBed.inject(HttpTestingController);
+  fixture.detectChanges();
+  http.expectOne('/api/health/live').flush({
+    code: 'RATE_LIMITED', message: '<script>private server detail</script>',
+    requestId: 'e3028dab-3a9d-4b02-9e28-d3b645f6a583',
+  }, { status: 429, statusText: 'Too Many Requests' });
+  fixture.detectChanges();
+  expect(fixture.nativeElement.textContent).toContain('Too many checks');
+  expect(fixture.nativeElement.textContent).not.toContain('private server detail');
+  fixture.nativeElement.querySelector('button').click();
+  http.expectOne('/api/health/live').flush(null, { status: 502, statusText: 'Bad Gateway' });
+  fixture.detectChanges();
+  expect(fixture.nativeElement.textContent).toContain('Unable to reach the API');
+  expect(fixture.nativeElement.textContent).not.toContain('Too many checks');
+});
+
+it('handles safe internal errors and rejects malformed contract bodies', () => {
+  const fixture = TestBed.createComponent(App);
+  const http = TestBed.inject(HttpTestingController);
+  fixture.detectChanges();
+  http.expectOne('/api/health/live').flush({
+    code: 'INTERNAL_ERROR', message: 'Private text',
+    requestId: 'e3028dab-3a9d-4b02-9e28-d3b645f6a583',
+  }, { status: 500, statusText: 'Server Error' });
+  fixture.detectChanges();
+  expect(fixture.nativeElement.textContent).toContain('The server could not complete the check');
+  fixture.nativeElement.querySelector('button').click();
+  http.expectOne('/api/health/live').flush({ code: 'RATE_LIMITED', message: 'Missing request ID' },
+    { status: 429, statusText: 'Too Many Requests' });
+  fixture.detectChanges();
+  expect(fixture.nativeElement.textContent).toContain('Unable to reach the API');
+});
