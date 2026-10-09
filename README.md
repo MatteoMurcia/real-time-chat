@@ -15,8 +15,8 @@ The web, API, PostgreSQL and migration job run locally through Docker Compose.
 Prisma manages the User/Session schema and the API database connection lifecycle.
 Container development supports automatic source reload. Account registration is
 available at `/register`, with validation, safe errors and submission feedback.
-Success redirects to `/login` with confirmation. Login and session restoration are
-available through the API; the login form, logout and chat remain pending.
+Success redirects to `/login` with confirmation. Sign-in opens `/workspace`,
+which restores the session before rendering. Logout and chat remain pending.
 
 The implementation checklist is maintained in [tasks/plan.md](tasks/plan.md).
 Product choices and scope are documented in
@@ -383,8 +383,8 @@ generate the client first; after schema edits during watch mode, run
 
 The initial schema has UUID users, unique normalized email values, password
 hashes, and sessions with unique token hashes, expiry/user indexes and a foreign
-key that restricts user deletion. Email normalization and actual password/token
-hashing belong to the authentication tasks; these tables do not implement login.
+key that restricts user deletion. The identity API normalizes email, hashes
+passwords/tokens, and validates sessions before returning the current user.
 
 Integration tests use a **separate database whose name ends in `_test`**. Create
 it once in the local SQL session and set `TEST_DATABASE_URL` to its full URL:
@@ -434,8 +434,8 @@ loopback development; other origins require HTTPS. Restart the API after changes
 
 3. Success is `201` with `{ "user": { "id": "…", "email": "…",
    "displayName": "…", "createdAt": "…" } }`. No password hash or session is
-   returned. The UI continues to `/login`, which currently confirms registration
-   and explains that the sign-in form is not yet available.
+   returned. The UI continues to `/login`, which confirms registration and offers
+   the sign-in form.
 
 Email is trimmed and lowercased (ASCII email addresses, at most 254 characters);
 provider-specific dot/plus rewriting is not performed. Display names are trimmed,
@@ -501,8 +501,8 @@ Sessions survive API restart because validation depends on the database, not an
 in-memory session map. Expired rows are rejected but are not automatically pruned.
 Changing the TTL affects newly issued sessions only.
 
-The login UI/restoration flow is task 1.2b; current-session logout and authenticated
-CSRF binding are task 1.2c. `/auth/csrf` currently issues pre-auth tokens for
+Current-session logout and authenticated CSRF binding are task 1.2c.
+`/auth/csrf` currently issues pre-auth tokens for
 registration/login; there are no authenticated mutation endpoints yet. Other
 sessions are not revoked on login. Rate limiting remains in task 4.1a.
 The design follows [OWASP session management guidance](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
@@ -511,7 +511,7 @@ not claim to implement every recommended control at this stage.
 
 ### Browser verification
 
-The registration form uses Angular reactive forms with native labels, autocomplete,
+The registration and login forms use Angular reactive forms with native labels, autocomplete,
 field descriptions, error focus and keyboard submission. The browser sends cookies
 on same-origin requests; the client fetches a fresh CSRF token for each attempt.
 It keeps credentials and tokens out of browser storage and URLs, prevents duplicate
@@ -519,7 +519,21 @@ submissions, and cancels requests on navigation. A 15-second timeout reports an
 unconfirmed outcome without automatically repeating a possibly completed POST.
 Server validation remains authoritative; server text is replaced with local copy.
 
-The first Playwright test uses Chromium against a real Compose stack. It creates
+`/workspace` is the first protected route. Its functional guard waits for `/auth/me`
+on each entry, including reload, and returns a redirect to the public login page
+on 401. The client stores only public session data in memory. Network failures,
+malformed responses and the five-second restoration timeout block access with a
+separate message and an explicit retry link. Login always targets `/workspace`;
+there is no user-controlled external redirect. Loading feedback is shown while
+checking, without rendering the protected view first.
+
+An expiry timer clears the in-memory identity and leaves the workspace when the
+reported absolute expiry is reached. This is a UI control; server-side session
+validation remains the authority, including when the client clock is inaccurate.
+The workspace currently confirms the signed-in identity and reserves space for
+future conversations. It does not simulate messaging or implement logout.
+
+The Playwright suite uses Chromium against a real Compose stack. It creates
 accounts, so use an isolated project and environment file. Copy `.env.example` to
 `.env.e2e`, set a private password, `WEB_PORT=18083` and
 `APP_ORIGIN=http://127.0.0.1:18083`, then run:
@@ -532,8 +546,11 @@ npx playwright install chromium
 Set `E2E_BASE_URL=http://127.0.0.1:18083` in your shell (`$env:E2E_BASE_URL =
 'http://127.0.0.1:18083'` in PowerShell; `export E2E_BASE_URL=http://127.0.0.1:18083`
 in Bash), then run `npm run test:e2e`. The suite requires this explicit URL. It
-checks a real registration and duplicate, an injected server failure followed by
-recovery, single submission, keyboard focus, and widths 320/768/1024/1440. Screenshots
+checks real registration/login, duplicates and wrong credentials, delayed session
+restoration, reload/navigation, anonymous 401, injected server failure and recovery,
+single submission, keyboard focus, and widths 320/768/1024/1440. Client expiry is
+tested by advancing the browser clock; real server expiry is covered by the API
+integration suite. Screenshots
 for visual review are written to ignored `test-results/`; traces are disabled.
 
 Stop only this test stack with `docker compose -p chat-e2e --env-file .env.e2e down`.
@@ -551,7 +568,7 @@ runs on every pull request targeting `main` and every push to `main`.
   isolated PostgreSQL 18.6 database.
 - **Containers:** build the Compose images, apply migrations to an empty volume,
   wait for healthy services, verify the public health response through Nginx,
-  and run the Chromium registration E2E against that stack.
+  and run the Chromium registration/session E2Es against that stack.
 
 Jobs use read-only repository permissions and actions pinned to commit SHAs.
 Only npm's download cache is reused, keyed by the lockfile; `npm ci` still checks

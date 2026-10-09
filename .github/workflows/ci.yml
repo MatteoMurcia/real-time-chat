@@ -91,7 +91,7 @@ jobs:
       - run: npm install --global npm@12.1.0
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - name: Register through the browser and real API
+      - name: Verify browser identity flows against the real API
         run: npm run test:e2e
         env:
           E2E_BASE_URL: http://127.0.0.1:8080
