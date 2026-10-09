@@ -1,24 +1,9 @@
 <a class="skip-link" href="#main">Skip to content</a>
 <header>
-  <a class="brand" href="/">Real-time Chat</a>
-  <nav aria-label="Main navigation"><a href="/" aria-current="page">Overview</a></nav>
+  <a class="brand" routerLink="/">Real-time Chat</a>
+  <nav aria-label="Main navigation">
+    <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" ariaCurrentWhenActive="page">Overview</a>
+    <a routerLink="/register" routerLinkActive="active" ariaCurrentWhenActive="page">Create account</a>
+  </nav>
 </header>
-<main id="main" tabindex="-1">
-  <p class="eyebrow">WORKSPACE OVERVIEW</p>
-  <h1>A place for your team’s conversations.</h1>
-  <p>Messaging is on its way. Start by checking your connection.</p>
-  <section aria-labelledby="connection-title">
-    <h2 id="connection-title">Connection</h2>
-    <p role="status" aria-live="polite">
-      @switch (status()) {
-        @case ('loading') { Checking connection… }
-        @case ('online') { API is reachable. }
-        @case ('error') { {{ errorMessage() }} }
-      }
-    </p>
-    <button type="button" (click)="checkConnection()" [disabled]="status() === 'loading'">
-      {{ status() === 'error' ? 'Try again' : 'Check again' }}
-    </button>
-    <p class="note">This checks the server connection. Messaging is not available yet.</p>
-  </section>
-</main>
+<main id="main" tabindex="-1"><router-outlet /></main>

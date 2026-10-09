@@ -2,11 +2,11 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { App } from './app';
+import { Overview } from './overview';
 
 beforeEach(() => {
   TestBed.configureTestingModule({
-    imports: [App],
+    imports: [Overview],
     providers: [provideHttpClient(), provideHttpClientTesting()],
   });
 });
@@ -17,7 +17,7 @@ afterEach(() => {
 });
 
 it('shows loading, an error and recovery through the retry button using the same origin', () => {
-  const fixture = TestBed.createComponent(App);
+  const fixture = TestBed.createComponent(Overview);
   const http = TestBed.inject(HttpTestingController);
   fixture.detectChanges();
   const element: HTMLElement = fixture.nativeElement;
@@ -38,7 +38,7 @@ it('shows loading, an error and recovery through the retry button using the same
 });
 
 it('does not report an invalid successful response as online', () => {
-  const fixture = TestBed.createComponent(App);
+  const fixture = TestBed.createComponent(Overview);
   fixture.detectChanges();
   TestBed.inject(HttpTestingController).expectOne('/api/health/live').flush({ status: 'unexpected' });
   fixture.detectChanges();
@@ -47,7 +47,7 @@ it('does not report an invalid successful response as online', () => {
 
 it('times out a stalled request and cancels the pending HTTP operation', () => {
   vi.useFakeTimers();
-  const fixture = TestBed.createComponent(App);
+  const fixture = TestBed.createComponent(Overview);
   fixture.detectChanges();
   const request = TestBed.inject(HttpTestingController).expectOne('/api/health/live');
   vi.advanceTimersByTime(5000);
@@ -57,7 +57,7 @@ it('times out a stalled request and cancels the pending HTTP operation', () => {
 });
 
 it('uses a validated error code instead of server text and clears it on retry', () => {
-  const fixture = TestBed.createComponent(App);
+  const fixture = TestBed.createComponent(Overview);
   const http = TestBed.inject(HttpTestingController);
   fixture.detectChanges();
   http.expectOne('/api/health/live').flush({
@@ -75,7 +75,7 @@ it('uses a validated error code instead of server text and clears it on retry', 
 });
 
 it('handles safe internal errors and rejects malformed contract bodies', () => {
-  const fixture = TestBed.createComponent(App);
+  const fixture = TestBed.createComponent(Overview);
   const http = TestBed.inject(HttpTestingController);
   fixture.detectChanges();
   http.expectOne('/api/health/live').flush({

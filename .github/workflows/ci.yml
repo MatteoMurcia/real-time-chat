@@ -83,6 +83,18 @@ jobs:
         run: docker compose up --build --wait --wait-timeout 120
       - name: Verify the public health endpoint
         run: test "$(curl --fail --silent --show-error http://127.0.0.1:8080/api/health/live)" = '{"status":"ok"}'
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm install --global npm@12.1.0
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Register through the browser and real API
+        run: npm run test:e2e
+        env:
+          E2E_BASE_URL: http://127.0.0.1:8080
       - name: Application diagnostics
         if: failure()
         run: docker compose ps -a && docker compose logs --tail 100
