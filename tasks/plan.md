@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-09 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d y CP0-D integrados; 0.3a implementada, pendiente de revisión y merge del propietario.
+Revisión: 3 · Actualización: 2026-10-09 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D y 0.3a integrados; CP0-B superado, evidencia pendiente de revisión y merge del propietario.
 
 ## 1. Cómo usar este plan
 
@@ -382,7 +382,7 @@ Resultado (2026-10-09): **superado con corrección de caché** sobre main `c7ff6
 - Regresión comprobada: después de cargar el build Nginx corregido, volver a desarrollo en el mismo origen/pestaña permite recibir otro cambio de texto automáticamente. Fuentes temporales restauradas; contenedores/redes/volumen del proyecto de prueba eliminados tras comprobar su etiqueta de propietario; `.env` temporal eliminado. Volumen principal `real-time-chat_postgres_data` conservado.
 - No se amplía el alcance: CI/lint siguen en 0.3b; contrato de errores en 0.3a. Validación realizada en Windows; no se afirma una ejecución en host Unix ni despliegue remoto.
 
-- [x] **0.3a — Establecer contrato de error** · S · Depende de: 0.1b, 0.1c. Implementada en rama; merge pendiente del propietario.
+- [x] **0.3a — Establecer contrato de error** · S · Depende de: 0.1b, 0.1c. Integrada mediante PR #10 por el propietario.
   - Trabajo: paquete contracts, error público y mapeo HTTP; mantenerlo limitado al recorrido actual.
   - Aceptación: un error validado contiene code/requestId sin stack; web puede interpretarlo.
   - Verificar: prueba del error y build de consumidores.
@@ -392,6 +392,15 @@ Resultado (2026-10-09): **superado con corrección de caché** sobre main `c7ff6
   - Verificación de desarrollo: Compose Watch arranca ambos consumidores no root con contracts compilado dentro de las imágenes. Handler temporal 429 devuelve RATE_LIMITED sin texto privado; Chrome muestra mensaje específico y recupera API disponible al restaurar/reintentar. Cambios temporales retirados; stack detenido conservando volumen.
 
 **Checkpoint CP0-B:** BD nueva migrada, errores seguros y tipos compartidos compilables.
+
+Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplicación.
+- Proyecto Docker aislado `cp0b-verification`, volumen nuevo y puerto web `127.0.0.1:18081`. `up --build --wait` correcto usando caché de las imágenes verificadas en 0.3a; migración inicial aplicada y API/web/BD healthy.
+- Segunda ejecución de `migrate deploy`: sin migraciones pendientes. Base separada `cp0b_test` creada vacía; suite de integración ejecutada dentro del target development no root, usando las credenciales temporales dentro del contenedor, sin publicar PostgreSQL.
+- Seis resultados de integración correctos: migración, unicidad email/token, claves foráneas y restricción de borrado, rollback, liveness con wiring real, cierre del pool y error de conexión sin URL privada. Consulta final: cero usuarios, cero sesiones y una migración completada en la base de prueba.
+- Prueba HTTP de errores y dos pruebas del guard compartido ejecutadas en Linux: tres resultados correctos; cubren códigos, JSON inválido, mensajes privados, requestId no confiable y cuerpos mal formados.
+- Comprobación externa vía Nginx: `/api/missing?token=private-probe` con cabecera requestId falsa devuelve 404/NOT_FOUND, UUID generado por servidor coincidente en cuerpo/cabecera y ningún dato privado ni stack; live devuelve `{"status":"ok"}`.
+- `npm run typecheck` correcto para API, Angular y contracts. Consumidores compilables en las imágenes; se reutiliza la evidencia de 17 pruebas API y 5 web del build integrado de 0.3a, sin presentarla como ejecución nueva.
+- Recursos y credenciales temporales eliminados tras comprobar la etiqueta del volumen de prueba. Volumen principal `real-time-chat_postgres_data` conservado. Sin hallazgos bloqueantes; CI/lint quedan en 0.3b.
 
 - [ ] **0.3b — Añadir CI inicial** · M · Depende de: 0.0c, 0.2d, 0.3a.
   - Trabajo: lint, tipos, pruebas existentes y build; PostgreSQL efímero para integración y caches reproducibles.
@@ -780,6 +789,8 @@ Decisiones explícitas:
 | 2026-10-09 | CP0-D — Demo y desarrollo Docker | Clon limpio de main c7ff6b4, BD nueva, build y 19 pruebas Linux correctos; recarga web/API, fallo de compilación y recuperación verificados. Corregida caché de bundles sin versión en Nginx y probado cambio de modo en la misma pestaña. Tres commits incrementales de estado/corrección/evidencia; PR pendiente de revisión y merge manual. Recursos temporales retirados, volumen principal conservado | 0.3a tras revisión |
 
 | 2026-10-09 | 0.3a — Contrato de error | Rama feature/0.3a-error-contract: paquete compartido validado, filtro HTTP global, interpretación por code en Angular y build Docker/host de consumidores. 24 pruebas correctas; mutación negativa, typecheck/build, 404 real, 429 temporal en navegador y recuperación verificados. Cuatro commits incrementales; PR pendiente de revisión y merge manual. No se agregaron dependencias externas ni endpoints de prueba permanentes | CP0-B tras revisión |
+
+| 2026-10-09 | CP0-B — Datos, errores y contratos | Verificado main 07bc90c con PostgreSQL nuevo y pruebas dentro de Docker: 6 resultados de integración y 3 de errores/contrato correctos. Migración repetible, cleanup de registros, 404 seguro vía Nginx y typecheck de consumidores verificados. Sin cambios de aplicación; dos commits de estado/evidencia. Recursos temporales eliminados; PR pendiente de revisión y merge manual | 0.3b tras revisión |
 
 Plantilla para cada cierre:
 ```text
