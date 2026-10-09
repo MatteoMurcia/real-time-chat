@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-09 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d y CP0-D integrados; 0.3a implementada, pendiente de revisión y merge del propietario.
+Revisión: 3 · Actualización: 2026-10-09 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D y 0.3a integrados; revisión CP0-B en curso.
 
 ## 1. Cómo usar este plan
 
@@ -382,7 +382,7 @@ Resultado (2026-10-09): **superado con corrección de caché** sobre main `c7ff6
 - Regresión comprobada: después de cargar el build Nginx corregido, volver a desarrollo en el mismo origen/pestaña permite recibir otro cambio de texto automáticamente. Fuentes temporales restauradas; contenedores/redes/volumen del proyecto de prueba eliminados tras comprobar su etiqueta de propietario; `.env` temporal eliminado. Volumen principal `real-time-chat_postgres_data` conservado.
 - No se amplía el alcance: CI/lint siguen en 0.3b; contrato de errores en 0.3a. Validación realizada en Windows; no se afirma una ejecución en host Unix ni despliegue remoto.
 
-- [x] **0.3a — Establecer contrato de error** · S · Depende de: 0.1b, 0.1c. Implementada en rama; merge pendiente del propietario.
+- [x] **0.3a — Establecer contrato de error** · S · Depende de: 0.1b, 0.1c. Integrada mediante PR #10 por el propietario.
   - Trabajo: paquete contracts, error público y mapeo HTTP; mantenerlo limitado al recorrido actual.
   - Aceptación: un error validado contiene code/requestId sin stack; web puede interpretarlo.
   - Verificar: prueba del error y build de consumidores.
