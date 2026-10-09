@@ -15,7 +15,8 @@ The web, API, PostgreSQL and migration job run locally through Docker Compose.
 Prisma manages the User/Session schema and the API database connection lifecycle.
 Container development supports automatic source reload. Account registration is
 available at `/register`, with validation, safe errors and submission feedback.
-Success redirects to `/login` with confirmation; login/sessions and chat remain pending.
+Success redirects to `/login` with confirmation. Login and session restoration are
+available through the API; the login form, logout and chat remain pending.
 
 The implementation checklist is maintained in [tasks/plan.md](tasks/plan.md).
 Product choices and scope are documented in
@@ -434,7 +435,7 @@ loopback development; other origins require HTTPS. Restart the API after changes
 3. Success is `201` with `{ "user": { "id": "…", "email": "…",
    "displayName": "…", "createdAt": "…" } }`. No password hash or session is
    returned. The UI continues to `/login`, which currently confirms registration
-   and explains that sign-in is not yet available.
+   and explains that the sign-in form is not yet available.
 
 Email is trimmed and lowercased (ASCII email addresses, at most 254 characters);
 provider-specific dot/plus rewriting is not performed. Display names are trimmed,
@@ -469,6 +470,44 @@ in task 4.1a. Database uniqueness resolves concurrent duplicate registrations.
 Integration tests exercise these endpoints against real PostgreSQL, including
 concurrent duplicates, invalid fields, malformed/oversized JSON, CSRF failures,
 public response fields, and absence of an automatically created session.
+
+## Login and sessions API
+
+Bootstrap CSRF with `GET /api/auth/csrf`, as for registration. Send
+`POST /api/auth/login` with JSON `{ "email": "person@example.test", "password":
+"a long unique passphrase" }`, the pre-auth cookie, matching origin and
+`X-CSRF-Token`. Email is trimmed/lowercased; the password is preserved exactly.
+Malformed request shapes return 400. Wrong credentials return the same safe
+`401 UNAUTHENTICATED` response for a missing account and a wrong password. Missing
+accounts still run Argon2id verification against an ephemeral dummy hash.
+
+Successful login returns `200` with `{ "user": { "id": "…", "email": "…",
+"displayName": "…", "createdAt": "…" }, "expiresAt": "…" }` and a session cookie.
+`GET /api/auth/me` with that cookie returns the same shape. Both responses use
+`Cache-Control: no-store`. Tokens and password hashes are never included in JSON.
+
+Every login generates a new opaque 32-byte random token, ignoring any supplied
+session identifier. Only its SHA-256 digest is stored in PostgreSQL for indexed
+lookup. The token is delivered through an HttpOnly, SameSite=Lax, `Path=/` cookie:
+`chat_session` on loopback HTTP; `__Host-chat_session` with Secure on HTTPS.
+`APP_ORIGIN` determines this policy, including when the API sits behind a proxy;
+the local production container image still supports loopback HTTP explicitly.
+
+`SESSION_TTL_SECONDS` defaults to 86400 (24 hours), accepting integers from 1 to
+604800 (7 days). Expiry is absolute and checked on every `/me` request; reads do
+not renew it. Missing, malformed, duplicate, unknown or expired session cookies
+return 401. Tokens in query parameters or Authorization headers are not accepted.
+Sessions survive API restart because validation depends on the database, not an
+in-memory session map. Expired rows are rejected but are not automatically pruned.
+Changing the TTL affects newly issued sessions only.
+
+The login UI/restoration flow is task 1.2b; current-session logout and authenticated
+CSRF binding are task 1.2c. `/auth/csrf` currently issues pre-auth tokens for
+registration/login; there are no authenticated mutation endpoints yet. Other
+sessions are not revoked on login. Rate limiting remains in task 4.1a.
+The design follows [OWASP session management guidance](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
+for random session identifiers, cookie controls and server-side expiry; it does
+not claim to implement every recommended control at this stage.
 
 ### Browser verification
 

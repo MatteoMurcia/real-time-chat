@@ -58,6 +58,7 @@ export class SessionService implements OnModuleInit {
     const session = await this.db.session.findUnique({
       where: { tokenHash: digest(token) }, select: { expiresAt: true, user: { select: publicUser } },
     });
+    // ponytail: expired rows are rejected; add periodic pruning if session-table growth warrants it.
     if (!session || session.expiresAt.getTime() <= this.now()) throw new UnauthorizedException();
     return { user: { ...session.user, createdAt: session.user.createdAt.toISOString() }, expiresAt: session.expiresAt.toISOString() };
   }

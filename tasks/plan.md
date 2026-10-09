@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-09 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a y 1.1b integradas; CP1-A verificado, pendiente de revisión y merge del propietario. CP0-C pendiente.
+Revisión: 3 · Actualización: 2026-10-09 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a implementada y verificada, pendiente de revisión y merge del propietario. CP0-C pendiente.
 
 ## 1. Cómo usar este plan
 
@@ -428,13 +428,13 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
   - Verificar: navegador/primer E2E de registro, incluyendo error servidor.
   - Archivos: `apps/web/src/app/features/auth/register.ts`, `register.html`, `apps/web/src/app/core/auth-client.ts`, rutas web, `e2e/register.spec.ts`.
 
-**Checkpoint CP1-A — VERIFICADO (2026-10-09):** cuenta creada desde navegador; PostgreSQL almacena hashes Argon2id y las respuestas solo exponen campos públicos. Evidencia detallada al final del documento; revisión y merge pendientes del propietario.
+**Checkpoint CP1-A — VERIFICADO (2026-10-09):** cuenta creada desde navegador; PostgreSQL almacena hashes Argon2id y las respuestas solo exponen campos públicos. Evidencia detallada al final del documento; integrado mediante PR #15.
 
-- [ ] **1.2a — Crear y consultar sesiones** · M · Depende de: 1.1a.
+- [x] **1.2a — Crear y consultar sesiones** · M · Depende de: 1.1a. Implementada en rama; revisión y merge pendientes del propietario.
   - Trabajo: login, cookie segura, hash de token, expiración absoluta y /me.
   - Aceptación: credenciales incorrectas dan error genérico; sesión válida se restaura y sesión caducada se rechaza.
   - Verificar: integración de cookie, token desconocido, expiración y CSRF en login.
-  - Archivos: `apps/api/src/identity/session.service.ts`, `session.controller.ts`, `session.guard.ts`, `apps/api/test/session.spec.ts`, contrato auth.
+  - Archivos: `apps/api/src/identity/session.service.ts`, `session.controller.ts`, `password.ts`, `apps/api/test/session.spec.ts`, integración de BD y contrato auth. `/me` valida directamente mediante el servicio; añadir guard al compartir protección entre más endpoints.
 - [ ] **1.2b — Integrar login y rutas protegidas** · M · Depende de: 1.2a, 1.1b.
   - Trabajo: pantalla login, estado de sesión y restauración antes de resolver rutas protegidas.
   - Aceptación: recarga mantiene sesión; 401 muestra acceso requerido y no crea bucles de redirección.
@@ -856,3 +856,16 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Límites conservados: login/sesiones en 1.2a y rate limiting en 4.1a; CSRF preauth para una instancia. CP0-C sigue pendiente y no se certifica un despliegue público.
 - Siguiente tarea: **1.2a — Crear y consultar sesiones**, después de revisión y merge manual de esta PR.
 - Limpieza final: stack y volumen temporales eliminados tras verificar su etiqueta de proyecto; `real-time-chat_postgres_data` conservado.
+
+### Evidencia 1.2a — Login y consulta de sesiones (2026-10-09)
+
+- Rama `feature/1.2a-api-sessions` desde `main` en `1d0f5e0`, con CP1-A integrado mediante PR #15. Commits incrementales de primitivas/contratos, endpoints/integración y documentación.
+- `POST /api/auth/login`: CSRF preauth y origen exacto, entrada acotada, email normalizado, contraseña preservada y verificación Argon2id compartida con registro. Usuario desconocido también ejecuta Argon2id; credenciales incorrectas devuelven el mismo 401 público.
+- Token opaco aleatorio de 256 bits nuevo en cada login, únicamente SHA-256 en BD. Cookie HttpOnly, SameSite=Lax y Path=/; HTTPS añade Secure y prefijo __Host-. `SESSION_TTL_SECONDS` configurable (1–604800), por defecto 86400; expiración absoluta sin renovación al leer. Sin cambio de esquema ni nuevas dependencias.
+- `GET /api/auth/me`: respuesta pública y expiresAt; rechaza cookie ausente, malformada, duplicada, desconocida o caducada. No acepta token por query. No se exponen token, hash ni ID interno de sesión en JSON.
+- Pruebas: 24 API, 8 web, 3 contratos, 2 Docker y 8 resultados de integración con PostgreSQL temporal; lint, typecheck, build y audit correctos. Integración verifica hash del token, ausencia de sesiones ante credenciales/CSRF inválidos, cookies HTTP/HTTPS, TTL, restauración con una nueva instancia API, dos sesiones independientes y límite exacto de caducidad.
+- Control negativo de revisión: cambiar temporalmente `expiresAt <= now` por `< now` hizo fallar la aserción de expiración exacta. Archivo restaurado; integración completa correcta de nuevo.
+- Docker/Nginx saludables; prueba de API desde Chromium: login 200, cookie de sesión oculta a JavaScript, almacenamiento vacío, /me 200 tras recarga y contexto anónimo 401. E2E de registro existente correcto. El formulario de login todavía corresponde a 1.2b.
+- Límites explícitos: sesiones caducadas se rechazan pero no se purgan automáticamente; CSRF vinculado a sesión se añadirá junto a logout en 1.2c, antes de introducir mutaciones autenticadas. Rate limiting permanece en 4.1a; no se certifica despliegue público.
+- Siguiente tarea: **1.2b — Integrar login y rutas protegidas**, tras revisión y merge manual. CP0-C sigue pendiente.
+- Limpieza: stack/volumen de verificación eliminados tras comprobar etiqueta de proyecto; volumen principal conservado.
