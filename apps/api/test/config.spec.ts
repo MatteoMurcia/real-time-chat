@@ -11,7 +11,18 @@ test('loads a valid configuration with a loopback host by default', () => {
     host: '127.0.0.1',
     databaseUrl,
     appOrigin: 'http://127.0.0.1:8080',
+    sessionTtlSeconds: 86400,
   });
+});
+
+test('bounds the configurable absolute session lifetime', () => {
+  const env = { NODE_ENV: 'test', PORT: '3000', DATABASE_URL: databaseUrl };
+  for (const ttl of ['1', '3600', '604800']) {
+    assert.equal(loadConfig({ ...env, SESSION_TTL_SECONDS: ttl }).sessionTtlSeconds, Number(ttl));
+  }
+  for (const ttl of ['', ' ', '0', '-1', '1.5', '1e3', '604801', 'Infinity']) {
+    assert.throws(() => loadConfig({ ...env, SESSION_TTL_SECONDS: ttl }), /SESSION_TTL_SECONDS/);
+  }
 });
 
 test('accepts explicit origins and rejects unsafe or ambiguous origin configuration', () => {

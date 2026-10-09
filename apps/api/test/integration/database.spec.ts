@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { createApp } from '../../src/app.js';
 import { DatabaseService } from '../../src/database/database.service.js';
 import { isApiError } from '@real-time-chat/contracts';
+import type { SessionResponse } from '@real-time-chat/contracts/auth';
+import { hashPassword } from '../../src/identity/password.js';
+import { SessionService } from '../../src/identity/session.service.js';
 
 test('migrations, user/session constraints and application connection lifecycle', async (t) => {
   const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -125,6 +128,97 @@ test('migrations, user/session constraints and application connection lifecycle'
       assert.equal(duplicate.code, 'CONFLICT');
     } finally {
       await db.user.deleteMany({ where: { email: registrationEmail } });
+    }
+  });
+
+  await t.test('login stores only token hashes and restores valid sessions with absolute expiry', async () => {
+    const origin = 'http://127.0.0.1:8080';
+    const endpoint = `${await app.getUrl()}/api/auth`;
+    const password = ' session test passphrase 🔐 ';
+    const member = await db.user.create({ data: { email: `${randomUUID()}@example.test`, displayName: 'Session test', passwordHash: await hashPassword(password) } });
+    try {
+      const input = { email: ` ${member.email.toUpperCase()} `, password };
+      const bootstrap = await fetch(`${endpoint}/csrf`, { headers: { origin } });
+      const { csrfToken } = await bootstrap.json() as { csrfToken: string };
+      const headers = { origin, 'content-type': 'application/json', cookie: bootstrap.headers.get('set-cookie')!.split(';')[0]!, 'x-csrf-token': csrfToken };
+      const login = (body = input, customHeaders = headers) => fetch(`${endpoint}/login`, { method: 'POST', headers: customHeaders, body: JSON.stringify(body) });
+      const me = (cookie = '') => fetch(`${endpoint}/me`, { headers: { cookie } });
+      for (const invalid of [{ ...headers, cookie: '' }, { ...headers, 'x-csrf-token': 'forged' }, { ...headers, origin: 'https://evil.test' }]) {
+        assert.equal((await login(input, invalid)).status, 403);
+      }
+      assert.equal((await login(input, { ...headers, 'content-type': 'text/plain' })).status, 400);
+      const wrong = await login({ ...input, password: password.trim() });
+      const unknown = await login({ ...input, email: `${randomUUID()}@example.test` });
+      for (const failure of [wrong, unknown]) {
+        assert.equal(failure.status, 401);
+        assert.equal(failure.headers.get('set-cookie'), null);
+      }
+      const wrongBody = await wrong.json();
+      const unknownBody = await unknown.json();
+      assert.ok(isApiError(wrongBody) && isApiError(unknownBody));
+      assert.deepEqual({ ...wrongBody, requestId: '' }, { ...unknownBody, requestId: '' });
+      assert.equal(wrongBody.code, 'UNAUTHENTICATED');
+      assert.equal(await db.session.count({ where: { userId: member.id } }), 0);
+
+      const response = await login(input, { ...headers, cookie: `${headers.cookie}; chat_session=${'a'.repeat(64)}` });
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get('cache-control'), 'no-store');
+      const cookie = response.headers.get('set-cookie')!;
+      assert.match(cookie, /^chat_session=[a-f0-9]{64}; Path=\/; Max-Age=86400; HttpOnly; SameSite=Lax$/);
+      const pair = cookie.split(';')[0]!;
+      const token = pair.split('=')[1]!;
+      assert.notEqual(token, 'a'.repeat(64));
+      const result = await response.json() as SessionResponse;
+      assert.deepEqual(Object.keys(result).sort(), ['expiresAt', 'user']);
+      assert.deepEqual(Object.keys(result.user).sort(), ['createdAt', 'displayName', 'email', 'id']);
+      assert.equal(result.user.id, member.id);
+      assert.ok(!JSON.stringify(result).includes(token));
+      assert.ok(!JSON.stringify(result).includes(password));
+      const stored = await db.session.findUniqueOrThrow({ where: { tokenHash: createHash('sha256').update(token).digest('hex') } });
+      assert.notEqual(stored.tokenHash, token);
+      assert.equal(stored.expiresAt.toISOString(), result.expiresAt);
+      assert.ok(Math.abs(stored.expiresAt.getTime() - stored.createdAt.getTime() - 86400000) < 2000);
+      const restored = await me(pair);
+      assert.equal(restored.status, 200);
+      assert.equal(restored.headers.get('cache-control'), 'no-store');
+      assert.equal(restored.headers.get('set-cookie'), null);
+      assert.deepEqual(await restored.json(), result);
+      for (const invalid of ['', 'chat_session=malformed', `chat_session=${'b'.repeat(64)}`, `${pair}; ${pair}`]) {
+        const failure = await me(invalid);
+        assert.equal(failure.status, 401);
+        assert.ok(isApiError(await failure.json()));
+      }
+      const tokenInQuery = await fetch(`${endpoint}/me?token=${token}`);
+      assert.equal(tokenInQuery.status, 401);
+      const { app: freshApp } = await createApp({ NODE_ENV: 'test', PORT: '3000', DATABASE_URL: databaseUrl });
+      try {
+        await freshApp.listen(0, '127.0.0.1');
+        const restoredAfterRestart = await fetch(`${await freshApp.getUrl()}/api/auth/me`, { headers: { cookie: pair } });
+        assert.equal(restoredAfterRestart.status, 200);
+        assert.deepEqual(await restoredAfterRestart.json(), result);
+      } finally { await freshApp.close(); }
+
+      const beforeExpiry = new SessionService(db, origin, 86400, () => stored.expiresAt.getTime() - 1);
+      assert.deepEqual(await beforeExpiry.me(pair), result);
+      const atExpiry = new SessionService(db, origin, 86400, () => stored.expiresAt.getTime());
+      await assert.rejects(atExpiry.me(pair), /Unauthorized/);
+      await db.session.update({ where: { id: stored.id }, data: { expiresAt: new Date(0) } });
+      assert.equal((await me(pair)).status, 401);
+
+      const second = await login();
+      assert.equal(second.status, 200);
+      const secondCookie = second.headers.get('set-cookie')!.split(';')[0]!;
+      assert.notEqual(secondCookie, pair);
+      assert.equal((await me(secondCookie)).status, 200);
+      assert.equal((await me(pair)).status, 401);
+      const httpsSessions = new SessionService(db, 'https://chat.example', 60);
+      await httpsSessions.onModuleInit();
+      const secure = await httpsSessions.login(input);
+      assert.match(secure.cookie, /^__Host-chat_session=[a-f0-9]{64}; Path=\/; Max-Age=60; HttpOnly; SameSite=Lax; Secure$/);
+      assert.equal((await httpsSessions.me(secure.cookie.split(';')[0])).user.id, member.id);
+    } finally {
+      await db.session.deleteMany({ where: { userId: member.id } });
+      await db.user.delete({ where: { id: member.id } });
     }
   });
 

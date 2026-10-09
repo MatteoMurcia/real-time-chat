@@ -37,5 +37,11 @@ export function loadConfig(env: NodeJS.ProcessEnv) {
     throw new Error('APP_ORIGIN must be an HTTPS origin or a loopback HTTP origin without a path');
   }
 
-  return { nodeEnv, port, host, databaseUrl, appOrigin };
+  const rawTtl = env.SESSION_TTL_SECONDS ?? '86400';
+  const sessionTtlSeconds = Number(rawTtl);
+  if (!/^\d+$/.test(rawTtl) || sessionTtlSeconds < 1 || sessionTtlSeconds > 604800) {
+    throw new Error('SESSION_TTL_SECONDS must be an integer between 1 and 604800');
+  }
+
+  return { nodeEnv, port, host, databaseUrl, appOrigin, sessionTtlSeconds };
 }
