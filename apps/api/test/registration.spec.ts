@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { argon2 } from 'node:crypto';
 import { promisify } from 'node:util';
 import { test } from 'node:test';
-import { validateRegistration, hashPassword } from '../src/identity/registration.service.js';
+import { validateRegistration } from '../src/identity/registration.service.js';
+import { hashPassword } from '../src/identity/password.js';
 import { CsrfService } from '../src/identity/csrf.service.js';
 
 const origin = 'http://127.0.0.1:8080';

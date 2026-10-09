@@ -16,3 +16,6 @@ export interface PublicUser {
 
 export interface RegistrationResponse { user: PublicUser }
 export interface CsrfResponse { csrfToken: string }
+
+export interface LoginRequest { email: string; password: string }
+export interface SessionResponse { user: PublicUser; expiresAt: string }
