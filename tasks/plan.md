@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-09 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D y 0.3a integrados; CP0-B superado, evidencia pendiente de revisión y merge del propietario.
+Revisión: 3 · Actualización: 2026-10-09 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b implementada y verificada, pendiente de revisión y merge del propietario.
 
 ## 1. Cómo usar este plan
 
@@ -393,7 +393,7 @@ Resultado (2026-10-09): **superado con corrección de caché** sobre main `c7ff6
 
 **Checkpoint CP0-B:** BD nueva migrada, errores seguros y tipos compartidos compilables.
 
-Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplicación.
+Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplicación. Evidencia integrada por el propietario mediante PR #11.
 - Proyecto Docker aislado `cp0b-verification`, volumen nuevo y puerto web `127.0.0.1:18081`. `up --build --wait` correcto usando caché de las imágenes verificadas en 0.3a; migración inicial aplicada y API/web/BD healthy.
 - Segunda ejecución de `migrate deploy`: sin migraciones pendientes. Base separada `cp0b_test` creada vacía; suite de integración ejecutada dentro del target development no root, usando las credenciales temporales dentro del contenedor, sin publicar PostgreSQL.
 - Seis resultados de integración correctos: migración, unicidad email/token, claves foráneas y restricción de borrado, rollback, liveness con wiring real, cierre del pool y error de conexión sin URL privada. Consulta final: cero usuarios, cero sesiones y una migración completada en la base de prueba.
@@ -402,11 +402,14 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
 - `npm run typecheck` correcto para API, Angular y contracts. Consumidores compilables en las imágenes; se reutiliza la evidencia de 17 pruebas API y 5 web del build integrado de 0.3a, sin presentarla como ejecución nueva.
 - Recursos y credenciales temporales eliminados tras comprobar la etiqueta del volumen de prueba. Volumen principal `real-time-chat_postgres_data` conservado. Sin hallazgos bloqueantes; CI/lint quedan en 0.3b.
 
-- [ ] **0.3b — Añadir CI inicial** · M · Depende de: 0.0c, 0.2d, 0.3a.
+- [x] **0.3b — Añadir CI inicial** · M · Depende de: 0.0c, 0.2d, 0.3a. Implementada en rama; merge pendiente del propietario.
   - Trabajo: lint, tipos, pruebas existentes y build; PostgreSQL efímero para integración y caches reproducibles.
   - Aceptación: errores detienen el pipeline; no exponer credenciales reales ni omitir fallos.
   - Verificar: comandos locales equivalentes y ejecución real de GitHub Actions sobre el remoto de 0.0b; comprobar build de imágenes sin publicarlas.
   - Archivos: `.github/workflows/ci.yml`, `package.json`, configuración lint, configuración de tests, `README.md`.
+  - Evidencia: ESLint recomendado para TS/JS y templates Angular/accesibilidad, cero warnings y prueba negativa de variable sin usar rechazada. Instalación limpia local, lint/typecheck, 24 pruebas de aplicación/contrato, 2 Docker, build y audit correctos (cero vulnerabilidades).
+  - CI real: [ejecución 37888566965](https://github.com/MatteoMurcia/real-time-chat/actions/runs/37888566965), ambos jobs correctos; Quality en 63 s con 6 resultados de integración PostgreSQL y Containers en 86 s con build/arranque/migración/health vía Nginx. Contraseñas efímeras generadas y enmascaradas, limpieza always, cache npm por lockfile, actions fijadas por SHA, token read-only y cancelación de ejecuciones sustituidas. Sin despliegue ni publicación de imágenes.
+  - Protección verificada: main exige Quality y Containers de GitHub Actions (app 15368), strict=true. Conserva PR obligatoria también para admins, cero aprobaciones externas, historial lineal, conversaciones resueltas y bloqueo de force-push/borrado. Merge reservado al propietario.
 
 **Salida CP0-C:** clon limpio arranca en Docker, CI pasa en GitHub y el plan está versionado. Configurar los checks de main definidos en 0.0c según disponibilidad.
 
@@ -791,6 +794,8 @@ Decisiones explícitas:
 | 2026-10-09 | 0.3a — Contrato de error | Rama feature/0.3a-error-contract: paquete compartido validado, filtro HTTP global, interpretación por code en Angular y build Docker/host de consumidores. 24 pruebas correctas; mutación negativa, typecheck/build, 404 real, 429 temporal en navegador y recuperación verificados. Cuatro commits incrementales; PR pendiente de revisión y merge manual. No se agregaron dependencias externas ni endpoints de prueba permanentes | CP0-B tras revisión |
 
 | 2026-10-09 | CP0-B — Datos, errores y contratos | Verificado main 07bc90c con PostgreSQL nuevo y pruebas dentro de Docker: 6 resultados de integración y 3 de errores/contrato correctos. Migración repetible, cleanup de registros, 404 seguro vía Nginx y typecheck de consumidores verificados. Sin cambios de aplicación; dos commits de estado/evidencia. Recursos temporales eliminados; PR pendiente de revisión y merge manual | 0.3b tras revisión |
+
+| 2026-10-09 | 0.3b — CI inicial | Rama chore/0.3b-initial-ci: lint, Quality y Containers implementados; comprobaciones locales y GitHub Actions correctas. Checks reales añadidos a protección de main sin retirar reglas existentes. Tres commits incrementales de lint/workflow/documentación; PR pendiente de revisión y merge manual | CP0-C tras revisión |
 
 Plantilla para cada cierre:
 ```text
