@@ -5,9 +5,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl ca-cert
 WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
 COPY apps/api/package.json ./apps/api/package.json
+COPY packages/contracts/package.json ./packages/contracts/package.json
 
 FROM base AS dependencies
 RUN npm ci --workspace @real-time-chat/api --include-workspace-root
+COPY --chown=node:node packages/contracts ./packages/contracts
 
 FROM dependencies AS build
 COPY tsconfig.base.json ./
@@ -18,7 +20,7 @@ FROM dependencies AS development
 RUN node node_modules/@prisma/engines/scripts/postinstall.js
 COPY tsconfig.base.json ./
 COPY --chown=node:node apps/api ./apps/api
-RUN chown node:node /app/apps/api
+RUN chown node:node /app/apps/api /app/packages/contracts
 COPY docker/database-env.mjs ./docker/database-env.mjs
 ENV NODE_ENV=development HOST=0.0.0.0 PORT=3000
 USER node
@@ -38,6 +40,7 @@ CMD ["node_modules/prisma/build/index.js", "migrate", "deploy", "--config", "app
 FROM base AS runtime
 RUN npm ci --omit=dev --omit=optional --workspace @real-time-chat/api --include-workspace-root
 COPY --from=build /app/apps/api/dist ./apps/api/dist
+COPY --from=build /app/packages/contracts/dist ./packages/contracts/dist
 COPY docker/database-env.mjs ./docker/database-env.mjs
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000
 USER node
