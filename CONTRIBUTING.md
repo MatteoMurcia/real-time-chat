@@ -68,13 +68,14 @@ fix: reuse message identifiers when retrying unconfirmed sends
 - For documentation changes, verify links and consistency with the implemented
   state. Never describe planned commands or features as already working.
 
-Run `npm test`, `npm run typecheck`, and `npm run build` from the root to check
+Run `npm run lint`, `npm test`, `npm run typecheck`, and `npm run build` from the root to check
 both applications, or use `--workspace` to check one application during an
 increment. The API uses Node's built-in test runner, including real HTTP checks;
-the web uses Angular's Vitest runner with HTTP testing utilities. CI is still pending;
-do not add placeholder success checks. Task **0.3b** introduces the CI
-workflow and registers its actual successful job names as required checks on
-`main`. Later tasks extend those checks with integration and E2E coverage.
+the web uses Angular's Vitest runner with HTTP testing utilities. The CI workflow
+runs **Quality** (including PostgreSQL integration and audit) and **Containers**
+(image builds and application startup). Both must pass before merging; do not
+rename jobs without updating branch protection. Lint must pass without warnings.
+Later tasks extend integration and E2E coverage.
 
 ## GitHub settings
 
@@ -89,7 +90,7 @@ Repository policy established in task 0.0c:
 | History | Linear, squash merges only |
 | Force pushes and branch deletion | Disabled on `main` |
 | Merged source branches | Deleted automatically |
-| Required CI checks | Pending task 0.3b; none configured yet |
+| Required CI checks | `Quality` and `Containers` from GitHub Actions; branch must be up to date |
 
 If GitHub settings change, update this table in the same task. The policy does
 not include deployments, publishing container images, or external services.

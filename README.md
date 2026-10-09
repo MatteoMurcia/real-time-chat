@@ -210,7 +210,8 @@ Tests use isolated configuration and an ephemeral HTTP port, so they do not
 require `.env` or a running API. For development, run
 `npm run build:watch --workspace @real-time-chat/api` in one terminal and, after
 the first build, `npm run start:watch --workspace @real-time-chat/api` in another.
-Lint and CI will be configured in task 0.3b.
+Run `npm run lint` from the root for TypeScript, JavaScript and Angular template
+checks, including template accessibility. Generated files are excluded.
 
 ## Run the web on the host
 
@@ -412,6 +413,43 @@ regenerate the lockfile and verify generation/migrations before doing so.
 
 Application features and demo seed data remain in the plan.
 Remote hosting is outside the current delivery scope.
+
+## Continuous integration
+
+[CI](https://github.com/MatteoMurcia/real-time-chat/actions/workflows/ci.yml)
+runs on every pull request targeting `main` and every push to `main`.
+
+- **Quality:** pinned Node/npm, lockfile installation, lint (zero warnings),
+  typecheck, unit/contract tests, Docker configuration tests, builds, dependency
+  audit (high/critical vulnerabilities fail), and integration tests with an
+  isolated PostgreSQL 18.6 database.
+- **Containers:** build the Compose images, apply migrations to an empty volume,
+  wait for healthy services, and verify the public health response through Nginx.
+
+Jobs use read-only repository permissions and actions pinned to commit SHAs.
+Only npm's download cache is reused, keyed by the lockfile; `npm ci` still checks
+the dependency tree. Database passwords are generated per run and masked, so
+fork pull requests need no repository secrets. Temporary databases are removed
+even after failed checks; diagnostics run on failure. Superseded runs are cancelled.
+There is no deployment, registry push or automatic merge.
+
+Run the code checks locally with the pinned toolchain:
+
+```text
+npm ci
+npm run lint
+npm run typecheck
+npm test
+npm run test:docker
+npm run build
+npm audit --audit-level=high
+```
+
+For integration, follow the separate test database setup above and run
+`npm run test:integration --workspace @real-time-chat/api`. For the container
+check, use the documented `docker compose up --build --wait` flow. CI runs these
+checks on disposable Ubuntu runners; do not copy its volume-deletion cleanup
+commands to your persistent local database.
 
 ## Repository hygiene
 
