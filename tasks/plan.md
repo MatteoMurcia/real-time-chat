@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-09 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A y 0.2a–0.2d integrados; CP0-D verificado con corrección de caché, pendiente de revisión y merge del propietario.
+Revisión: 3 · Actualización: 2026-10-09 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d y CP0-D integrados; 0.3a implementada, pendiente de revisión y merge del propietario.
 
 ## 1. Cómo usar este plan
 
@@ -372,7 +372,7 @@ Resultado (2026-10-08): **superado** sobre main `e6664d6`.
 
 **Checkpoint CP0-D:** demo base y desarrollo funcionan en Docker; el host no necesita instalar herramientas del stack.
 
-Resultado (2026-10-09): **superado con corrección de caché** sobre main `c7ff6b4` y el cambio Nginx de esta rama.
+Resultado (2026-10-09): **superado con corrección de caché** sobre main `c7ff6b4` y el cambio Nginx integrado por el propietario mediante PR #9.
 - Clon limpio en `.git/cp0d-checkout`, sin node_modules, dist ni cliente Prisma generado en el host. Solo Git, PowerShell y Docker para construir/arrancar; Docker Engine 29.8.0 y Compose 5.5.1 en Windows con contenedores Linux. No se desinstalaron las herramientas existentes del host; el flujo no las invocó.
 - Proyecto aislado `cp0d-verification`, puerto web `127.0.0.1:18080`, credenciales temporales y volumen nuevo. `docker compose -p cp0d-verification up --build --wait`: correcto; 16 pruebas API y 3 web dentro de las imágenes, migración inicial exitosa, API/web/BD healthy. Chrome muestra API disponible.
 - Cambio al comando documentado `up --build --watch` con ambos archivos Compose: base conservada y migración sin pendientes. API/web no root y sin mounts; dependencias Linux internas. Solo web publicada.
@@ -382,11 +382,14 @@ Resultado (2026-10-09): **superado con corrección de caché** sobre main `c7ff6
 - Regresión comprobada: después de cargar el build Nginx corregido, volver a desarrollo en el mismo origen/pestaña permite recibir otro cambio de texto automáticamente. Fuentes temporales restauradas; contenedores/redes/volumen del proyecto de prueba eliminados tras comprobar su etiqueta de propietario; `.env` temporal eliminado. Volumen principal `real-time-chat_postgres_data` conservado.
 - No se amplía el alcance: CI/lint siguen en 0.3b; contrato de errores en 0.3a. Validación realizada en Windows; no se afirma una ejecución en host Unix ni despliegue remoto.
 
-- [ ] **0.3a — Establecer contrato de error** · S · Depende de: 0.1b, 0.1c.
+- [x] **0.3a — Establecer contrato de error** · S · Depende de: 0.1b, 0.1c. Implementada en rama; merge pendiente del propietario.
   - Trabajo: paquete contracts, error público y mapeo HTTP; mantenerlo limitado al recorrido actual.
   - Aceptación: un error validado contiene code/requestId sin stack; web puede interpretarlo.
   - Verificar: prueba del error y build de consumidores.
   - Archivos: `packages/contracts/package.json`, `src/errors.ts` dentro del paquete, `apps/api/src/http/error.filter.ts`, `apps/api/test/errors.spec.ts`, configuración de alias.
+  - Implementación: workspace privado con exports JS/declaraciones (sin alias de runtime), guard de contrato, filtro global Nest y consumo por code en Angular. Mensajes públicos fijos; UUID v4 generado por el servidor, igual en cuerpo/X-Request-Id; no-store. Códigos HTTP previstos mapeados; excepciones/status no mapeados normalizados a 500. Sin propagar mensajes de excepciones ni errores de campo hasta introducir formularios.
+  - Evidencia: 17 pruebas API (incluyen nueve escenarios HTTP, 404 real y JSON inválido), 5 web y 2 de contrato correctas. Mutación temporal de requestId provocó fallo esperado; fuente restaurada. Build/typecheck de todos los workspaces correctos. Imágenes normales compiladas con pruebas Linux; stack healthy y 404 mediante Nginx con contrato/header coincidentes. Hooks y Dockerfiles construyen contracts antes de consumidores; cambios compartidos requieren rebuild documentado.
+  - Verificación de desarrollo: Compose Watch arranca ambos consumidores no root con contracts compilado dentro de las imágenes. Handler temporal 429 devuelve RATE_LIMITED sin texto privado; Chrome muestra mensaje específico y recupera API disponible al restaurar/reintentar. Cambios temporales retirados; stack detenido conservando volumen.
 
 **Checkpoint CP0-B:** BD nueva migrada, errores seguros y tipos compartidos compilables.
 
@@ -775,6 +778,8 @@ Decisiones explícitas:
 | 2026-10-08 | 0.2d — Desarrollo en contenedores | Rama chore/0.2d-container-hot-reload: targets de desarrollo no root, proxy interno y Compose Watch sin montar dependencias del host. Recarga real de texto/handler y restauración comprobadas sin reconstruir imágenes. Typecheck API/web en Docker, 16 pruebas API, 3 web y 2 Docker correctas. Build normal y navegador verificados tras cambiar de modo. Stack detenido conservando el volumen. PR pendiente de revisión y merge manual | CP0-D tras revisión |
 
 | 2026-10-09 | CP0-D — Demo y desarrollo Docker | Clon limpio de main c7ff6b4, BD nueva, build y 19 pruebas Linux correctos; recarga web/API, fallo de compilación y recuperación verificados. Corregida caché de bundles sin versión en Nginx y probado cambio de modo en la misma pestaña. Tres commits incrementales de estado/corrección/evidencia; PR pendiente de revisión y merge manual. Recursos temporales retirados, volumen principal conservado | 0.3a tras revisión |
+
+| 2026-10-09 | 0.3a — Contrato de error | Rama feature/0.3a-error-contract: paquete compartido validado, filtro HTTP global, interpretación por code en Angular y build Docker/host de consumidores. 24 pruebas correctas; mutación negativa, typecheck/build, 404 real, 429 temporal en navegador y recuperación verificados. Cuatro commits incrementales; PR pendiente de revisión y merge manual. No se agregaron dependencias externas ni endpoints de prueba permanentes | CP0-B tras revisión |
 
 Plantilla para cada cierre:
 ```text

@@ -6,7 +6,11 @@
     "start": "ng serve --host 127.0.0.1",
     "build": "ng build",
     "typecheck": "ngc -p tsconfig.json --noEmit",
-    "test": "ng test --watch=false"
+    "test": "ng test --watch=false",
+    "prestart": "npm run build --workspace @real-time-chat/contracts",
+    "prebuild": "npm run build --workspace @real-time-chat/contracts",
+    "pretypecheck": "npm run build --workspace @real-time-chat/contracts",
+    "pretest": "npm run build --workspace @real-time-chat/contracts"
   },
   "dependencies": {
     "@angular/common": "22.2.1",
@@ -14,7 +18,8 @@
     "@angular/core": "22.2.1",
     "@angular/platform-browser": "22.2.1",
     "rxjs": "7.8.2",
-    "tslib": "2.8.1"
+    "tslib": "2.8.1",
+    "@real-time-chat/contracts": "0.0.0"
   },
   "devDependencies": {
     "@angular/build": "22.2.2",

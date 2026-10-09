@@ -13,7 +13,7 @@
       @switch (status()) {
         @case ('loading') { Checking connection… }
         @case ('online') { API is reachable. }
-        @case ('error') { Unable to reach the API. Check that it is running, then try again. }
+        @case ('error') { {{ errorMessage() }} }
       }
     </p>
     <button type="button" (click)="checkConnection()" [disabled]="status() === 'loading'">

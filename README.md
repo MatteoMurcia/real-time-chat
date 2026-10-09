@@ -116,7 +116,7 @@ containers run as non-root. Only the web port is published, on loopback; the
 development proxy reaches the API through its internal service name.
 
 Changes outside these source directories (dependencies, lockfile, configuration,
-Dockerfiles or Prisma schema/migrations) require stopping Watch with Ctrl+C,
+Dockerfiles, `packages/contracts`, or Prisma schema/migrations) require stopping Watch with Ctrl+C,
 then running the following commands. This also applies migrations before API
 startup and regenerates the client; Watch never resets or migrates your database.
 
@@ -240,6 +240,47 @@ Root `npm run build`, `npm run typecheck` and `npm test` check both applications
 Use `npm run build --workspace @real-time-chat/web` (or `typecheck` / `test`) for
 web-only checks. Component tests use Angular's HTTP testing backend and Vitest;
 no running API is required. Production web output is in `apps/web/dist/browser`.
+
+## HTTP error contract
+
+Nest HTTP failures return `{ code, message, requestId }`. `message` is fixed public
+text; exception messages, stacks, request URLs and database details are never
+copied into the response. Clients decide by `code`, not by message text.
+
+| HTTP status | Code |
+| --- | --- |
+| 400 | `VALIDATION_ERROR` |
+| 401 | `UNAUTHENTICATED` |
+| 403 | `FORBIDDEN` |
+| 404 | `NOT_FOUND` |
+| 409 | `CONFLICT` |
+| 429 | `RATE_LIMITED` |
+| 500 | `INTERNAL_ERROR` |
+
+Unmapped exceptions/statuses currently normalize to 500; extend this mapping
+when an endpoint needs another HTTP semantic. A fresh server UUID v4 appears in
+the body and `X-Request-Id` header for each error, with `Cache-Control: no-store`.
+Incoming request IDs are not trusted. Internal failures log only code/requestId;
+full request tracing and structured diagnostics belong to the observability stage.
+Successful responses keep their existing shape. Proxy/network failures may not
+follow this contract, so Angular retains its generic connection-error fallback.
+
+The existing connection UI recognizes validated server errors and gives a
+specific retry message for rate limiting. It never renders server-provided text.
+No error-only endpoint is exposed: requesting `/api/missing` exercises the
+404 contract. HTTP tests use isolated controllers for the other failure cases.
+Field-level validation errors will be introduced with the registration form.
+
+`@real-time-chat/contracts` is a private npm workspace containing the TypeScript
+contract and `isApiError` runtime guard. Package exports point to generated JS
+and declarations, so Node and Angular resolve the same package without custom
+runtime path aliases. Consumer build/test/typecheck hooks build it first; web
+startup does too. Docker images include the package independently of host output.
+After editing shared contracts in Docker development, use the rebuild sequence
+above. For host development, rebuild the package and restart the consumers.
+
+The filter uses Nest's documented
+[global exception filter registration](https://docs.nestjs.com/exception-filters).
 
 ## Local execution target
 

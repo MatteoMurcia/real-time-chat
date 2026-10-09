@@ -3,12 +3,14 @@ RUN npm install --global npm@12.1.0
 WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
 COPY apps/web/package.json ./apps/web/package.json
+COPY packages/contracts/package.json ./packages/contracts/package.json
 RUN npm ci --workspace @real-time-chat/web --include-workspace-root
+COPY --chown=node:node packages/contracts ./packages/contracts
 
 FROM dependencies AS development
 COPY tsconfig.base.json ./
 COPY --chown=node:node apps/web ./apps/web
-RUN chown node:node /app/apps/web
+RUN chown node:node /app/apps/web /app/packages/contracts
 USER node
 EXPOSE 8080
 CMD ["npm", "start", "--workspace", "@real-time-chat/web", "--", "--host", "0.0.0.0", "--port", "8080", "--proxy-config", "proxy.docker.json"]
