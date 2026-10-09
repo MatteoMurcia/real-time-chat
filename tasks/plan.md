@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-08 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A y 0.2a–0.2d integrados; revisión CP0-D en curso.
+Revisión: 3 · Actualización: 2026-10-09 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A y 0.2a–0.2d integrados; CP0-D verificado con corrección de caché, pendiente de revisión y merge del propietario.
 
 ## 1. Cómo usar este plan
 
@@ -371,6 +371,16 @@ Resultado (2026-10-08): **superado** sobre main `e6664d6`.
   - Evidencia: Compose Watch 5.5.1 en Windows sincroniza texto Angular sin refrescar el navegador y reinicia/recompila API al editar su handler. Respuesta temporal HTTP confirmada; ambos cambios restaurados y recargados. Identificadores de imágenes iguales antes/después; API/web con usuario node y sin mounts del host. Typecheck de ambos servicios correcto dentro de Docker. Dependencias/configuración/esquema requieren down y up --build --watch explícitos; comandos compatibles con PowerShell y Unix documentados.
 
 **Checkpoint CP0-D:** demo base y desarrollo funcionan en Docker; el host no necesita instalar herramientas del stack.
+
+Resultado (2026-10-09): **superado con corrección de caché** sobre main `c7ff6b4` y el cambio Nginx de esta rama.
+- Clon limpio en `.git/cp0d-checkout`, sin node_modules, dist ni cliente Prisma generado en el host. Solo Git, PowerShell y Docker para construir/arrancar; Docker Engine 29.8.0 y Compose 5.5.1 en Windows con contenedores Linux. No se desinstalaron las herramientas existentes del host; el flujo no las invocó.
+- Proyecto aislado `cp0d-verification`, puerto web `127.0.0.1:18080`, credenciales temporales y volumen nuevo. `docker compose -p cp0d-verification up --build --wait`: correcto; 16 pruebas API y 3 web dentro de las imágenes, migración inicial exitosa, API/web/BD healthy. Chrome muestra API disponible.
+- Cambio al comando documentado `up --build --watch` con ambos archivos Compose: base conservada y migración sin pendientes. API/web no root y sin mounts; dependencias Linux internas. Solo web publicada.
+- Edición temporal del handler: respuesta HTTP con marcador CP0-D. Edición/restauración de texto: actualización automática de Angular comprobada. Imágenes sin cambios durante la sincronización.
+- Error TypeScript intencional: compilación falla con TS2322 y API sale con código 1. Restaurar el archivo permite a Watch reiniciar y recuperar `{"status":"ok"}` sin reconstruir imagen ni intervención manual en el contenedor.
+- Hallazgo corregido: los bundles de nombre estable podían quedar en caché al cambiar de modo. Nginx añade `Cache-Control: no-cache` en archivos web; `nginx -t` y comprobaciones HTTP de `/` y `/main.js` correctos. README documenta recarga forzada para cachés anteriores a la corrección.
+- Regresión comprobada: después de cargar el build Nginx corregido, volver a desarrollo en el mismo origen/pestaña permite recibir otro cambio de texto automáticamente. Fuentes temporales restauradas; contenedores/redes/volumen del proyecto de prueba eliminados tras comprobar su etiqueta de propietario; `.env` temporal eliminado. Volumen principal `real-time-chat_postgres_data` conservado.
+- No se amplía el alcance: CI/lint siguen en 0.3b; contrato de errores en 0.3a. Validación realizada en Windows; no se afirma una ejecución en host Unix ni despliegue remoto.
 
 - [ ] **0.3a — Establecer contrato de error** · S · Depende de: 0.1b, 0.1c.
   - Trabajo: paquete contracts, error público y mapeo HTTP; mantenerlo limitado al recorrido actual.
@@ -763,6 +773,8 @@ Decisiones explícitas:
 | 2026-10-08 | 0.2c — Aplicación en Compose | Rama chore/0.2c-compose-application: imágenes, proxy y gate de migración verificados desde checkout limpio. Persistencia y bloqueo ante fallo comprobados; cinco commits incrementales de implementación/correcciones/documentación. Sin puertos API/BD en configuración base; override host opt-in probado. PR pendiente de revisión y merge manual | 0.2d tras revisión |
 
 | 2026-10-08 | 0.2d — Desarrollo en contenedores | Rama chore/0.2d-container-hot-reload: targets de desarrollo no root, proxy interno y Compose Watch sin montar dependencias del host. Recarga real de texto/handler y restauración comprobadas sin reconstruir imágenes. Typecheck API/web en Docker, 16 pruebas API, 3 web y 2 Docker correctas. Build normal y navegador verificados tras cambiar de modo. Stack detenido conservando el volumen. PR pendiente de revisión y merge manual | CP0-D tras revisión |
+
+| 2026-10-09 | CP0-D — Demo y desarrollo Docker | Clon limpio de main c7ff6b4, BD nueva, build y 19 pruebas Linux correctos; recarga web/API, fallo de compilación y recuperación verificados. Corregida caché de bundles sin versión en Nginx y probado cambio de modo en la misma pestaña. Tres commits incrementales de estado/corrección/evidencia; PR pendiente de revisión y merge manual. Recursos temporales retirados, volumen principal conservado | 0.3a tras revisión |
 
 Plantilla para cada cierre:
 ```text
