@@ -14,7 +14,8 @@ validation, HTTP/component tests, and strict TypeScript checks are available.
 The web, API, PostgreSQL and migration job run locally through Docker Compose.
 Prisma manages the User/Session schema and the API database connection lifecycle.
 Container development supports automatic source reload. Account registration is
-available through the API; its Angular form, login/sessions and chat remain pending.
+available at `/register`, with validation, safe errors and submission feedback.
+Success redirects to `/login` with confirmation; login/sessions and chat remain pending.
 
 The implementation checklist is maintained in [tasks/plan.md](tasks/plan.md).
 Product choices and scope are documented in
@@ -432,7 +433,8 @@ loopback development; other origins require HTTPS. Restart the API after changes
 
 3. Success is `201` with `{ "user": { "id": "…", "email": "…",
    "displayName": "…", "createdAt": "…" } }`. No password hash or session is
-   returned. The UI will continue to login in the next task.
+   returned. The UI continues to `/login`, which currently confirms registration
+   and explains that sign-in is not yet available.
 
 Email is trimmed and lowercased (ASCII email addresses, at most 254 characters);
 provider-specific dot/plus rewriting is not performed. Display names are trimmed,
@@ -468,6 +470,37 @@ Integration tests exercise these endpoints against real PostgreSQL, including
 concurrent duplicates, invalid fields, malformed/oversized JSON, CSRF failures,
 public response fields, and absence of an automatically created session.
 
+### Browser verification
+
+The registration form uses Angular reactive forms with native labels, autocomplete,
+field descriptions, error focus and keyboard submission. The browser sends cookies
+on same-origin requests; the client fetches a fresh CSRF token for each attempt.
+It keeps credentials and tokens out of browser storage and URLs, prevents duplicate
+submissions, and cancels requests on navigation. A 15-second timeout reports an
+unconfirmed outcome without automatically repeating a possibly completed POST.
+Server validation remains authoritative; server text is replaced with local copy.
+
+The first Playwright test uses Chromium against a real Compose stack. It creates
+accounts, so use an isolated project and environment file. Copy `.env.example` to
+`.env.e2e`, set a private password, `WEB_PORT=18083` and
+`APP_ORIGIN=http://127.0.0.1:18083`, then run:
+
+```text
+docker compose -p chat-e2e --env-file .env.e2e up --build --wait
+npx playwright install chromium
+```
+
+Set `E2E_BASE_URL=http://127.0.0.1:18083` in your shell (`$env:E2E_BASE_URL =
+'http://127.0.0.1:18083'` in PowerShell; `export E2E_BASE_URL=http://127.0.0.1:18083`
+in Bash), then run `npm run test:e2e`. The suite requires this explicit URL. It
+checks a real registration and duplicate, an injected server failure followed by
+recovery, single submission, keyboard focus, and widths 320/768/1024/1440. Screenshots
+for visual review are written to ignored `test-results/`; traces are disabled.
+
+Stop only this test stack with `docker compose -p chat-e2e --env-file .env.e2e down`.
+Its dedicated volume retains synthetic accounts between runs; each run uses unique
+emails. The ordinary development volume is separate. CI uses a disposable stack.
+
 ## Continuous integration
 
 [CI](https://github.com/MatteoMurcia/real-time-chat/actions/workflows/ci.yml)
@@ -478,7 +511,8 @@ runs on every pull request targeting `main` and every push to `main`.
   audit (high/critical vulnerabilities fail), and integration tests with an
   isolated PostgreSQL 18.6 database.
 - **Containers:** build the Compose images, apply migrations to an empty volume,
-  wait for healthy services, and verify the public health response through Nginx.
+  wait for healthy services, verify the public health response through Nginx,
+  and run the Chromium registration E2E against that stack.
 
 Jobs use read-only repository permissions and actions pinned to commit SHAs.
 Only npm's download cache is reused, keyed by the lockfile; `npm ci` still checks

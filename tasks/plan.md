@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-09 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b integrada; 1.1a implementada y verificada, pendiente de revisión y merge del propietario. CP0-C pendiente.
+Revisión: 3 · Actualización: 2026-10-09 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b y 1.1a integradas; 1.1b implementada y verificada, pendiente de revisión y merge del propietario. CP0-C y CP1-A pendientes.
 
 ## 1. Cómo usar este plan
 
@@ -417,12 +417,12 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
 
 **Objetivo:** un usuario completa registro/login/logout; el navegador restaura una sesión válida.
 
-- [x] **1.1a — Registrar una cuenta en API** · M · Depende de: 0.2b, 0.3a. Implementada en rama; revisión y merge pendientes del propietario.
+- [x] **1.1a — Registrar una cuenta en API** · M · Depende de: 0.2b, 0.3a. Integrada mediante PR #13.
   - Trabajo: normalización de email, validación de nombre/contraseña, hash Argon2id y CSRF preauth; contrato con errores.
   - Aceptación: cuenta persistida, duplicado controlado y ningún hash expuesto.
   - Verificar: integración válida, inválida, duplicada y petición sin protección CSRF.
   - Archivos: `packages/contracts/src/auth.ts`, `apps/api/src/identity/registration.service.ts`, `registration.controller.ts`, `csrf.service.ts`, `apps/api/test/registration.spec.ts`.
-- [ ] **1.1b — Completar registro desde Angular** · M · Depende de: 1.1a, 0.1c.
+- [x] **1.1b — Completar registro desde Angular** · M · Depende de: 1.1a, 0.1c. Implementada en rama; revisión y merge pendientes del propietario.
   - Trabajo: formulario accesible y cliente de identidad; tras éxito dirigir a login.
   - Aceptación: validaciones comprensibles, estado de envío y prevención de doble submit.
   - Verificar: navegador/primer E2E de registro, incluyendo error servidor.
@@ -833,3 +833,12 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Imágenes construidas y servicios saludables; comprobación vía Nginx en stack aislado: registro 201, duplicado 409 y sin CSRF 403. Sin despliegue remoto.
 - README documenta contrato, `APP_ORIGIN`, políticas de entrada y límites actuales (CSRF para una instancia, sesiones y rate limiting en sus tareas previstas). Se añaden únicamente tipos de Express como dependencia de desarrollo.
 - CP0-C permanece pendiente: se inicia 1.1a por instrucción del propietario, sin dar ese checkpoint por revisado. Próximo paso funcional: 1.1b tras revisión y merge manual de esta PR.
+
+### Evidencia 1.1b — Registro desde Angular (2026-10-09)
+
+- Rama `feature/1.1b-angular-registration` desde main con PR #13 integrada. Formulario reactivo accesible, navegación Angular, cliente de identidad con CSRF fresco por intento, validación local/servidor, bloqueo de doble envío y timeout sin reintento automático.
+- Tras crear cuenta se borra el formulario y se navega a `/login?registered=1`. No se inicia sesión; la pantalla de destino informa de que el login está pendiente de 1.2a. Contraseñas y tokens no se guardan en URL ni almacenamiento del navegador.
+- Verificación: lint y typecheck estrictos; 21 pruebas API, 8 web, 3 contratos y 2 Docker; build y audit. E2E Chromium con API/PostgreSQL reales en Compose: alta, duplicado, error 500 controlado y recuperación, doble submit, foco y teclado; sin errores de ejecución de página.
+- Diseño mantiene colores y tipografía existentes, formulario de una columna y controles nativos. Comprobados 320/768/1024/1440 px sin overflow; capturas de 320 y 1440 revisadas visualmente. No se afirma una auditoría completa WCAG ni pruebas con lector de pantalla.
+- El job Containers ejecuta ahora el primer E2E contra su stack temporal; README documenta la ejecución local aislada y sus cuentas sintéticas. Dependencias Angular forms/router fijadas a la versión existente; Playwright únicamente en desarrollo.
+- CP1-A queda pendiente de revisión explícita después del merge manual; CP0-C continúa pendiente. Sin despliegue remoto ni merge automático.
