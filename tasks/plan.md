@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-09 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b implementada y verificada, pendiente de revisión y merge del propietario.
+Revisión: 3 · Actualización: 2026-10-09 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b integrada; 1.1a implementada y verificada, pendiente de revisión y merge del propietario. CP0-C pendiente.
 
 ## 1. Cómo usar este plan
 
@@ -402,7 +402,7 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
 - `npm run typecheck` correcto para API, Angular y contracts. Consumidores compilables en las imágenes; se reutiliza la evidencia de 17 pruebas API y 5 web del build integrado de 0.3a, sin presentarla como ejecución nueva.
 - Recursos y credenciales temporales eliminados tras comprobar la etiqueta del volumen de prueba. Volumen principal `real-time-chat_postgres_data` conservado. Sin hallazgos bloqueantes; CI/lint quedan en 0.3b.
 
-- [x] **0.3b — Añadir CI inicial** · M · Depende de: 0.0c, 0.2d, 0.3a. Implementada en rama; merge pendiente del propietario.
+- [x] **0.3b — Añadir CI inicial** · M · Depende de: 0.0c, 0.2d, 0.3a. Integrada mediante PR #12.
   - Trabajo: lint, tipos, pruebas existentes y build; PostgreSQL efímero para integración y caches reproducibles.
   - Aceptación: errores detienen el pipeline; no exponer credenciales reales ni omitir fallos.
   - Verificar: comandos locales equivalentes y ejecución real de GitHub Actions sobre el remoto de 0.0b; comprobar build de imágenes sin publicarlas.
@@ -417,7 +417,7 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
 
 **Objetivo:** un usuario completa registro/login/logout; el navegador restaura una sesión válida.
 
-- [ ] **1.1a — Registrar una cuenta en API** · M · Depende de: 0.2b, 0.3a.
+- [x] **1.1a — Registrar una cuenta en API** · M · Depende de: 0.2b, 0.3a. Implementada en rama; revisión y merge pendientes del propietario.
   - Trabajo: normalización de email, validación de nombre/contraseña, hash Argon2id y CSRF preauth; contrato con errores.
   - Aceptación: cuenta persistida, duplicado controlado y ningún hash expuesto.
   - Verificar: integración válida, inválida, duplicada y petición sin protección CSRF.
@@ -824,3 +824,12 @@ No marcar implementación completa por haber redactado este documento. Los próx
 - [Docker: builds multietapa](https://docs.docker.com/build/building/multi-stage/): separar compilación, herramientas y runtime.
 
 Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs y compatibilidades concretas contra documentación oficial durante implementación.
+
+### Evidencia 1.1a — Registro en API (2026-10-09)
+
+- Rama `feature/1.1a-account-registration` desde `main` con PR #12 integrada. Commits incrementales de primitivas, endpoints/pruebas y documentación, subidos individualmente.
+- `GET /api/auth/csrf` y `POST /api/auth/register`: origen explícito configurable, cookie preauth firmada, validación/normalización, Argon2id nativo y respuesta pública sin hash ni sesión. Duplicados concurrentes resueltos por restricción PostgreSQL con 409.
+- Verificación local: lint sin warnings, typecheck, 21 pruebas API, 5 web, 3 contratos, 2 Docker; 7 resultados de integración con PostgreSQL temporal. Incluye JSON inválido/excesivo, campos inválidos, CSRF ausente, concurrencia, persistencia y ausencia de sesión.
+- Imágenes construidas y servicios saludables; comprobación vía Nginx en stack aislado: registro 201, duplicado 409 y sin CSRF 403. Sin despliegue remoto.
+- README documenta contrato, `APP_ORIGIN`, políticas de entrada y límites actuales (CSRF para una instancia, sesiones y rate limiting en sus tareas previstas). Se añaden únicamente tipos de Express como dependencia de desarrollo.
+- CP0-C permanece pendiente: se inicia 1.1a por instrucción del propietario, sin dar ese checkpoint por revisado. Próximo paso funcional: 1.1b tras revisión y merge manual de esta PR.
