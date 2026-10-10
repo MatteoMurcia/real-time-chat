@@ -8,6 +8,7 @@ import { RegistrationService } from './identity/registration.service.js';
 import { CsrfService } from './identity/csrf.service.js';
 import { SessionController } from './identity/session.controller.js';
 import { SessionService } from './identity/session.service.js';
+import { ChatGateway } from './realtime/chat.gateway.js';
 
 @Module({
   controllers: [LiveController, RegistrationController, SessionController],
@@ -18,6 +19,8 @@ export class AppModule {
     return {
       module: AppModule,
       providers: [
+        { provide: 'APP_ORIGIN', useValue: appOrigin },
+        ChatGateway,
         { provide: DatabaseService, useFactory: () => new DatabaseService(databaseUrl) },
         { provide: CsrfService, useFactory: () => new CsrfService(appOrigin) },
         RegistrationService,

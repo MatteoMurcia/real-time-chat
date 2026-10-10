@@ -21,6 +21,7 @@
     "@angular/router": "22.2.1",
     "@real-time-chat/contracts": "0.0.0",
     "rxjs": "7.8.2",
+    "socket.io-client": "4.8.3",
     "tslib": "2.8.1"
   },
   "devDependencies": {

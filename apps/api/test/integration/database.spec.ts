@@ -10,6 +10,7 @@ import { isApiError } from '@real-time-chat/contracts';
 import type { SessionResponse } from '@real-time-chat/contracts/auth';
 import { hashPassword } from '../../src/identity/password.js';
 import { SessionService } from '../../src/identity/session.service.js';
+import { io, type ManagerOptions, type SocketOptions } from 'socket.io-client';
 
 test('migrations, user/session constraints and application connection lifecycle', async (t) => {
   const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -278,6 +279,60 @@ test('migrations, user/session constraints and application connection lifecycle'
       assert.equal(events.length, 1);
     } finally {
       subscription.unsubscribe();
+      await db.session.deleteMany({ where: { userId: member.id } });
+      await db.user.delete({ where: { id: member.id } });
+    }
+  });
+
+  await t.test('authenticates real Socket.IO clients and checks origins for polling and WebSocket', async () => {
+    const origin = 'http://127.0.0.1:8080';
+    const endpoint = await app.getUrl();
+    const sessions = app.get(SessionService);
+    const member = await db.user.create({ data: { email: `${randomUUID()}@example.test`, displayName: 'Socket test', passwordHash: await hashPassword('socket passphrase') } });
+    const input = { email: member.email, password: 'socket passphrase' };
+    const cookie = (await sessions.login(input)).cookie.split(';')[0]!;
+    const attempt = async (options: Partial<ManagerOptions & SocketOptions>, accepted: boolean) => {
+      const socket = io(endpoint, { autoConnect: false, reconnection: false, timeout: 3000, ...options });
+      try {
+        const result = await new Promise<Error | null>(resolve => {
+          socket.once('connect', () => resolve(null));
+          socket.once('connect_error', resolve);
+          socket.connect();
+        });
+        assert.equal(result === null, accepted);
+        if (result && 'data' in result) {
+          assert.ok(isApiError(result.data));
+          assert.equal(result.data.code, 'UNAUTHENTICATED');
+          assert.ok(!JSON.stringify(result.data).includes(cookie));
+        }
+        if (accepted && options.transports?.[0] === 'polling') {
+          const response = await fetch(`${endpoint}/socket.io/?EIO=4&transport=polling&sid=${socket.io.engine.id}`, {
+            method: 'POST', headers: { origin: 'https://evil.test', 'content-type': 'text/plain' }, body: '2',
+          });
+          assert.equal(response.status, 400);
+        }
+      } finally { socket.disconnect(); }
+    };
+    try {
+      for (const transport of ['polling', 'websocket']) {
+        const base = { transports: [transport], extraHeaders: { origin, cookie } };
+        await attempt(base, true);
+        for (const from of ['', 'null', 'https://evil.test', `${origin}.evil.test`]) {
+          await attempt({ ...base, extraHeaders: { origin: from, cookie } }, false);
+        }
+        for (const invalid of ['', 'chat_session=bad', `chat_session=${'a'.repeat(64)}`, `${cookie}; ${cookie}`]) {
+          await attempt({ ...base, extraHeaders: { origin, cookie: invalid } }, false);
+        }
+        await attempt({ ...base, extraHeaders: { origin }, auth: { token: cookie.split('=')[1], userId: member.id } }, false);
+      }
+      await attempt({ transports: ['polling'], extraHeaders: { referer: `${origin}/workspace`, cookie } }, true);
+      const current = await sessions.authenticate(cookie);
+      await db.session.update({ where: { id: current.id }, data: { expiresAt: new Date(0) } });
+      await attempt({ transports: ['websocket'], extraHeaders: { origin, cookie } }, false);
+      const fresh = (await sessions.login(input)).cookie.split(';')[0]!;
+      await sessions.revoke((await sessions.authenticate(fresh)).id);
+      await attempt({ transports: ['websocket'], extraHeaders: { origin, cookie: fresh } }, false);
+    } finally {
       await db.session.deleteMany({ where: { userId: member.id } });
       await db.user.delete({ where: { id: member.id } });
     }
