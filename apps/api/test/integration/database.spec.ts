@@ -244,11 +244,18 @@ test('migrations, user/session constraints and application connection lifecycle'
       assert.ok(!csrfToken.includes(current.id));
       const headers = { origin, cookie: first, 'x-csrf-token': csrfToken };
       const logout = (custom = headers) => fetch(`${endpoint}/logout`, { method: 'POST', headers: custom });
-      for (const invalid of [{ ...headers, 'x-csrf-token': '' }, { ...headers, cookie: second }, { ...headers, origin: 'https://evil.test' }]) {
+      const preauth = await fetch(`${endpoint}/csrf`, { headers: { origin } });
+      const preauthToken = (await preauth.json() as { csrfToken: string }).csrfToken;
+      for (const invalid of [{ ...headers, 'x-csrf-token': '' }, { ...headers, cookie: second },
+        { ...headers, origin: 'https://evil.test' }, { ...headers, 'x-csrf-token': preauthToken }]) {
         const failure = await logout(invalid);
         assert.equal(failure.status, 403);
         assert.equal(failure.headers.get('set-cookie'), null);
         assert.ok(isApiError(await failure.json()));
+      }
+      for (const cookie of ['', 'chat_session=malformed', `chat_session=${'b'.repeat(64)}`, `${first}; ${first}`]) {
+        assert.equal((await logout({ ...headers, cookie })).status, 401);
+        assert.equal((await bootstrap(cookie)).status, 401);
       }
       assert.equal(await db.session.count({ where: { userId: member.id } }), 2);
       assert.equal(events.length, 0);
@@ -263,6 +270,11 @@ test('migrations, user/session constraints and application connection lifecycle'
       assert.equal((await fetch(`${endpoint}/me`, { headers: { cookie: second } })).status, 200);
       assert.equal((await logout()).status, 401);
       assert.equal((await bootstrap(first)).status, 401);
+      assert.equal(events.length, 1);
+      const remaining = await sessions.authenticate(second);
+      await db.session.update({ where: { id: remaining.id }, data: { expiresAt: new Date(0) } });
+      assert.equal((await logout({ ...headers, cookie: second })).status, 401);
+      assert.equal((await bootstrap(second)).status, 401);
       assert.equal(events.length, 1);
     } finally {
       subscription.unsubscribe();
