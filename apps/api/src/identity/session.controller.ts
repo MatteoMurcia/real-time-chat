@@ -25,4 +25,20 @@ export class SessionController {
   me(@Headers() headers: IncomingHttpHeaders): Promise<SessionResponse> {
     return this.sessions.me(headers.cookie);
   }
+
+  @Get('session/csrf')
+  @Header('Cache-Control', 'no-store')
+  async sessionCsrf(@Headers() headers: IncomingHttpHeaders) {
+    const session = await this.sessions.authenticate(headers.cookie);
+    return this.csrf.issueSession(headers, session.id);
+  }
+
+  @Post('logout')
+  @HttpCode(204)
+  @Header('Cache-Control', 'no-store')
+  async logout(@Headers() headers: IncomingHttpHeaders, @Res({ passthrough: true }) response: ServerResponse): Promise<void> {
+    const session = await this.sessions.authenticate(headers.cookie);
+    this.csrf.verifySession(headers, session.id);
+    response.setHeader('Set-Cookie', await this.sessions.revoke(session.id));
+  }
 }

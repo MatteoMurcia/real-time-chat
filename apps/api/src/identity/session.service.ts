@@ -3,6 +3,7 @@ import { BadRequestException, UnauthorizedException, type OnModuleInit } from '@
 import type { LoginRequest, SessionResponse } from '@real-time-chat/contracts/auth';
 import { DatabaseService } from '../database/database.service.js';
 import { hashPassword, verifyPassword } from './password.js';
+import { Subject } from 'rxjs';
 
 const publicUser = { id: true, email: true, displayName: true, createdAt: true } as const;
 const digest = (token: string) => createHash('sha256').update(token).digest('hex');
@@ -19,6 +20,8 @@ export function validateLogin(body: unknown): LoginRequest {
 }
 
 export class SessionService implements OnModuleInit {
+  private readonly revocations = new Subject<{ sessionId: string }>();
+  readonly revoked = this.revocations.asObservable();
   private dummyHash = '';
   private readonly cookieName: string;
   private readonly secure: boolean;
@@ -52,14 +55,25 @@ export class SessionService implements OnModuleInit {
   }
 
   async me(cookie: string | undefined): Promise<SessionResponse> {
+    const session = await this.authenticate(cookie);
+    return { user: { ...session.user, createdAt: session.user.createdAt.toISOString() }, expiresAt: session.expiresAt.toISOString() };
+  }
+
+  async revoke(sessionId: string): Promise<string> {
+    const result = await this.db.session.deleteMany({ where: { id: sessionId } });
+    if (result.count > 0) this.revocations.next({ sessionId });
+    return `${this.cookieName}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${this.secure ? '; Secure' : ''}`;
+  }
+
+  async authenticate(cookie: string | undefined) {
     const cookies = (cookie ?? '').split(';').map(part => part.trim()).filter(part => part.startsWith(`${this.cookieName}=`));
     const token = cookies[0]?.slice(this.cookieName.length + 1);
     if (cookies.length !== 1 || !token || !/^[a-f0-9]{64}$/.test(token)) throw new UnauthorizedException();
     const session = await this.db.session.findUnique({
-      where: { tokenHash: digest(token) }, select: { expiresAt: true, user: { select: publicUser } },
+      where: { tokenHash: digest(token) }, select: { id: true, expiresAt: true, user: { select: publicUser } },
     });
     // ponytail: expired rows are rejected; add periodic pruning if session-table growth warrants it.
     if (!session || session.expiresAt.getTime() <= this.now()) throw new UnauthorizedException();
-    return { user: { ...session.user, createdAt: session.user.createdAt.toISOString() }, expiresAt: session.expiresAt.toISOString() };
+    return session;
   }
 }

@@ -22,6 +22,17 @@ export class CsrfService {
     return createHmac('sha256', this.secret).update(value).digest('hex');
   }
 
+  issueSession(headers: IncomingHttpHeaders, sessionId: string): { csrfToken: string } {
+    this.checkOrigin(headers);
+    const payload = `${randomBytes(32).toString('hex')}.${Math.floor(this.now() / 1000) + 600}`;
+    return { csrfToken: `${payload}.${this.sign(`session:${sessionId}:${payload}`)}` };
+  }
+
+  verifySession(headers: IncomingHttpHeaders, sessionId: string): void {
+    this.checkOrigin(headers);
+    this.verifyToken(headers['x-csrf-token'], `session:${sessionId}:`);
+  }
+
   issue(headers: IncomingHttpHeaders): { csrfToken: string; cookie: string } {
     this.checkOrigin(headers);
     const payload = `${randomBytes(32).toString('hex')}.${Math.floor(this.now() / 1000) + 600}`;
@@ -38,9 +49,14 @@ export class CsrfService {
       .filter(part => part.startsWith(`${this.cookieName}=`));
     if (typeof token !== 'string' || !/^[a-f0-9]{64}\.[0-9]{10}\.[a-f0-9]{64}$/.test(token)
       || cookies.length !== 1 || cookies[0] !== `${this.cookieName}=${token}`) throw new ForbiddenException();
+    this.verifyToken(token);
+  }
+
+  private verifyToken(token: unknown, binding = ''): void {
+    if (typeof token !== 'string' || !/^[a-f0-9]{64}\.[0-9]{10}\.[a-f0-9]{64}$/.test(token)) throw new ForbiddenException();
     const [nonce, expiry, signature] = token.split('.') as [string, string, string];
     if (Number(expiry) <= Math.floor(this.now() / 1000)
-      || !timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(this.sign(`${nonce}.${expiry}`), 'hex'))) {
+      || !timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(this.sign(`${binding}${nonce}.${expiry}`), 'hex'))) {
       throw new ForbiddenException();
     }
   }

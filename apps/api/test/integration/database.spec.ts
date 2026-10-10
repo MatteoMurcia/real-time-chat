@@ -222,6 +222,55 @@ test('migrations, user/session constraints and application connection lifecycle'
     }
   });
 
+  await t.test('logout revokes only the current session and binds CSRF to that session', async () => {
+    const origin = 'http://127.0.0.1:8080';
+    const endpoint = `${await app.getUrl()}/api/auth`;
+    const sessions = app.get(SessionService);
+    const member = await db.user.create({ data: { email: `${randomUUID()}@example.test`, displayName: 'Logout test', passwordHash: await hashPassword('logout passphrase') } });
+    const events: { sessionId: string }[] = [];
+    const subscription = sessions.revoked.subscribe(event => events.push(event));
+    try {
+      const input = { email: member.email, password: 'logout passphrase' };
+      const first = (await sessions.login(input)).cookie.split(';')[0]!;
+      const second = (await sessions.login(input)).cookie.split(';')[0]!;
+      const current = await sessions.authenticate(first);
+      const bootstrap = (cookie: string, from = origin) => fetch(`${endpoint}/session/csrf`, { headers: { origin: from, cookie } });
+      assert.equal((await bootstrap('')).status, 401);
+      assert.equal((await bootstrap(first, 'https://evil.test')).status, 403);
+      const csrfResponse = await bootstrap(first);
+      assert.equal(csrfResponse.headers.get('cache-control'), 'no-store');
+      assert.equal(csrfResponse.headers.get('set-cookie'), null);
+      const { csrfToken } = await csrfResponse.json() as { csrfToken: string };
+      assert.ok(!csrfToken.includes(current.id));
+      const headers = { origin, cookie: first, 'x-csrf-token': csrfToken };
+      const logout = (custom = headers) => fetch(`${endpoint}/logout`, { method: 'POST', headers: custom });
+      for (const invalid of [{ ...headers, 'x-csrf-token': '' }, { ...headers, cookie: second }, { ...headers, origin: 'https://evil.test' }]) {
+        const failure = await logout(invalid);
+        assert.equal(failure.status, 403);
+        assert.equal(failure.headers.get('set-cookie'), null);
+        assert.ok(isApiError(await failure.json()));
+      }
+      assert.equal(await db.session.count({ where: { userId: member.id } }), 2);
+      assert.equal(events.length, 0);
+      const response = await logout();
+      assert.equal(response.status, 204);
+      assert.equal(await response.text(), '');
+      assert.equal(response.headers.get('cache-control'), 'no-store');
+      assert.equal(response.headers.get('set-cookie'), 'chat_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax');
+      assert.deepEqual(events, [{ sessionId: current.id }]);
+      assert.equal(await db.session.count({ where: { id: current.id } }), 0);
+      assert.equal((await fetch(`${endpoint}/me`, { headers: { cookie: first } })).status, 401);
+      assert.equal((await fetch(`${endpoint}/me`, { headers: { cookie: second } })).status, 200);
+      assert.equal((await logout()).status, 401);
+      assert.equal((await bootstrap(first)).status, 401);
+      assert.equal(events.length, 1);
+    } finally {
+      subscription.unsubscribe();
+      await db.session.deleteMany({ where: { userId: member.id } });
+      await db.user.delete({ where: { id: member.id } });
+    }
+  });
+
   await t.test('serves liveness with real application wiring and closes database connections', async () => {
     assert.equal((await fetch(`${await app.getUrl()}/api/health/live`)).status, 200);
     const connections = await db.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
