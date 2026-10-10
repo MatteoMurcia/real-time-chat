@@ -63,12 +63,16 @@ test('registers once through the real API, redirects, and handles duplicates and
 
   await page.goto('/register');
   await fill();
-  const rejected = page.waitForResponse(response => response.url().endsWith('/api/auth/register') && response.status() === 409);
+  await page.route('**/api/auth/register', async route => {
+    const response = await route.fetch({ maxRedirects: 0, maxRetries: 0 });
+    const duplicate = await response.json();
+    expect(response.status()).toBe(409);
+    expect(Object.keys(duplicate).sort()).toEqual(['code', 'message', 'requestId']);
+    expect(duplicate.code).toBe('CONFLICT');
+    expect(JSON.stringify(duplicate)).not.toContain('a unique test passphrase');
+    await route.fulfill({ response });
+  }, { times: 1 });
   await page.getByRole('button', { name: 'Create account', exact: true }).click();
-  const duplicate = await (await rejected).json();
-  expect(Object.keys(duplicate).sort()).toEqual(['code', 'message', 'requestId']);
-  expect(duplicate.code).toBe('CONFLICT');
-  expect(JSON.stringify(duplicate)).not.toContain('a unique test passphrase');
   await expect(page.getByRole('alert')).toHaveText('An account already uses this email address.');
   await expect(page.getByRole('alert')).toBeFocused();
   await expect(page.getByLabel('Email address', { exact: true })).toHaveAttribute('aria-invalid', 'true');
