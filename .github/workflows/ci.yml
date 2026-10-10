@@ -78,7 +78,7 @@ jobs:
         run: |
           password=$(openssl rand -hex 24)
           echo "::add-mask::$password"
-          printf 'POSTGRES_DB=ci_chat\nPOSTGRES_USER=ci_user\nPOSTGRES_PASSWORD=%s\n' "$password" > .env
+          printf 'POSTGRES_DB=ci_chat\nPOSTGRES_USER=ci_user\nPOSTGRES_PASSWORD=%s\nAPP_ORIGIN=http://localhost:8080\n' "$password" > .env
       - name: Build images and start the application
         run: docker compose up --build --wait --wait-timeout 120
       - name: Verify the public health endpoint
@@ -94,7 +94,8 @@ jobs:
       - name: Verify browser identity flows against the real API
         run: npm run test:e2e
         env:
-          E2E_BASE_URL: http://127.0.0.1:8080
+          E2E_BASE_URL: http://localhost:8080
+          E2E_COMPOSE_PROJECT: ci-chat
       - name: Application diagnostics
         if: failure()
         run: docker compose ps -a && docker compose logs --tail 100
