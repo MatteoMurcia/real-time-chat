@@ -96,6 +96,7 @@ jobs:
         env:
           E2E_BASE_URL: http://localhost:8080
           E2E_COMPOSE_PROJECT: ci-chat
+          E2E_COMPOSE_ENV_FILE: .env
       - name: Application diagnostics
         if: failure()
         run: docker compose ps -a && docker compose logs --tail 100
