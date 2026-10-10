@@ -149,3 +149,40 @@ test('logs out once, handles failure, rejects the old cookie and preserves anoth
     expect(errors).toEqual([]);
   } finally { await other.close(); }
 });
+
+test('recovers when logout commits but its response never reaches the browser', async ({ page, context }) => {
+  const email = `lost-logout-${randomUUID()}@example.test`;
+  const password = 'a unique lost response passphrase';
+  await page.goto('/register');
+  await page.getByLabel('Display name', { exact: true }).fill('Lost Response');
+  await page.getByLabel('Email address', { exact: true }).fill(email);
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Create account', exact: true }).click();
+  await expect(page).toHaveURL(/\/login\?registered=1$/);
+  await page.getByLabel('Email address', { exact: true }).fill(email);
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page).toHaveURL(/\/workspace$/);
+  const oldCookie = (await context.cookies()).find(cookie => cookie.name === 'chat_session')!;
+  let attempts = 0;
+  await page.route('**/api/auth/logout', async route => {
+    attempts++;
+    const response = await route.fetch({ maxRedirects: 0, maxRetries: 0 });
+    expect(response.status()).toBe(204);
+    // route.fetch applies Set-Cookie; restore it to model a response lost before its headers arrive.
+    await context.addCookies([oldCookie]);
+    await route.abort('failed');
+  });
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(page.getByRole('alert')).toHaveText('We could not confirm sign-out. Check your connection and try again.');
+  await expect(page.getByRole('heading', { name: 'Welcome, Lost Response' })).toBeVisible();
+  expect((await context.cookies()).find(cookie => cookie.name === 'chat_session')?.value).toBe(oldCookie.value);
+  expect((await page.request.get('/api/auth/me')).status()).toBe(401);
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(page).toHaveURL(/\/login\?reason=signed-out$/);
+  expect(attempts).toBe(1);
+  await expect(page.getByRole('heading', { name: 'Welcome, Lost Response' })).toHaveCount(0);
+  await page.reload();
+  await page.getByRole('link', { name: 'Try opening your workspace' }).click();
+  await expect(page).toHaveURL(/\/login\?reason=required$/);
+});

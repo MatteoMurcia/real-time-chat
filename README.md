@@ -576,7 +576,10 @@ single submission, keyboard focus, and widths 320/768/1024/1440. Client expiry i
 tested by advancing the browser clock; real server expiry is covered by the API
 integration suite. Logout also checks cookie removal, rejection of a replayed
 cookie, reload, server failure recovery and preservation of a second browser
-session. Screenshots
+session. A separate case forwards logout to the real API, observes its 204, then
+drops the response while retaining the old browser cookie: manual retry discovers
+the revoked session without another logout POST. This verifies response loss after
+revocation rather than treating a timeout as proof of a committed operation. Screenshots
 for visual review are written to ignored `test-results/`; traces are disabled.
 
 Stop only this test stack with `docker compose -p chat-e2e --env-file .env.e2e down`.
