@@ -80,3 +80,64 @@ test('blocks anonymous access, distinguishes network failure and avoids redirect
   expect(checks).toBe(2);
   await expect(page.getByRole('heading', { name: /Welcome,/ })).toHaveCount(0);
 });
+
+test('logs out once, handles failure, rejects the old cookie and preserves another session', async ({ page, context, browser }, testInfo) => {
+  const email = `logout-${randomUUID()}@example.test`;
+  const password = 'a unique logout passphrase';
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/register');
+  await page.getByLabel('Display name', { exact: true }).fill('Logout Browser');
+  await page.getByLabel('Email address', { exact: true }).fill(email);
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Create account', exact: true }).click();
+  await expect(page).toHaveURL(/\/login\?registered=1$/);
+  await page.getByLabel('Email address', { exact: true }).fill(email);
+  await page.getByLabel('Password', { exact: true }).fill(password);
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page).toHaveURL(/\/workspace$/);
+  const oldCookie = (await context.cookies()).find(cookie => cookie.name === 'chat_session')!;
+  const other = await browser.newContext({ baseURL: testInfo.project.use.baseURL });
+  try {
+    const otherPage = await other.newPage();
+    await otherPage.goto('/login');
+    await otherPage.getByLabel('Email address', { exact: true }).fill(email);
+    await otherPage.getByLabel('Password', { exact: true }).fill(password);
+    await otherPage.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await expect(otherPage).toHaveURL(/\/workspace$/);
+    await page.route('**/api/auth/logout', route => route.fulfill({ status: 503, body: 'private detail' }), { times: 1 });
+    await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+    await expect(page.getByRole('alert')).toHaveText('We could not confirm sign-out. Check your connection and try again.');
+    await expect(page.getByRole('alert')).toBeFocused();
+    await expect(page.getByRole('heading', { name: 'Welcome, Logout Browser' })).toBeVisible();
+    for (const width of [320, 768, 1024, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeInViewport();
+      if (width === 320 || width === 1440) await page.screenshot({ path: testInfo.outputPath(`logout-${width}.png`), fullPage: true });
+    }
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    let attempts = 0;
+    await page.route('**/api/auth/logout', async route => { attempts++; await gate; await route.continue(); });
+    await page.getByRole('button', { name: 'Sign out', exact: true }).focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('button', { name: 'Signing out…' })).toBeDisabled();
+    await page.keyboard.press('Enter');
+    release();
+    await expect(page).toHaveURL(/\/login\?reason=signed-out$/);
+    await expect(page.getByText('You are signed out.', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeFocused();
+    expect(attempts).toBe(1);
+    expect((await context.cookies()).some(cookie => cookie.name === 'chat_session')).toBe(false);
+    expect(await page.evaluate(() => [document.cookie, localStorage.length, sessionStorage.length])).toEqual(['', 0, 0]);
+    expect((await page.request.get('/api/auth/me', { headers: { cookie: `${oldCookie.name}=${oldCookie.value}` } })).status()).toBe(401);
+    await page.reload();
+    await page.getByRole('link', { name: 'Try opening your workspace' }).click();
+    await expect(page).toHaveURL(/\/login\?reason=required$/);
+    await expect(page.getByRole('heading', { name: 'Welcome, Logout Browser' })).toHaveCount(0);
+    await otherPage.reload();
+    await expect(otherPage.getByRole('heading', { name: 'Welcome, Logout Browser' })).toBeVisible();
+    expect(errors).toEqual([]);
+  } finally { await other.close(); }
+});

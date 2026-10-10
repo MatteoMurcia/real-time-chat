@@ -3,6 +3,8 @@
   <h1 tabindex="-1">{{ registered() ? 'Account created' : 'Sign in' }}</h1>
   @if (registered()) {
     <p>Your registration is complete. Sign in to continue.</p>
+  } @else if (reason() === 'signed-out') {
+    <p role="status">You are signed out.</p>
   } @else if (reason() === 'required' || reason() === 'expired') {
     <p role="status">Your session is missing or expired. Sign in to access your workspace.</p>
   } @else if (reason() === 'unavailable') {
