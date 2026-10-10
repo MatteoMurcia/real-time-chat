@@ -21,6 +21,8 @@ current session. The workspace establishes an authenticated Socket.IO connection
 through the same-origin proxy and shows reconnecting feedback after interruption.
 Chat messages remain pending. See [local Socket.IO setup](docs/local-development.md)
 for localhost configuration and the isolated restart test.
+See [container persistence checks](docs/local-development.md#stop-recreate-and-verify-persistence-manually)
+for recreating containers, preserving sessions and testing a separate empty database.
 
 The implementation checklist is maintained in [tasks/plan.md](tasks/plan.md).
 Product choices and scope are documented in
@@ -573,10 +575,14 @@ npx playwright install chromium
 Set `E2E_BASE_URL=http://127.0.0.1:18083` in your shell (`$env:E2E_BASE_URL =
 'http://127.0.0.1:18083'` in PowerShell; `export E2E_BASE_URL=http://127.0.0.1:18083`
 in Bash). Also set `E2E_COMPOSE_PROJECT=chat-e2e` (`$env:E2E_COMPOSE_PROJECT =
-'chat-e2e'` in PowerShell; `export E2E_COMPOSE_PROJECT=chat-e2e` in Bash), then run
+'chat-e2e'` in PowerShell; `export E2E_COMPOSE_PROJECT=chat-e2e` in Bash), and set
+`E2E_COMPOSE_ENV_FILE=.env.e2e` in the same shell, then run
 `npm run test:e2e`. The suite requires the explicit URL and disposable project. Its
 handshake test stops and starts only that project's API container and checks a
 new WebSocket upgrade after automatic reconnection, retaining the session cookie. It
+also recreates all containers in that isolated project with base Compose, retains
+the named volume, restores the existing session and signs in again. Run against
+an exclusively reserved stack; the suite interrupts it but never deletes its volume. It
 checks real registration/login/logout, duplicates and wrong credentials, delayed session
 restoration, reload/navigation, anonymous 401, injected server failure and recovery,
 single submission, keyboard focus, and widths 320/768/1024/1440. Client expiry is

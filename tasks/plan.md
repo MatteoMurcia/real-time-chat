@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-10 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a implementada y verificada localmente y en CI, pendiente de revisión y merge de PR #20. CP0-C pendiente.
+Revisión: 3 · Actualización: 2026-10-10 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b verificada localmente, PR #21 pendiente de revisión y merge manual. CP0-C pendiente.
 
 ## 1. Cómo usar este plan
 
@@ -448,13 +448,13 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
 
 **Checkpoint CP1-B — VERIFICADO (2026-10-10):** flujo completo de identidad y límites de sesión revisados; suite de identidad, integración, cinco E2E y build correctos. Evidencia detallada al final del documento; integrado mediante PR #19.
 
-- [x] **1.3a — Validar handshake autenticado a través del proxy local** · M · Depende de: 1.2c, 0.3b. Implementada y verificada en PR #20; pendiente de revisión y merge manual.
+- [x] **1.3a — Validar handshake autenticado a través del proxy local** · M · Depende de: 1.2c, 0.3b. Integrada mediante PR #20.
   - Trabajo: gateway autenticado y rutas de proxy HTTP/Socket.IO en las imágenes de 0.2c; parametrizar origen y cookies para localhost.
   - Aceptación: login y conexión persistente funcionan en http://localhost:8080; origen ajeno rechazado y configuración Secure preparada para HTTPS futuro.
   - Verificar: cliente real desde navegador, handshake y reconexión al reiniciar el contenedor API.
   - Archivos: docker/nginx.conf, gateway, prueba handshake, .env.example, docs/local-development.md.
 
-- [ ] **1.3b — Validar imágenes compiladas y persistencia local** · M · Depende de: 1.3a.
+- [x] **1.3b — Validar imágenes compiladas y persistencia local** · M · Depende de: 1.3a. Verificada en PR #21; pendiente de revisión y merge manual.
   - Trabajo: comprobar Compose normal sin bind mounts ni herramientas instaladas en host; documentar arranque, parada y diagnóstico.
   - Aceptación: build limpio, migración y sesión funcionan; down/up conserva usuarios y permite login de nuevo.
   - Verificar: recrear contenedores conservando el volumen y probar otra base vacía aislada; no ejecutar down -v contra la base de trabajo.
@@ -929,3 +929,17 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Límites: validación de sesión en cada nueva conexión/reconexión; revocación/caducidad de sockets ya abiertos queda en 3.4a y autorización por operación en tareas de canales/mensajes. CP0-C sigue pendiente. Sin despliegue remoto.
 - Siguiente tarea tras revisión/merge manual: **1.3b — Validar imágenes compiladas y persistencia local**.
 - Seguimiento CI: Chromium perdió el cuerpo de la respuesta 409 en el E2E previo de registro. Se captura ahora mediante route.fetch antes de entregarla al navegador, igual que el alta 201, conservando todas las aserciones y sin reintentos de POST. Lint y los seis E2E locales pasan nuevamente; stack temporal eliminado otra vez.
+
+
+### Evidencia 1.3b — Imágenes compiladas y persistencia local (2026-10-10)
+
+- Rama `test/1.3b-container-persistence` desde `main` en `fbf5a37`, con PR #20 integrada. PR #21; commits separados de prueba/CI y documentación. Sin cambios de lógica de aplicación, esquema, dependencias o Dockerfiles: la configuración existente cumple el alcance.
+- Build local sin caché de las tres imágenes con Compose base, sin overrides de desarrollo/host. Instalación, generación Prisma, 26 pruebas API, 20 web y compilación dentro de Linux. El runtime solo requiere Docker/Compose; Node/Playwright del host se utilizó para la automatización del navegador, no para ejecutar la aplicación.
+- Stack aislado `chat-e2e` en puerto 18083: migración inicial, healthchecks y siete E2E Chromium correctos. La nueva prueba comprueba etiquetas de proyecto desechable, ausencia de bind mounts y montaje del volumen nombrado en PostgreSQL. Ejecuta down sin borrar volúmenes y up con --no-build, verifica IDs nuevos para db/migrate/api/web, migración con salida 0, misma cookie/sesión tras recarga, Socket.IO y nuevo login después de logout.
+- Tras recreación, Prisma informa que no hay migraciones pendientes. Control negativo: sustituir down por stop hizo fallar la comparación de IDs; fuente restaurada y prueba de persistencia correcta de nuevo. Lint y diff --check correctos.
+- Segunda base aislada `chat-fresh` en puerto 18084 con las mismas imágenes compiladas: volumen inexistente antes del arranque, migración aplicada y cero usuarios comprobados por SQL. Desde Chromium la cuenta del primer stack devuelve 401; registrar ese email en la base nueva, login y Socket.IO funcionan. La base nueva contiene un usuario después del recorrido.
+- CI incorpora E2E_COMPOSE_ENV_FILE para recrear exclusivamente el stack de prueba con su configuración explícita. Ejecución serial, sin reintentos de tests y sin borrado de volumen desde la prueba. No ejecutar la suite en un stack compartido con uso manual u otras pruebas.
+- Documentados requisitos de runtime frente a herramientas de test, down/up y stop/start, credenciales persistentes, build limpio, segunda base y diagnóstico de migración/origen/puerto.
+- Limpieza: eliminados contenedores, redes, volúmenes y archivos de credenciales de ambos proyectos temporales después de comprobar sus etiquetas; `real-time-chat_postgres_data` conservado.
+- Límites: Chromium/HTTP local, sin despliegue remoto ni TLS; no prueba de recuperación ante pérdida de disco ni backup/restore. No certifica CP0-C ni revocación de sockets abiertos (3.4a).
+- Siguiente paso tras revisión y merge manual: revisar la salida **CP1-C**, antes de comenzar canales en 2.1a.
