@@ -16,7 +16,8 @@ Prisma manages the User/Session schema and the API database connection lifecycle
 Container development supports automatic source reload. Account registration is
 available at `/register`, with validation, safe errors and submission feedback.
 Success redirects to `/login` with confirmation. Sign-in opens `/workspace`,
-which restores the session before rendering. Logout and chat remain pending.
+which restores the session before rendering and lets users sign out of their
+current session. Chat remains pending.
 
 The implementation checklist is maintained in [tasks/plan.md](tasks/plan.md).
 Product choices and scope are documented in
@@ -501,10 +502,27 @@ Sessions survive API restart because validation depends on the database, not an
 in-memory session map. Expired rows are rejected but are not automatically pruned.
 Changing the TTL affects newly issued sessions only.
 
-Current-session logout and authenticated CSRF binding are task 1.2c.
-`/auth/csrf` currently issues pre-auth tokens for
-registration/login; there are no authenticated mutation endpoints yet. Other
-sessions are not revoked on login. Rate limiting remains in task 4.1a.
+`GET /api/auth/session/csrf` requires a valid session and matching origin (or
+same-origin Referer). It returns `{ "csrfToken": "…" }` with `no-store`, without
+setting a cookie. Its HMAC binds a random nonce and ten-minute expiry to the
+internal session ID, which is never exposed in the token. Send it in
+`X-CSRF-Token` with the session cookie and matching origin to
+`POST /api/auth/logout` (no body required). Pre-auth tokens and tokens from another
+session cannot authorize logout. `/auth/csrf` remains for registration/login.
+
+Logout deletes only the current session and returns an empty `204` with
+`Cache-Control: no-store`. Its clearing cookie uses the same name, Path, HttpOnly,
+SameSite and Secure policy as login, with `Max-Age=0`. A revoked token immediately
+fails `/me`; another session stays valid. Missing, expired or already revoked
+sessions return `401`; invalid CSRF/origin returns `403`. Database failure does
+not clear the cookie or confirm success. No session ID supplied by the client is
+used as a revocation target.
+
+After deletion, `SessionService.revoked` emits `{ sessionId }` locally, once per
+deleted row. This is the hook for later socket disconnection, not a durable or
+cross-process event bus. CSRF signing keys are process-local: restart requires a
+fresh token, and multiple API instances need shared signing configuration before
+deployment. Other sessions are not revoked on login. Rate limiting remains in task 4.1a.
 The design follows [OWASP session management guidance](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
 for random session identifiers, cookie controls and server-side expiry; it does
 not claim to implement every recommended control at this stage.
@@ -531,7 +549,13 @@ An expiry timer clears the in-memory identity and leaves the workspace when the
 reported absolute expiry is reached. This is a UI control; server-side session
 validation remains the authority, including when the client clock is inaccurate.
 The workspace currently confirms the signed-in identity and reserves space for
-future conversations. It does not simulate messaging or implement logout.
+future conversations. Its Sign out button prevents duplicate submission and
+returns to login after confirmed logout (or 401 indicating no valid session).
+It clears the identity and expiry timer; an older in-flight `/me` response cannot
+restore the cleared identity. Network errors, 403 and timeouts retain local state
+and show a focused error with manual retry, never falsely claiming successful
+revocation. Other open tabs discover revocation on their next session check;
+immediate cross-tab notification is not implemented. Messaging remains pending.
 
 The Playwright suite uses Chromium against a real Compose stack. It creates
 accounts, so use an isolated project and environment file. Copy `.env.example` to
@@ -546,11 +570,13 @@ npx playwright install chromium
 Set `E2E_BASE_URL=http://127.0.0.1:18083` in your shell (`$env:E2E_BASE_URL =
 'http://127.0.0.1:18083'` in PowerShell; `export E2E_BASE_URL=http://127.0.0.1:18083`
 in Bash), then run `npm run test:e2e`. The suite requires this explicit URL. It
-checks real registration/login, duplicates and wrong credentials, delayed session
+checks real registration/login/logout, duplicates and wrong credentials, delayed session
 restoration, reload/navigation, anonymous 401, injected server failure and recovery,
 single submission, keyboard focus, and widths 320/768/1024/1440. Client expiry is
 tested by advancing the browser clock; real server expiry is covered by the API
-integration suite. Screenshots
+integration suite. Logout also checks cookie removal, rejection of a replayed
+cookie, reload, server failure recovery and preservation of a second browser
+session. Screenshots
 for visual review are written to ignored `test-results/`; traces are disabled.
 
 Stop only this test stack with `docker compose -p chat-e2e --env-file .env.e2e down`.
