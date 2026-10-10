@@ -1,0 +1,57 @@
+import { DestroyRef, inject, Injectable, signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
+import type { LoginRequest, SessionResponse } from '@real-time-chat/contracts/auth';
+import { catchError, defer, finalize, map, of, throwError } from 'rxjs';
+import { AuthClient } from './auth-client';
+
+@Injectable({ providedIn: 'root' })
+export class SessionStore {
+  private readonly client = inject(AuthClient);
+  private readonly current = signal<SessionResponse | null>(null);
+  private readonly phase = signal<'unknown' | 'checking' | 'authenticated' | 'anonymous' | 'error'>('unknown');
+  private expiryTimer: ReturnType<typeof setTimeout> | undefined;
+  readonly session = this.current.asReadonly();
+  readonly status = this.phase.asReadonly();
+
+  constructor() { inject(DestroyRef).onDestroy(() => clearTimeout(this.expiryTimer)); }
+
+  login(input: LoginRequest) {
+    return this.client.login(input).pipe(map(session => this.accept(session)));
+  }
+
+  restore() {
+    return defer(() => {
+      this.phase.set('checking');
+      return this.client.me().pipe(
+        map(session => this.accept(session)),
+        catchError((error: unknown) => {
+          this.clear();
+          if (error instanceof HttpErrorResponse && error.status === 401) return of(null);
+          this.phase.set('error');
+          return throwError(() => error);
+        }),
+        finalize(() => { if (this.phase() === 'checking') this.phase.set('unknown'); }),
+      );
+    });
+  }
+
+  private accept(session: SessionResponse): SessionResponse | null {
+    this.clear();
+    if (Date.parse(session.expiresAt) <= Date.now()) return null;
+    this.current.set(session);
+    this.phase.set('authenticated');
+    const expire = () => {
+      const remaining = Date.parse(session.expiresAt) - Date.now();
+      if (remaining <= 0) this.clear();
+      else this.expiryTimer = setTimeout(expire, Math.min(remaining, 2147483647));
+    };
+    expire();
+    return session;
+  }
+
+  private clear(): void {
+    clearTimeout(this.expiryTimer);
+    this.current.set(null);
+    this.phase.set('anonymous');
+  }
+}

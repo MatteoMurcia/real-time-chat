@@ -4,6 +4,11 @@
   <nav aria-label="Main navigation">
     <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" ariaCurrentWhenActive="page">Overview</a>
     <a routerLink="/register" routerLinkActive="active" ariaCurrentWhenActive="page">Create account</a>
+    <a routerLink="/workspace" routerLinkActive="active" ariaCurrentWhenActive="page">Workspace</a>
+    @if (!sessions.session()) { <a routerLink="/login" routerLinkActive="active" ariaCurrentWhenActive="page">Sign in</a> }
   </nav>
 </header>
-<main id="main" tabindex="-1"><router-outlet /></main>
+<main id="main" tabindex="-1">
+  @if (sessions.status() === 'checking') { <p role="status">Checking your session…</p> }
+  <router-outlet />
+</main>

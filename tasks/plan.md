@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-09 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a implementada y verificada, pendiente de revisión y merge del propietario. CP0-C pendiente.
+Revisión: 3 · Actualización: 2026-10-09 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a integrada; 1.2b implementada y verificada, pendiente de revisión y merge del propietario. CP0-C pendiente.
 
 ## 1. Cómo usar este plan
 
@@ -430,12 +430,12 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
 
 **Checkpoint CP1-A — VERIFICADO (2026-10-09):** cuenta creada desde navegador; PostgreSQL almacena hashes Argon2id y las respuestas solo exponen campos públicos. Evidencia detallada al final del documento; integrado mediante PR #15.
 
-- [x] **1.2a — Crear y consultar sesiones** · M · Depende de: 1.1a. Implementada en rama; revisión y merge pendientes del propietario.
+- [x] **1.2a — Crear y consultar sesiones** · M · Depende de: 1.1a. Integrada mediante PR #16.
   - Trabajo: login, cookie segura, hash de token, expiración absoluta y /me.
   - Aceptación: credenciales incorrectas dan error genérico; sesión válida se restaura y sesión caducada se rechaza.
   - Verificar: integración de cookie, token desconocido, expiración y CSRF en login.
   - Archivos: `apps/api/src/identity/session.service.ts`, `session.controller.ts`, `password.ts`, `apps/api/test/session.spec.ts`, integración de BD y contrato auth. `/me` valida directamente mediante el servicio; añadir guard al compartir protección entre más endpoints.
-- [ ] **1.2b — Integrar login y rutas protegidas** · M · Depende de: 1.2a, 1.1b.
+- [x] **1.2b — Integrar login y rutas protegidas** · M · Depende de: 1.2a, 1.1b. Implementada en rama; revisión y merge pendientes del propietario.
   - Trabajo: pantalla login, estado de sesión y restauración antes de resolver rutas protegidas.
   - Aceptación: recarga mantiene sesión; 401 muestra acceso requerido y no crea bucles de redirección.
   - Verificar: E2E login → recarga → navegación; error y sesión expirada.
@@ -869,3 +869,16 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Límites explícitos: sesiones caducadas se rechazan pero no se purgan automáticamente; CSRF vinculado a sesión se añadirá junto a logout en 1.2c, antes de introducir mutaciones autenticadas. Rate limiting permanece en 4.1a; no se certifica despliegue público.
 - Siguiente tarea: **1.2b — Integrar login y rutas protegidas**, tras revisión y merge manual. CP0-C sigue pendiente.
 - Limpieza: stack/volumen de verificación eliminados tras comprobar etiqueta de proyecto; volumen principal conservado.
+
+### Evidencia 1.2b — Login y rutas protegidas en Angular (2026-10-09)
+
+- Rama `feature/1.2b-angular-login` desde `main` en `85e8513`, con PR #16 integrada. Commits separados para cliente/store/guard, formulario/vista protegida/E2E y documentación.
+- Formulario accesible de login, CSRF fresco por intento, validación local, error genérico de credenciales, bloqueo de doble envío, cancelación al abandonar el formulario y timeout sin reintento automático del POST. Contraseña preservada y borrada tras éxito.
+- `/workspace` espera a `/auth/me` antes de renderizar, también tras recarga. El guard devuelve UrlTree a login ante 401; errores de red/respuesta inválida/timeout tienen mensaje y reintento explícitos. Parámetros de aviso reactivos evitan mensajes obsoletos cuando Angular reutiliza login. Destino de login fijo, sin redirecciones externas controladas por entrada.
+- Estado de sesión únicamente en memoria, campos públicos seleccionados y temporizador de expiración absoluta que borra identidad y abandona la vista protegida. El servidor sigue siendo la autoridad de autenticación; no se confía en el guard para proteger datos API.
+- Verificación local: lint, typecheck, build, audit; 24 pruebas API, 16 web, 3 contratos y 2 Docker correctas. Tres E2E Chromium pasan contra Docker/Nginx/API/PostgreSQL reales: registro existente; login incorrecto/correcto, doble envío, restauración retenida sin mostrar contenido protegido, recarga/navegación, cookie HttpOnly y almacenamiento vacío; acceso anónimo y fallo 503 sin bucles.
+- Caducidad de interfaz comprobada adelantando el reloj del navegador hasta expiresAt; no se presenta como caducidad real de la BD (cubierta por la integración API de 1.2a). Control negativo: invertir la decisión del guard hizo fallar dos pruebas; restaurado el archivo, las 16 pruebas web pasan.
+- Comprobados 320/768/1024/1440 px sin overflow; capturas móvil/escritorio revisadas, foco y teclado verificados, sin errores de ejecución en el recorrido de login. Diseño mantiene estilos existentes; no se afirma auditoría WCAG completa.
+- Workspace solo confirma identidad y reserva espacio para conversaciones futuras. Logout queda en **1.2c**, siguiente tarea tras revisión y merge manual. CP1-B se revisará después de logout; CP0-C continúa pendiente. Sin despliegue remoto.
+- Limpieza: stack y volumen temporales eliminados tras comprobar su etiqueta de proyecto; volumen principal conservado.
+- Seguimiento CI (2026-10-10): el E2E de registro encontró una carrera al leer el cuerpo después de la navegación. Se inspecciona ahora la respuesta real con route.fetch antes de entregarla al navegador, conservando todas las aserciones y sin reintentos de POST. Lint y los tres E2E pasan de nuevo en Docker local.

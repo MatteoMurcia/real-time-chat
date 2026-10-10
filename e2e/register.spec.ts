@@ -37,21 +37,24 @@ test('registers once through the real API, redirects, and handles duplicates and
   await page.route('**/api/auth/register', async route => {
     attempts++;
     await held;
-    await route.continue();
+    // Read the real response before the app can navigate and Chromium discards its body.
+    const response = await route.fetch({ maxRedirects: 0, maxRetries: 0 });
+    const account = await response.json();
+    expect(response.status()).toBe(201);
+    expect(Object.keys(account)).toEqual(['user']);
+    expect(Object.keys(account.user).sort()).toEqual(['createdAt', 'displayName', 'email', 'id']);
+    expect(account.user.email).toBe(email);
+    expect(JSON.stringify(account)).not.toContain('a unique test passphrase');
+    expect(response.headers()['cache-control']).toBe('no-store');
+    expect(response.headers()['set-cookie']).toBeUndefined();
+    await route.fulfill({ response });
   });
   await page.keyboard.press('Enter');
   await expect(page.getByRole('button', { name: 'Creating account…' })).toBeDisabled();
   await page.keyboard.press('Enter');
   const registered = page.waitForResponse(response => response.url().endsWith('/api/auth/register') && response.status() === 201);
   release();
-  const response = await registered;
-  const account = await response.json();
-  expect(Object.keys(account)).toEqual(['user']);
-  expect(Object.keys(account.user).sort()).toEqual(['createdAt', 'displayName', 'email', 'id']);
-  expect(account.user.email).toBe(email);
-  expect(JSON.stringify(account)).not.toContain('a unique test passphrase');
-  expect(response.headers()['cache-control']).toBe('no-store');
-  expect(response.headers()['set-cookie']).toBeUndefined();
+  await registered;
   await expect(page).toHaveURL(/\/login\?registered=1$/);
   expect(attempts).toBe(1);
   await expect(page.getByRole('heading', { name: 'Account created' })).toBeFocused();
