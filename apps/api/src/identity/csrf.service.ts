@@ -1,6 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import type { IncomingHttpHeaders } from 'node:http';
 import { ForbiddenException } from '@nestjs/common';
+import { verifyOrigin } from './request-origin.js';
 
 export class CsrfService {
   private readonly secret = randomBytes(32);
@@ -11,11 +12,7 @@ export class CsrfService {
   }
 
   private checkOrigin(headers: IncomingHttpHeaders): void {
-    let origin = headers.origin;
-    if (!origin && headers.referer) {
-      try { origin = new URL(headers.referer).origin; } catch { throw new ForbiddenException(); }
-    }
-    if (origin !== this.origin) throw new ForbiddenException();
+    verifyOrigin(headers, this.origin);
   }
 
   private sign(value: string): string {
