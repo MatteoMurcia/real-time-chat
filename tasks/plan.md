@@ -896,3 +896,4 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Límites: sin notificación inmediata entre pestañas ni eventos distribuidos; cada pestaña descubre revocación al consultar sesión. Clave CSRF por proceso, nuevo token tras reinicio. Rate limiting permanece en 4.1a; CP0-C sigue pendiente. Sin despliegue remoto.
 - Siguiente paso: **Checkpoint CP1-B**, tras revisión y merge manual de esta PR. Este registro no da el checkpoint por aprobado.
 - Limpieza final: stack y volumen `logout-verification` eliminados tras verificar etiqueta de proyecto; volumen principal `real-time-chat_postgres_data` conservado.
+- Seguimiento CI: el test previo de login también mostró la carrera de Chromium al leer el cuerpo después de navegación. Se captura expiresAt desde la respuesta real antes de entregarla al navegador, como en registro; se conserva cobertura y no se reintenta el POST.

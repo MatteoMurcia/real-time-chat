@@ -30,7 +30,15 @@ test('signs in once, restores before rendering, survives reload and clears expir
   const loginGate = new Promise<void>(resolve => { releaseLogin = resolve; });
   const sessionGate = new Promise<void>(resolve => { releaseSession = resolve; });
   let attempts = 0;
-  await page.route('**/api/auth/login', async route => { attempts++; await loginGate; await route.continue(); });
+  let expiresAt = '';
+  await page.route('**/api/auth/login', async route => {
+    attempts++;
+    await loginGate;
+    // Capture expiry before Angular navigation can discard Chromium's response body.
+    const response = await route.fetch({ maxRedirects: 0, maxRetries: 0 });
+    expiresAt = (await response.json()).expiresAt;
+    await route.fulfill({ response });
+  });
   await page.route('**/api/auth/me', async route => { await sessionGate; await route.continue(); });
   const loggedIn = page.waitForResponse(response => response.url().endsWith('/api/auth/login') && response.status() === 200);
   await page.getByLabel('Password', { exact: true }).focus();
@@ -40,7 +48,7 @@ test('signs in once, restores before rendering, survives reload and clears expir
   await expect(page.getByRole('button', { name: 'Signing in…' })).toBeDisabled();
   await page.keyboard.press('Enter');
   releaseLogin();
-  const session = await (await loggedIn).json();
+  await loggedIn;
   await expect(page.getByText('Checking your session…', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Welcome, Session Browser' })).toHaveCount(0);
   releaseSession();
@@ -56,7 +64,7 @@ test('signs in once, restores before rendering, survives reload and clears expir
   await page.getByRole('link', { name: 'Overview', exact: true }).click();
   await page.getByRole('link', { name: 'Workspace', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Welcome, Session Browser' })).toBeVisible();
-  const remaining = Date.parse(session.expiresAt) - await page.evaluate(() => Date.now());
+  const remaining = Date.parse(expiresAt) - await page.evaluate(() => Date.now());
   await page.clock.fastForward(Math.max(1, remaining));
   await expect(page).toHaveURL(/\/login\?reason=expired$/);
   await expect(page.getByText('Your session is missing or expired.', { exact: false })).toBeVisible();
