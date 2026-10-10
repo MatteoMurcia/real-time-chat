@@ -17,7 +17,10 @@ Container development supports automatic source reload. Account registration is
 available at `/register`, with validation, safe errors and submission feedback.
 Success redirects to `/login` with confirmation. Sign-in opens `/workspace`,
 which restores the session before rendering and lets users sign out of their
-current session. Chat remains pending.
+current session. The workspace establishes an authenticated Socket.IO connection
+through the same-origin proxy and shows reconnecting feedback after interruption.
+Chat messages remain pending. See [local Socket.IO setup](docs/local-development.md)
+for localhost configuration and the isolated restart test.
 
 The implementation checklist is maintained in [tasks/plan.md](tasks/plan.md).
 Product choices and scope are documented in
@@ -569,7 +572,11 @@ npx playwright install chromium
 
 Set `E2E_BASE_URL=http://127.0.0.1:18083` in your shell (`$env:E2E_BASE_URL =
 'http://127.0.0.1:18083'` in PowerShell; `export E2E_BASE_URL=http://127.0.0.1:18083`
-in Bash), then run `npm run test:e2e`. The suite requires this explicit URL. It
+in Bash). Also set `E2E_COMPOSE_PROJECT=chat-e2e` (`$env:E2E_COMPOSE_PROJECT =
+'chat-e2e'` in PowerShell; `export E2E_COMPOSE_PROJECT=chat-e2e` in Bash), then run
+`npm run test:e2e`. The suite requires the explicit URL and disposable project. Its
+handshake test stops and starts only that project's API container and checks a
+new WebSocket upgrade after automatic reconnection, retaining the session cookie. It
 checks real registration/login/logout, duplicates and wrong credentials, delayed session
 restoration, reload/navigation, anonymous 401, injected server failure and recovery,
 single submission, keyboard focus, and widths 320/768/1024/1440. Client expiry is

@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-10 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c integradas; CP1-B verificado, pendiente de revisión y merge del propietario. CP0-C pendiente.
+Revisión: 3 · Actualización: 2026-10-10 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a implementada y verificada en CI, cierre local pendiente por Docker Desktop sin respuesta. CP0-C pendiente.
 
 ## 1. Cómo usar este plan
 
@@ -446,9 +446,9 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
   - Verificar: integración con dos sesiones y E2E de logout/recarga.
   - Archivos: servicio/controller de sesiones, store web, `apps/api/test/logout.spec.ts`, `e2e/session.spec.ts`.
 
-**Checkpoint CP1-B — VERIFICADO (2026-10-10):** flujo completo de identidad y límites de sesión revisados; suite de identidad, integración, cinco E2E y build correctos. Evidencia detallada al final del documento; pendiente de revisión y merge del propietario.
+**Checkpoint CP1-B — VERIFICADO (2026-10-10):** flujo completo de identidad y límites de sesión revisados; suite de identidad, integración, cinco E2E y build correctos. Evidencia detallada al final del documento; integrado mediante PR #19.
 
-- [ ] **1.3a — Validar handshake autenticado a través del proxy local** · M · Depende de: 1.2c, 0.3b.
+- [ ] **1.3a — Validar handshake autenticado a través del proxy local** · M · Depende de: 1.2c, 0.3b. Implementada en PR #20; CI correcto, comprobación y limpieza local pendientes por Docker Desktop sin respuesta.
   - Trabajo: gateway autenticado y rutas de proxy HTTP/Socket.IO en las imágenes de 0.2c; parametrizar origen y cookies para localhost.
   - Aceptación: login y conexión persistente funcionan en http://localhost:8080; origen ajeno rechazado y configuración Secure preparada para HTTPS futuro.
   - Verificar: cliente real desde navegador, handshake y reconexión al reiniciar el contenedor API.
@@ -914,3 +914,17 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Límites conservados: rate limiting en 4.1a, purga periódica pendiente si crece la tabla, claves CSRF y eventos por proceso, sin aviso inmediato entre pestañas ni desconexión socket implementada. Solo Chromium/HTTP local en navegador; política HTTPS comprobada en pruebas de API, no mediante despliegue TLS. CP0-C sigue pendiente; este checkpoint no certifica producción.
 - Limpieza: stack, red, volumen temporal y archivo de credenciales eliminados tras verificar etiqueta de proyecto; `real-time-chat_postgres_data` conservado.
 - Siguiente tarea: **1.3a — Validar handshake autenticado a través del proxy local**, después de revisión y merge manual de la PR del checkpoint.
+
+### Evidencia 1.3a — Handshake autenticado (2026-10-10, cierre local pendiente)
+
+- Rama `feature/1.3a-authenticated-handshake` desde `main` en `9a2fc0f`, con CP1-B integrado mediante PR #19. PR #20 en borrador; commits separados de gateway/dependencias, cliente/proxies/E2E y documentación.
+- Nest gateway con Socket.IO 4.8.3, compatible con el adaptador Nest 12.1.2. Middleware Engine.IO aplica el origen exacto (o Referer del mismo origen si no hay Origin) a polling y upgrades. Middleware Socket.IO autentica la cookie en PostgreSQL antes de conectar; guarda solo sessionId/userId del servidor. Payload auth/query no sustituye la cookie. Errores públicos seguros; sin mensajes de chat ni recuperación nativa de estado.
+- Nginx y ambos proxies Angular reenvían /socket.io/ y upgrades. Rutas relativas, cookie HttpOnly existente, límite de frame/body de 8 KiB y timeout proxy de 75 s. Configuración HTTPS conserva __Host-/Secure; no se montó TLS local.
+- Workspace muestra conexión/reconexión/rechazo y permite reintento manual cuando corresponde. Socket acotado al ciclo de vida del workspace; se desconecta al desaparecer la sesión o destruirse la vista. Socket.IO reconecta con backoff tras interrupción de transporte; no reintenta automáticamente un rechazo de autenticación.
+- Verificación local completada antes/durante el fallo del motor: 26 pruebas API, 20 web, 10 resultados de integración PostgreSQL con clientes Socket.IO reales, 2 pruebas Docker, lint, typecheck web, build web y audit sin vulnerabilidades conocidas. Integración cubre ambos transportes, origen ajeno, petición posterior con sid válido desde otro origen, cookies ausentes/malformadas/desconocidas/duplicadas, caducidad, revocación y credenciales auth ignoradas.
+- CI Quality y Containers pasaron en la primera ejecución de PR #20 (run 38055767099): suite completa, typecheck/build, integración y seis E2E en http://localhost:8080. El E2E nuevo autentica, observa WebSocket, detiene exclusivamente el API del proyecto desechable, comprueba feedback de reconexión, arranca API en finally y verifica otro upgrade con la misma cookie, recarga y logout.
+- Control negativo local: invertir la comparación de origen rompió dos pruebas CSRF. Fuente restaurada; las 26 pruebas API pasan nuevamente.
+- Incidencia local: Docker Desktop dejó de responder durante la construcción de imágenes (EOF de BuildKit, consultas Docker agotadas o HTTP 500). No se reinició globalmente porque puede interrumpir otros proyectos; se solicitó confirmación al propietario. Esto no se presenta como un fallo de la aplicación ni como verificación local completada.
+- Pendiente de cierre: recuperar Docker, completar el recorrido navegador en este equipo y eliminar únicamente stack/volumen `handshake-verification` tras verificar etiqueta. Configuración temporal ignorada en `.git/handshake.env`; el volumen principal no se ha modificado. No se afirma limpieza del stack mientras el motor no responde.
+- Límites: validación de sesión en cada nueva conexión/reconexión; revocación/caducidad de sockets ya abiertos queda en 3.4a y autorización por operación en tareas de canales/mensajes. CP0-C sigue pendiente. Sin despliegue remoto.
+- Siguiente tarea tras cerrar esta incidencia y revisión/merge manual: **1.3b — Validar imágenes compiladas y persistencia local**.
