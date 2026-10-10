@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-09 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a integrada; 1.2b implementada y verificada, pendiente de revisión y merge del propietario. CP0-C pendiente.
+Revisión: 3 · Actualización: 2026-10-10 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a y 1.2b integradas; 1.2c implementada y verificada, pendiente de revisión y merge del propietario. CP0-C pendiente.
 
 ## 1. Cómo usar este plan
 
@@ -435,12 +435,12 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
   - Aceptación: credenciales incorrectas dan error genérico; sesión válida se restaura y sesión caducada se rechaza.
   - Verificar: integración de cookie, token desconocido, expiración y CSRF en login.
   - Archivos: `apps/api/src/identity/session.service.ts`, `session.controller.ts`, `password.ts`, `apps/api/test/session.spec.ts`, integración de BD y contrato auth. `/me` valida directamente mediante el servicio; añadir guard al compartir protección entre más endpoints.
-- [x] **1.2b — Integrar login y rutas protegidas** · M · Depende de: 1.2a, 1.1b. Implementada en rama; revisión y merge pendientes del propietario.
+- [x] **1.2b — Integrar login y rutas protegidas** · M · Depende de: 1.2a, 1.1b. Integrada mediante PR #17.
   - Trabajo: pantalla login, estado de sesión y restauración antes de resolver rutas protegidas.
   - Aceptación: recarga mantiene sesión; 401 muestra acceso requerido y no crea bucles de redirección.
   - Verificar: E2E login → recarga → navegación; error y sesión expirada.
   - Archivos: `apps/web/src/app/features/auth/login.ts`, `login.html`, `core/session.store.ts`, `core/auth.guard.ts`, `e2e/session.spec.ts` con prefijos web correspondientes.
-- [ ] **1.2c — Revocar la sesión actual** · M · Depende de: 1.2a, 1.2b.
+- [x] **1.2c — Revocar la sesión actual** · M · Depende de: 1.2a, 1.2b. Implementada en rama; revisión y merge pendientes del propietario.
   - Trabajo: logout HTTP, limpieza de cookie y estado cliente; evento local de revocación para futura integración socket.
   - Aceptación: token revocado falla en /me; otra sesión del usuario permanece válida.
   - Verificar: integración con dos sesiones y E2E de logout/recarga.
@@ -882,3 +882,18 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Workspace solo confirma identidad y reserva espacio para conversaciones futuras. Logout queda en **1.2c**, siguiente tarea tras revisión y merge manual. CP1-B se revisará después de logout; CP0-C continúa pendiente. Sin despliegue remoto.
 - Limpieza: stack y volumen temporales eliminados tras comprobar su etiqueta de proyecto; volumen principal conservado.
 - Seguimiento CI (2026-10-10): el E2E de registro encontró una carrera al leer el cuerpo después de la navegación. Se inspecciona ahora la respuesta real con route.fetch antes de entregarla al navegador, conservando todas las aserciones y sin reintentos de POST. Lint y los tres E2E pasan de nuevo en Docker local.
+
+### Evidencia 1.2c — Revocación de la sesión actual (2026-10-10)
+
+- Rama `feature/1.2c-session-logout` desde `main` en `811ef23`, con PR #17 integrada. Commits separados para API/CSRF/pruebas, Angular/E2E y documentación.
+- `GET /api/auth/session/csrf` autentica y emite un token HMAC con nonce y caducidad, vinculado al ID interno de sesión sin exponerlo. Logout exige ese token y origen exacto (o Referer del mismo origen); tokens preauth o de otra sesión no sirven.
+- `POST /api/auth/logout` elimina únicamente la fila actual y responde 204/no-store con cookie expirada y atributos equivalentes a login. Token revocado devuelve 401 en /me; otra sesión permanece válida. Sesión ausente/caducada/revocada devuelve 401; CSRF inválido devuelve 403. Error de BD no emite evento ni limpia cookie.
+- `SessionService.revoked` publica `{ sessionId }` después de una eliminación efectiva, sin exponer token/hash. Evento local no durable, preparado para la futura integración socket; no se añade transporte ni dependencia.
+- Botón Sign out accesible, bloqueo de doble envío, feedback pendiente y error enfocado. Éxito o 401 limpian identidad/temporizador y navegan a login; 403, error de red y timeout conservan estado con reintento manual. Una respuesta antigua de /me no puede resucitar la sesión cerrada.
+- Verificación: 26 pruebas API, 18 web, 9 resultados de integración PostgreSQL y 2 Docker; lint y typecheck web correctos, builds de API/web correctos en Docker, audit sin vulnerabilidades conocidas. Cuatro E2E Chromium pasan contra Nginx/API/PostgreSQL reales, incluyendo dos contextos independientes, rechazo de cookie antigua, recarga, fallo 503 y recuperación.
+- Control negativo: sustituir temporalmente la eliminación en BD por éxito simulado hizo fallar la integración de logout (la fila seguía presente). Fuente restaurada y suite de integración ejecutada nuevamente.
+- Teclado/foco y anchos 320/768/1024/1440 comprobados sin overflow; capturas de logout/error móvil y escritorio revisadas. No se afirma auditoría WCAG completa.
+- Límites: sin notificación inmediata entre pestañas ni eventos distribuidos; cada pestaña descubre revocación al consultar sesión. Clave CSRF por proceso, nuevo token tras reinicio. Rate limiting permanece en 4.1a; CP0-C sigue pendiente. Sin despliegue remoto.
+- Siguiente paso: **Checkpoint CP1-B**, tras revisión y merge manual de esta PR. Este registro no da el checkpoint por aprobado.
+- Limpieza final: stack y volumen `logout-verification` eliminados tras verificar etiqueta de proyecto; volumen principal `real-time-chat_postgres_data` conservado.
+- Seguimiento CI: el test previo de login también mostró la carrera de Chromium al leer el cuerpo después de navegación. Se captura expiresAt desde la respuesta real antes de entregarla al navegador, como en registro; se conserva cobertura y no se reintenta el POST.
