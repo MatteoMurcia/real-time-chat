@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-10 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a y 1.2b integradas; 1.2c implementada y verificada, pendiente de revisión y merge del propietario. CP0-C pendiente.
+Revisión: 3 · Actualización: 2026-10-10 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c integradas; CP1-B verificado, pendiente de revisión y merge del propietario. CP0-C pendiente.
 
 ## 1. Cómo usar este plan
 
@@ -440,13 +440,13 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
   - Aceptación: recarga mantiene sesión; 401 muestra acceso requerido y no crea bucles de redirección.
   - Verificar: E2E login → recarga → navegación; error y sesión expirada.
   - Archivos: `apps/web/src/app/features/auth/login.ts`, `login.html`, `core/session.store.ts`, `core/auth.guard.ts`, `e2e/session.spec.ts` con prefijos web correspondientes.
-- [x] **1.2c — Revocar la sesión actual** · M · Depende de: 1.2a, 1.2b. Implementada en rama; revisión y merge pendientes del propietario.
+- [x] **1.2c — Revocar la sesión actual** · M · Depende de: 1.2a, 1.2b. Integrada mediante PR #18.
   - Trabajo: logout HTTP, limpieza de cookie y estado cliente; evento local de revocación para futura integración socket.
   - Aceptación: token revocado falla en /me; otra sesión del usuario permanece válida.
   - Verificar: integración con dos sesiones y E2E de logout/recarga.
   - Archivos: servicio/controller de sesiones, store web, `apps/api/test/logout.spec.ts`, `e2e/session.spec.ts`.
 
-**Checkpoint CP1-B:** flujo completo de identidad y límites de sesión verificados; ejecutar suite de identidad y build.
+**Checkpoint CP1-B — VERIFICADO (2026-10-10):** flujo completo de identidad y límites de sesión revisados; suite de identidad, integración, cinco E2E y build correctos. Evidencia detallada al final del documento; pendiente de revisión y merge del propietario.
 
 - [ ] **1.3a — Validar handshake autenticado a través del proxy local** · M · Depende de: 1.2c, 0.3b.
   - Trabajo: gateway autenticado y rutas de proxy HTTP/Socket.IO en las imágenes de 0.2c; parametrizar origen y cookies para localhost.
@@ -897,3 +897,20 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Siguiente paso: **Checkpoint CP1-B**, tras revisión y merge manual de esta PR. Este registro no da el checkpoint por aprobado.
 - Limpieza final: stack y volumen `logout-verification` eliminados tras verificar etiqueta de proyecto; volumen principal `real-time-chat_postgres_data` conservado.
 - Seguimiento CI: el test previo de login también mostró la carrera de Chromium al leer el cuerpo después de navegación. Se captura expiresAt desde la respuesta real antes de entregarla al navegador, como en registro; se conserva cobertura y no se reintenta el POST.
+
+### Evidencia CP1-B — Identidad y límites de sesión (2026-10-10)
+
+- Base revisada: `main` en `72b401d`, con 1.2c integrada mediante PR #18. Rama `chore/cp1-b-identity-checkpoint`. Resultado: sin hallazgos bloqueantes para el alcance local del checkpoint; se refuerzan pruebas, sin cambios de lógica de aplicación, dependencias ni esquema.
+- Recorrido revisado: formularios → AuthClient/CSRF → controladores/servicios → Argon2id y PostgreSQL → cookie HttpOnly → restauración/guard → caducidad y revocación. Validación autoritativa en API, campos públicos seleccionados, errores genéricos, consultas parametrizadas y búsqueda por tokenHash único. Sin N+1 ni recorridos no acotados en estos endpoints; no se realizó prueba de carga.
+- Registro: normalización y unicidad, hash Argon2id con salt aleatorio, contraseña preservada, sin sesión automática ni secretos en JSON. Login: mismo 401 para cuenta desconocida/contraseña incorrecta, token opaco nuevo, solo digest en BD y expiración absoluta sin renovación por lectura.
+- Límites de sesión: cookies ausentes/malformadas/duplicadas/desconocidas y expiración exacta rechazadas; cookie HTTPS con prefijo __Host-/Secure y limpieza equivalente. Restauración tras nueva instancia API cubierta por integración. Temporizador cliente y respuestas tardías no sustituyen la validación del servidor.
+- CSRF: preauth para registro/login y token firmado vinculado a sesión para logout; origen exacto, caducidad y rechazo de intercambio de tokens. Se amplía integración HTTP para rechazar tokens preauth en logout y cookies inválidas/caducadas tanto en logout como en bootstrap autenticado, sin emitir revocaciones.
+- Logout: eliminación de la sesión actual, token antiguo rechazado, segunda sesión conservada, evento local posterior a eliminación efectiva. Fallos de BD no confirman éxito ni emiten evento; red/timeout no disparan reintentos automáticos.
+- Nueva prueba E2E de resultado incierto: logout llega a la API real y devuelve 204 al interceptor; se descarta la respuesta y se restaura la cookie previa para simular que tampoco llegaron las cabeceras. La interfaz conserva el aviso de resultado no confirmado, /me devuelve 401 y el reintento manual sale a login sin un segundo POST de logout. Recarga no recupera la identidad revocada.
+- Verificación ejecutada: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`, `npm run test:docker`, `npm audit --audit-level=high`, integración API y `npm run test:e2e`. Resultados: 26 API, 18 web, 3 contratos, 2 Docker, 9 resultados de integración PostgreSQL y 5 E2E Chromium correctos; audit sin vulnerabilidades conocidas.
+- Stack aislado `cp1b-verification`, BD nueva `cp1b_test`, Nginx en 18088 y puerto temporal de PostgreSQL 15488. Build/arranque Compose saludables. No se usó el volumen principal para las pruebas.
+- Control negativo: omitir temporalmente `verifySession` en logout hizo fallar la integración (204 recibido frente a 403 esperado). Archivo restaurado desde copia; integración completa correcta después. No queda mutación en fuente ni cambios de aplicación en el diff.
+- Logs de los recorridos del stack: no se encontraron las contraseñas sintéticas probadas, hashes PHC Argon2id ni valores de cookie de sesión. Revisión acotada a esos recorridos, no auditoría exhaustiva de logs futuros.
+- Límites conservados: rate limiting en 4.1a, purga periódica pendiente si crece la tabla, claves CSRF y eventos por proceso, sin aviso inmediato entre pestañas ni desconexión socket implementada. Solo Chromium/HTTP local en navegador; política HTTPS comprobada en pruebas de API, no mediante despliegue TLS. CP0-C sigue pendiente; este checkpoint no certifica producción.
+- Limpieza: stack, red, volumen temporal y archivo de credenciales eliminados tras verificar etiqueta de proyecto; `real-time-chat_postgres_data` conservado.
+- Siguiente tarea: **1.3a — Validar handshake autenticado a través del proxy local**, después de revisión y merge manual de la PR del checkpoint.
