@@ -9,9 +9,11 @@ import { CsrfService } from './identity/csrf.service.js';
 import { SessionController } from './identity/session.controller.js';
 import { SessionService } from './identity/session.service.js';
 import { ChatGateway } from './realtime/chat.gateway.js';
+import { ChannelsController } from './channels/channels.controller.js';
+import { ChannelsService } from './channels/channels.service.js';
 
 @Module({
-  controllers: [LiveController, RegistrationController, SessionController],
+  controllers: [LiveController, RegistrationController, SessionController, ChannelsController],
   providers: [{ provide: APP_FILTER, useClass: ErrorFilter }],
 })
 export class AppModule {
@@ -24,6 +26,7 @@ export class AppModule {
         { provide: DatabaseService, useFactory: () => new DatabaseService(databaseUrl) },
         { provide: CsrfService, useFactory: () => new CsrfService(appOrigin) },
         RegistrationService,
+        ChannelsService,
         { provide: SessionService, inject: [DatabaseService], useFactory: (db: DatabaseService) => new SessionService(db, appOrigin, sessionTtlSeconds) },
       ],
       exports: [DatabaseService],
