@@ -50,6 +50,10 @@ entries are removed when idle; user socket sets are removed on disconnect.
 - PR #24's [CI run](https://github.com/MatteoMurcia/real-time-chat/actions/runs/38147055873)
   passed Quality and Containers: 30 API tests, 27 Angular tests, contract tests,
   strict checks, builds, audit and all 9 E2Es against the compiled proxy stack.
+- The merged `main` [CI run](https://github.com/MatteoMurcia/real-time-chat/actions/runs/38147333820)
+  also completed successfully during this checkpoint.
+- Removed the temporary database, network and credentials after verifying the
+  Compose ownership label. Preserved `real-time-chat_postgres_data`.
 
 ## Limits and next gate
 
