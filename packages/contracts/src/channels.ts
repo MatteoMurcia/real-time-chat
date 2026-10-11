@@ -8,3 +8,4 @@ export interface PublicChannel {
 }
 export interface CreateChannelResponse { channel: PublicChannel }
 export interface ChannelPage { channels: PublicChannel[]; nextCursor: string | null }
+export interface MembershipResponse { channelId: string; isMember: boolean }

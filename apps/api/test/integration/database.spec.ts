@@ -12,6 +12,7 @@ import { hashPassword } from '../../src/identity/password.js';
 import { SessionService } from '../../src/identity/session.service.js';
 import { io, type ManagerOptions, type SocketOptions } from 'socket.io-client';
 import { verifyChannels } from './channels.js';
+import { verifyMembership } from './membership.js';
 
 test('migrations, user/session constraints and application connection lifecycle', async (t) => {
   const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -36,6 +37,7 @@ test('migrations, user/session constraints and application connection lifecycle'
   await app.listen(0, '127.0.0.1');
   const db = app.get(DatabaseService);
   await t.test('creates channels atomically, rejects forged requests and paginates discovery', () => verifyChannels(app, db));
+  await t.test('joins and leaves channels idempotently with session-scoped access', () => verifyMembership(app, db));
   const email = `${randomUUID()}@example.test`;
   const user = await db.user.create({ data: { email, displayName: 'Integration test', passwordHash: 'test-only-hash' } });
   t.after(async () => {

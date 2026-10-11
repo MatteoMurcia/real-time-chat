@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Header, Headers, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Header, Headers, Param, Post, Put, Query } from '@nestjs/common';
 import type { IncomingHttpHeaders } from 'node:http';
 import { SessionService } from '../identity/session.service.js';
 import { CsrfService } from '../identity/csrf.service.js';
@@ -22,5 +22,24 @@ export class ChannelsController {
     this.csrf.verifySession(headers, session.id);
     if (!/^application\/json(?:\s*;|$)/i.test(headers['content-type'] ?? '')) throw new BadRequestException();
     return this.channels.create(session.user.id, body);
+  }
+
+  @Put(':id/membership')
+  @Header('Cache-Control', 'no-store')
+  join(@Headers() headers: IncomingHttpHeaders, @Param('id') id: string, @Body() body: unknown, @Query() query: object) {
+    return this.membership(headers, id, body, query, true);
+  }
+
+  @Delete(':id/membership')
+  @Header('Cache-Control', 'no-store')
+  leave(@Headers() headers: IncomingHttpHeaders, @Param('id') id: string, @Body() body: unknown, @Query() query: object) {
+    return this.membership(headers, id, body, query, false);
+  }
+
+  private async membership(headers: IncomingHttpHeaders, id: string, body: unknown, query: object, isMember: boolean) {
+    const session = await this.sessions.authenticate(headers.cookie);
+    this.csrf.verifySession(headers, session.id);
+    if (body != null || Object.keys(query).length) throw new BadRequestException();
+    return this.channels.setMembership(session.user.id, id, isMember);
   }
 }

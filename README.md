@@ -21,7 +21,8 @@ current session. The workspace establishes an authenticated Socket.IO connection
 through the same-origin proxy and shows reconnecting feedback after interruption.
 Users can create channels and browse a paginated directory in the workspace;
 creation includes the creator's membership. See [channel contracts and verification](docs/channels.md).
-Joining/leaving channels and chat messages remain pending. See [local Socket.IO setup](docs/local-development.md)
+Users can join and leave from the directory, with safe manual retry after an
+unconfirmed response. Channel subscriptions and chat messages remain pending. See [local Socket.IO setup](docs/local-development.md)
 for localhost configuration and the isolated restart test.
 See [container persistence checks](docs/local-development.md#stop-recreate-and-verify-persistence-manually)
 for recreating containers, preserving sessions and testing a separate empty database.

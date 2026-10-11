@@ -11,6 +11,7 @@ import { SessionService } from './identity/session.service.js';
 import { ChatGateway } from './realtime/chat.gateway.js';
 import { ChannelsController } from './channels/channels.controller.js';
 import { ChannelsService } from './channels/channels.service.js';
+import { ChannelAccessService } from './channels/channel-access.service.js';
 
 @Module({
   controllers: [LiveController, RegistrationController, SessionController, ChannelsController],
@@ -27,6 +28,7 @@ export class AppModule {
         { provide: CsrfService, useFactory: () => new CsrfService(appOrigin) },
         RegistrationService,
         ChannelsService,
+        ChannelAccessService,
         { provide: SessionService, inject: [DatabaseService], useFactory: (db: DatabaseService) => new SessionService(db, appOrigin, sessionTtlSeconds) },
       ],
       exports: [DatabaseService],

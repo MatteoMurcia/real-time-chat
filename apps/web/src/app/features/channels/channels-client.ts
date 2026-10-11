@@ -29,9 +29,17 @@ export class ChannelsClient {
   }
 
   create(input: CreateChannelRequest) {
-    return this.auth.authenticatedPost('/api/channels', input).pipe(map(body => {
+    return this.auth.authenticatedRequest('POST', '/api/channels', input).pipe(map(body => {
       if (!body || typeof body !== 'object' || !('channel' in body)) throw new Error('Invalid channel response');
       return readChannel(body.channel);
+    }));
+  }
+
+  setMembership(channelId: string, isMember: boolean) {
+    return this.auth.authenticatedRequest(isMember ? 'PUT' : 'DELETE', `/api/channels/${encodeURIComponent(channelId)}/membership`).pipe(map(body => {
+      if (!body || typeof body !== 'object' || !('channelId' in body) || body.channelId !== channelId
+        || !('isMember' in body) || body.isMember !== isMember) throw new Error('Invalid membership response');
+      return { channelId, isMember };
     }));
   }
 }
