@@ -1,7 +1,8 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
-import type { ChannelPage, CreateChannelRequest, CreateChannelResponse } from '@real-time-chat/contracts/channels';
+import type { ChannelPage, CreateChannelRequest, CreateChannelResponse, MembershipResponse } from '@real-time-chat/contracts/channels';
 import { DatabaseService } from '../database/database.service.js';
 import { Prisma } from '../generated/prisma/client.js';
+import { ChannelAccessService, validateChannelId } from './channel-access.service.js';
 
 const validSlug = (slug: string) => slug.length >= 3 && slug.length <= 48 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug);
 const publicChannel = { id: true, name: true, slug: true, createdAt: true } as const;
@@ -32,7 +33,20 @@ export function validateChannelPage(value: unknown): { limit: number; after?: st
 
 @Injectable()
 export class ChannelsService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(private readonly db: DatabaseService, private readonly access: ChannelAccessService) {}
+
+  async setMembership(userId: string, id: string, isMember: boolean): Promise<MembershipResponse> {
+    const channelId = validateChannelId(id);
+    await this.db.$transaction(async tx => {
+      await this.access.lockChannel(tx, channelId);
+      if (isMember) {
+        await tx.membership.upsert({ where: { userId_channelId: { userId, channelId } }, create: { userId, channelId }, update: {} });
+      } else {
+        await tx.membership.deleteMany({ where: { userId, channelId } });
+      }
+    });
+    return { channelId, isMember };
+  }
 
   async create(userId: string, body: unknown): Promise<CreateChannelResponse> {
     const { name, slug } = validateChannel(body);
