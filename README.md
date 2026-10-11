@@ -19,7 +19,9 @@ Success redirects to `/login` with confirmation. Sign-in opens `/workspace`,
 which restores the session before rendering and lets users sign out of their
 current session. The workspace establishes an authenticated Socket.IO connection
 through the same-origin proxy and shows reconnecting feedback after interruption.
-Chat messages remain pending. See [local Socket.IO setup](docs/local-development.md)
+Users can create channels and browse a paginated directory in the workspace;
+creation includes the creator's membership. See [channel contracts and verification](docs/channels.md).
+Joining/leaving channels and chat messages remain pending. See [local Socket.IO setup](docs/local-development.md)
 for localhost configuration and the isolated restart test.
 See [container persistence checks](docs/local-development.md#stop-recreate-and-verify-persistence-manually)
 for recreating containers, preserving sessions and testing a separate empty database.
