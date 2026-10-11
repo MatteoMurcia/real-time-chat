@@ -5,7 +5,8 @@ The creator becomes its first member. Every authenticated user can discover it;
 the directory shows **Member** or **Open channel** for the current user.
 Use **Join** or **Leave** in the directory to change your membership. The creator
 can also leave; the channel remains discoverable. Socket subscription endpoints
-are available; the conversation UI and messages are subsequent tasks.
+are available; [persistent messages](messages.md) are supported by the API.
+The conversation UI is a subsequent task.
 
 ## HTTP contract
 
@@ -43,7 +44,7 @@ channel contains only `id`, `name`, `slug`, `createdAt` (ISO timestamp) and
 Creation uses one Prisma nested write for the channel and initial membership.
 If membership insertion fails, the channel rolls back. Membership has a composite
 user/channel primary key and foreign keys; channel deletion and editing are not exposed.
-`lastSequence` starts at zero for the planned message sequence, but is not part of
+`lastSequence` starts at zero for message ordering, but is not part of
 this API. Membership data is filtered to the current user in a bounded relation
 query, rather than fetching member lists or issuing a query per channel.
 
@@ -64,8 +65,8 @@ Each mutation locks the channel row inside its transaction before updating the
 membership. Concurrent mutations on that channel serialize; success is returned
 only after commit. `ChannelAccessService.requireMember` checks persisted membership
 and denies access after removal, including for the creator. Dependent writes must
-check it within the same channel-locked transaction. There are no channel message
-routes yet.
+check it within the same channel-locked transaction. Message sends use this
+policy; HTTP history routes remain pending.
 
 The browser updates membership only after a validated response. It blocks
 overlapping mutations and list refreshes while a request is pending, retains
@@ -110,9 +111,9 @@ must also be distributed before scaling. Do not add an asynchronous adapter with
 revisiting the room-change boundary. Future channel broadcasts must participate
 in this ordering; a room is never a substitute for permission checks.
 
-Immediate logout disconnection, idle-session expiry and delivery-time session
-filtering remain task 3.4a. Current events reject revoked/expired sessions on the
-next operation; no message broadcasting exists yet. See the official
+Immediate logout disconnection and idle-session expiry remain task 3.4a.
+Operations reject invalid sessions, and message delivery filters revoked/expired
+recipients before emission. See the official
 [Socket.IO room lifecycle](https://socket.io/docs/v4/rooms/).
 
 ## Verification and local operation

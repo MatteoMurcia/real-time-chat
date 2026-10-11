@@ -24,7 +24,9 @@ creation includes the creator's membership. See [channel contracts and verificat
 Users can join and leave from the directory, with safe manual retry after an
 unconfirmed response. Socket subscriptions require current membership; leaving
 removes all of the user's subscriptions to that channel before the HTTP response.
-The conversation UI and chat messages remain pending. See [local Socket.IO setup](docs/local-development.md)
+The API persists messages with per-channel ordering and retry deduplication,
+then acknowledges and emits them after commit. See [message contracts and limits](docs/messages.md).
+The conversation UI remains pending. See [local Socket.IO setup](docs/local-development.md)
 for localhost configuration and the isolated restart test.
 See [container persistence checks](docs/local-development.md#stop-recreate-and-verify-persistence-manually)
 for recreating containers, preserving sessions and testing a separate empty database.

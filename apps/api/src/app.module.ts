@@ -13,6 +13,7 @@ import { ChannelsController } from './channels/channels.controller.js';
 import { ChannelsService } from './channels/channels.service.js';
 import { ChannelAccessService } from './channels/channel-access.service.js';
 import { ConnectionsService } from './realtime/connections.service.js';
+import { SendMessageService } from './messaging/send-message.service.js';
 
 @Module({
   controllers: [LiveController, RegistrationController, SessionController, ChannelsController],
@@ -26,6 +27,7 @@ export class AppModule {
         { provide: 'APP_ORIGIN', useValue: appOrigin },
         ChatGateway,
         ConnectionsService,
+        SendMessageService,
         { provide: DatabaseService, useFactory: () => new DatabaseService(databaseUrl) },
         { provide: CsrfService, useFactory: () => new CsrfService(appOrigin) },
         RegistrationService,

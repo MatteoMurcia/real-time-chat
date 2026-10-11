@@ -33,12 +33,21 @@ test('authorizes subscriptions through the proxy and revokes every socket on HTT
     expect(await subscribe(third)).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
     expect((await other.api.put(`/api/channels/${channel.id}/membership`, { headers: other.headers })).status()).toBe(200);
     for (const socket of sockets) expect(await subscribe(socket)).toEqual({ ok: true, data: { channelId: channel.id, subscribed: true } });
+    const messages: unknown[] = [];
+    third.on('message:created', message => messages.push(message));
+    const input = { channelId: channel.id, clientMessageId: randomUUID(), body: 'Persistent message through the proxy 🌍' };
+    const sent = await first.timeout(3000).emitWithAck('message:send', input);
+    expect(sent).toMatchObject({ ok: true, data: { ...input, sequence: '1' } });
+    expect(await second.timeout(3000).emitWithAck('message:send', input)).toEqual(sent);
+    await subscribe(third);
+    expect(messages).toEqual([sent.data]);
     const revoked: unknown[] = [];
     first.on('channel:access-revoked', payload => revoked.push(payload));
     second.on('channel:access-revoked', payload => revoked.push(payload));
     expect((await owner.api.delete(`/api/channels/${channel.id}/membership`, { headers: owner.headers })).status()).toBe(200);
     await expect.poll(() => revoked).toEqual([{ channelId: channel.id }, { channelId: channel.id }]);
     for (const socket of [first, second]) expect(await subscribe(socket)).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
+    expect(await first.timeout(3000).emitWithAck('message:send', input)).toMatchObject({ ok: false, error: { code: 'FORBIDDEN' } });
     expect((await subscribe(third)).ok).toBe(true);
     expect(await third.timeout(3000).emitWithAck('channel:unsubscribe', { channelId: channel.id })).toEqual({ ok: true, data: { channelId: channel.id, subscribed: false } });
   } finally {

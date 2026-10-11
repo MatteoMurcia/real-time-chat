@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-11 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A verificado, pendiente de revisión y merge de PR #25. CP0-C y revisión de salida CP1-C pendientes.
+Revisión: 3 · Actualización: 2026-10-11 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a implementada y verificada, pendiente de revisión y merge de PR #26. CP0-C y revisión de salida CP1-C pendientes.
 
 ## 1. Cómo usar este plan
 
@@ -482,9 +482,9 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
   - Verificar: dos sockets del mismo usuario y carrera entre subscribe/leave en ambos órdenes.
   - Archivos: `apps/api/src/realtime/gateway.ts`, `connections.service.ts`, servicio acceso, `apps/api/test/subscriptions.spec.ts`, `packages/contracts/src/channels.ts`.
 
-**Checkpoint CP2-A — VERIFICADO (2026-10-11):** permisos HTTP/socket revisados y ambas carreras subscribe/leave comprobadas con barreras sobre PostgreSQL real. Sin hallazgos bloqueantes para una instancia local. [Informe y límites](../docs/checkpoints/cp2-a.md); PR #25 pendiente de revisión y merge manual.
+**Checkpoint CP2-A — VERIFICADO (2026-10-11):** permisos HTTP/socket revisados y ambas carreras subscribe/leave comprobadas con barreras sobre PostgreSQL real. Sin hallazgos bloqueantes para una instancia local. [Informe y límites](../docs/checkpoints/cp2-a.md); integrado mediante PR #25.
 
-- [ ] **2.3a — Persistir mensajes con orden e idempotencia básicos** · M · Depende de: 2.2b.
+- [x] **2.3a — Persistir mensajes con orden e idempotencia básicos** · M · Depende de: 2.2b. Implementada en PR #26; pendiente de revisión y merge manual.
   - Trabajo: Message, bloqueo por canal, contador transaccional y clave única de envío; conectar al gateway.
   - Aceptación: éxito solo después de commit; mismo identificador no duplica; salida previa bloquea envío.
   - Verificar: PostgreSQL real con envíos concurrentes, rollback y reintento; los fallos de commit no emiten éxito.
@@ -551,7 +551,7 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
   - Verificar: prueba con reloj o disparador controlado y otra con tráfico concurrente hasta H; fixture no incluida en producción.
   - Archivos: `apps/api/test/fixtures/message-emitter.ts`, `apps/api/test/commit-emission.spec.ts`, `e2e/sync-gap.spec.ts`, `playwright.config.ts`.
 - [ ] **3.4a — Cerrar conexiones revocadas y caducadas** · M · Depende de: 1.2c, 2.2b, 3.2b.
-  - Trabajo: índice sockets/sesión, temporizador de expiración y limpieza de estado cliente; comprobar permisos al reconectar y excluir sesiones revocadas/caducadas al distribuir eventos, aunque el temporizador se retrase.
+  - Trabajo: índice sockets/sesión, temporizador de expiración y limpieza de estado cliente; comprobar permisos al reconectar y excluir sesiones revocadas/caducadas al distribuir eventos, aunque el temporizador se retrase. El filtro de sesión antes de emitir mensajes se adelantó en 2.3a; completar aquí desconexión activa y sus carreras.
   - Aceptación: logout desconecta todas las conexiones de esa sesión; una sesión idle caduca; otra sesión permanece válida.
   - Verificar: multi-socket, logout durante reconexión y salida de canal estando desconectado; comprobar que no quedan temporizadores.
   - Archivos: connections service, gateway, store sesión web, `apps/api/test/socket-session.spec.ts`, `e2e/session-revocation.spec.ts`.
@@ -995,3 +995,15 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Proyecto temporal `cp2a-review`, redes, volumen y credenciales eliminados tras comprobar etiqueta; volumen `real-time-chat_postgres_data` conservado.
 - Límites: una instancia y adaptador síncrono; sin prueba de carga, TLS ni despliegue. Mensajes/historial aún no existen; su autorización se verifica en sus tareas. Cierre inmediato por logout y caducidad inactiva en 3.4a. CP0-C y CP1-C permanecen pendientes.
 - Siguiente tarea tras revisión y merge manual: **2.3a — Persistir mensajes con orden e idempotencia básicos**.
+### Evidencia 2.3a — Persistencia, orden e idempotencia básicos (2026-10-11)
+
+- Rama `feature/2.3a-message-persistence` desde `main` en `329ceb1`, con CP2-A/PR #25 integrada. PR #26; commits separados de esquema/validación, persistencia/gateway, E2E y documentación. Merge reservado al usuario.
+- Migración aditiva Message: UUID, FKs restrictivas, únicos `(authorId, clientMessageId)` y `(channelId, sequence)`, BIGINT positivo y texto no vacío de hasta 2.000 puntos de código. Contrato público con autor `{ id, displayName }`, fecha ISO y secuencia decimal como string. Identidad y campos ajenos rechazados; texto preservado, NUL/Unicode inválido y solo blanco rechazados.
+- `message:send` valida sesión dentro de la cola del canal; transacción con bloqueo de fila y membresía autoritativa, búsqueda de clave, incremento de contador e inserción. Ack y `message:created` posteriores al commit, manteniendo coordinación local hasta emitir. Reintento autorizado devuelve el mismo mensaje sin secuencia/evento adicional; diferente contenido/canal de una clave ya persistida devuelve CONFLICT. Salir bloquea también reintentos.
+- Ajuste de seguridad necesario al empezar a emitir contenido: consulta agrupada de sesiones receptoras antes de distribuir y comprobación de que cada socket siga en la room. Sesiones ya revocadas/caducadas excluidas. Desconexión activa/temporizadores siguen en 3.4a. Límite socket elevado al valor previsto de 16 KiB; HTTP JSON conserva 8 KiB.
+- Verificación: 31 pruebas API, 27 Angular en Docker, 14 resultados de integración PostgreSQL y 2 pruebas Docker; lint, typecheck estricto, builds y arranque saludable. Auditoría sin vulnerabilidades. Sin dependencias nuevas.
+- PostgreSQL real: envíos paralelos tanto por socket como en transacciones independientes; claves repetidas producen una fila, secuencias únicas y ordenadas, conflictos, separación por autor, restricciones SQL y representación exacta por encima de MAX_SAFE_INTEGER. Trigger de restricción diferida fuerza fallo real durante COMMIT después del insert/update: sin éxito ni evento, contador y mensaje revertidos; reintento posterior correcto.
+- 9 E2E aprobados contra imágenes compiladas: evento canónico por proxy, reintento desde otro socket sin rebroadcast y rechazo tras salir. Recreación completa del stack conservando volumen recupera exactamente el mismo mensaje (ID, secuencia y contenido) al reintentar.
+- Documentación de contratos, garantías y límites en [docs/messages.md](../docs/messages.md). Entorno temporal `chat-e2e`, volumen y credenciales eliminados tras verificar etiqueta; `real-time-chat_postgres_data` conservado.
+- Límites: una instancia; emisión best-effort sin outbox. Un fallo posterior a commit puede dejar mensaje persistido sin evento/ack. Recuperación de colisión simultánea de clave entre canales en 3.1a (unicidad ya impide duplicados; el perdedor puede recibir INTERNAL_ERROR). Historial, reconciliación, rate limiting y UI aún en sus tareas. CP0-C y CP1-C siguen pendientes.
+- Siguiente tarea tras revisión y merge manual: **2.3b — Conversar desde dos navegadores**.

@@ -14,6 +14,7 @@ import { io, type ManagerOptions, type SocketOptions } from 'socket.io-client';
 import { verifyChannels } from './channels.js';
 import { verifyMembership } from './membership.js';
 import { verifySubscriptions } from './subscriptions.js';
+import { verifyMessages } from './messages.js';
 
 test('migrations, user/session constraints and application connection lifecycle', async (t) => {
   const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -40,6 +41,7 @@ test('migrations, user/session constraints and application connection lifecycle'
   await t.test('creates channels atomically, rejects forged requests and paginates discovery', () => verifyChannels(app, db));
   await t.test('joins and leaves channels idempotently with session-scoped access', () => verifyMembership(app, db));
   await t.test('authorizes channel subscriptions and orders both subscribe/leave races', { timeout: 20000 }, () => verifySubscriptions(app, db));
+  await t.test('persists ordered messages, deduplicates retries and rejects failed commits', { timeout: 20000 }, () => verifyMessages(app, db));
   const email = `${randomUUID()}@example.test`;
   const user = await db.user.create({ data: { email, displayName: 'Integration test', passwordHash: 'test-only-hash' } });
   t.after(async () => {
