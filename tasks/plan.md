@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-10 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b verificada localmente, PR #21 pendiente de revisión y merge manual. CP0-C pendiente.
+Revisión: 3 · Actualización: 2026-10-11 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a implementada y verificada localmente, pendiente de revisión y merge de PR #22. CP0-C y revisión de salida CP1-C pendientes.
 
 ## 1. Cómo usar este plan
 
@@ -454,7 +454,7 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
   - Verificar: cliente real desde navegador, handshake y reconexión al reiniciar el contenedor API.
   - Archivos: docker/nginx.conf, gateway, prueba handshake, .env.example, docs/local-development.md.
 
-- [x] **1.3b — Validar imágenes compiladas y persistencia local** · M · Depende de: 1.3a. Verificada en PR #21; pendiente de revisión y merge manual.
+- [x] **1.3b — Validar imágenes compiladas y persistencia local** · M · Depende de: 1.3a. Integrada mediante PR #21.
   - Trabajo: comprobar Compose normal sin bind mounts ni herramientas instaladas en host; documentar arranque, parada y diagnóstico.
   - Aceptación: build limpio, migración y sesión funcionan; down/up conserva usuarios y permite login de nuevo.
   - Verificar: recrear contenedores conservando el volumen y probar otra base vacía aislada; no ejecutar down -v contra la base de trabajo.
@@ -466,7 +466,7 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
 
 **Objetivo:** construir recorridos completos, con pruebas transaccionales tempranas antes de pulir interfaz.
 
-- [ ] **2.1a — Crear y descubrir canales** · M · Depende de: 1.2b, 0.2b.
+- [x] **2.1a — Crear y descubrir canales** · M · Depende de: 1.2b, 0.2b. Implementada en PR #22; pendiente de revisión y merge manual.
   - Trabajo: Channel/Membership, creación transaccional con membresía inicial, lista paginada y pantalla básica.
   - Aceptación: canal visible al creador y terceros autenticados; nombres/slug inválidos o duplicados rechazados.
   - Verificar: integración de rollback y listado; recorrido manual de creación.
@@ -943,3 +943,19 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Limpieza: eliminados contenedores, redes, volúmenes y archivos de credenciales de ambos proyectos temporales después de comprobar sus etiquetas; `real-time-chat_postgres_data` conservado.
 - Límites: Chromium/HTTP local, sin despliegue remoto ni TLS; no prueba de recuperación ante pérdida de disco ni backup/restore. No certifica CP0-C ni revocación de sockets abiertos (3.4a).
 - Siguiente paso tras revisión y merge manual: revisar la salida **CP1-C**, antes de comenzar canales en 2.1a.
+
+
+### Evidencia 2.1a — Crear y descubrir canales (2026-10-11)
+
+- Rama `feature/2.1a-channel-discovery` desde `main` en `9e3d91b`, con PR #21 integrada. PR #22; commits separados de API/esquema/contratos, interfaz/E2E, mejora del foco y documentación. El usuario pidió continuar con 2.1a; la revisión formal de salida CP1-C sigue pendiente.
+- Migración aditiva Channel/Membership: slugs únicos, nombre normalizado en nameKey único, FK de creador/miembros, PK compuesta userId/channelId e índice por channelId. lastSequence comienza en cero y no se expone por HTTP. No hay borrado de datos ni cambios de dependencias.
+- POST /api/channels valida sesión, CSRF vinculado a sesión, origen y JSON. Creador obtenido exclusivamente de la sesión; campos extra rechazados. Canal y membresía inicial se crean en una única escritura anidada transaccional. Nombres normalizados NFC/espacios y comparados en minúsculas; slugs ASCII minúsculos. Conflictos concurrentes resueltos por restricciones únicas y respuesta 409 segura.
+- GET /api/channels requiere sesión; orden ascendente por slug, cursor versionado/canónico, 50 por defecto y máximo 100, consulta indexada y una fila adicional. isMember se calcula solo para el usuario actual con consulta de relación acotada; no se devuelven identidades de miembros ni campos internos. El cursor no es snapshot: nuevos canales anteriores al límite se ven al refrescar.
+- Angular integra formulario/listado en workspace, una página en memoria, estados de carga/vacío/error, bloqueo de doble submit, CSRF fresco y sin reintentos automáticos del POST. Un resultado incierto conserva el formulario y pide refrescar antes de intentar crear otra vez. Se cancela trabajo al destruir la vista; 401 navega a login. Cambiar de página lleva el foco al título para evitar perderlo cuando desaparece Next.
+- Verificación local: 28 pruebas API, 11 resultados de integración PostgreSQL, 24 web, 2 Docker y ocho E2E Chromium. Lint, typecheck web estricto, builds API/web en Compose y audit sin vulnerabilidades conocidas. Bundle inicial 373.40 kB, por debajo del umbral de aviso existente.
+- Integración fuerza una restricción fallida al insertar Membership y confirma que Channel no persiste. También cubre dos usuarios, isMember distinto, paginación, entrada inválida, CSRF de otra sesión, duplicados concurrentes y restricciones PK/FK. Control negativo: aceptar createdBy temporalmente rompió la prueba de validación; fuente restaurada y suite API correcta de nuevo.
+- E2E contra imágenes compiladas: registro/login de dos usuarios independientes, creación única con respuesta retenida, canal visible al observador no miembro, conflicto por nombre, error 503 al listar y recuperación, teclado/foco y 320/768/1024/1440 px sin overflow. Capturas móvil/escritorio revisadas. La suite existente de sesiones, handshake y persistencia también pasa.
+- Incidencia de tooling resuelta: migrate diff sin config explícita no produjo SQL desde la raíz; se generó con --config apps/api/prisma.config.ts y se verificó aplicándolo a PostgreSQL aislado.
+- Limpieza: stack, redes, volumen y archivo de credenciales temporales eliminados tras verificar etiqueta del proyecto; `real-time-chat_postgres_data` conservado. No se migra la base de trabajo automáticamente.
+- Límites: canales abiertos para registrados; unirse/salir en 2.2a, suscripción autorizada en 2.2b y mensajes después. Rate limiting en 4.1a; sin despliegue remoto, TLS ni auditoría WCAG completa. CP0-C y CP1-C no se dan por aprobados.
+- Siguiente tarea después de revisión y merge manual: **2.2a — Unirse y salir desde la UI**.

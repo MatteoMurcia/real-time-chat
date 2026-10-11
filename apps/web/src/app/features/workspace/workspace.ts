@@ -4,10 +4,11 @@ import { finalize } from 'rxjs';
 import { Router, RouterLink } from '@angular/router';
 import { SessionStore } from '../../core/session.store';
 import { RealtimeConnection } from '../../core/realtime-connection';
+import { ChannelList } from '../channels/channel-list';
 
 @Component({
   selector: 'app-workspace',
-  imports: [RouterLink],
+  imports: [RouterLink, ChannelList],
   providers: [RealtimeConnection],
   template: `
     @if (sessions.session(); as current) {
@@ -22,11 +23,7 @@ import { RealtimeConnection } from '../../core/realtime-connection';
       <button type="button" (click)="logout()" [disabled]="pending()">{{ pending() ? 'Signing out…' : 'Sign out' }}</button>
       @if (pending()) { <p role="status">Closing your session. Please wait.</p> }
       @if (message()) { <p id="logout-error" class="error-summary" role="alert" tabindex="-1">{{ message() }}</p> }
-      <section aria-labelledby="conversations-title">
-        <h2 id="conversations-title">Conversations</h2>
-        <p>Your team’s conversations will appear here. Messaging is not available yet.</p>
-        <a routerLink="/">Back to overview</a>
-      </section>
+      <app-channel-list />
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,

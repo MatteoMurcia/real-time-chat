@@ -37,10 +37,14 @@ export class AuthClient {
   }
 
   logout() {
-    return this.post('/api/auth/logout', null, '/api/auth/session/csrf').pipe(map(() => undefined));
+    return this.authenticatedPost('/api/auth/logout', null).pipe(map(() => undefined));
   }
 
-  private post(url: string, input: RegistrationRequest | LoginRequest | null, csrfUrl = '/api/auth/csrf') {
+  authenticatedPost(url: string, input: unknown) {
+    return this.post(url, input, '/api/auth/session/csrf');
+  }
+
+  private post(url: string, input: unknown, csrfUrl = '/api/auth/csrf') {
     return this.http.get<unknown>(csrfUrl).pipe(
       switchMap(body => {
         if (!body || typeof body !== 'object' || !('csrfToken' in body)

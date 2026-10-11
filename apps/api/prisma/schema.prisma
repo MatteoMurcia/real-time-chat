@@ -16,6 +16,31 @@ model User {
   passwordHash String
   createdAt    DateTime  @default(now()) @db.Timestamptz(3)
   sessions     Session[]
+  channels     Channel[]
+  memberships  Membership[]
+}
+
+model Channel {
+  id           String       @id @default(uuid()) @db.Uuid
+  slug         String       @unique @db.VarChar(48)
+  name         String       @db.VarChar(80)
+  nameKey      String       @unique @db.VarChar(160)
+  createdBy    String       @db.Uuid
+  creator      User         @relation(fields: [createdBy], references: [id], onDelete: Restrict)
+  lastSequence BigInt       @default(0)
+  createdAt    DateTime     @default(now()) @db.Timestamptz(3)
+  memberships  Membership[]
+}
+
+model Membership {
+  userId    String   @db.Uuid
+  channelId String   @db.Uuid
+  joinedAt  DateTime @default(now()) @db.Timestamptz(3)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Restrict)
+
+  @@id([userId, channelId])
+  @@index([channelId])
 }
 
 model Session {

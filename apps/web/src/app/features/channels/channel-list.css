@@ -1,0 +1,7 @@
+ul { list-style: none; padding: 0; }
+li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .75rem; padding: 1rem 0; border-bottom: 1px solid var(--line); }
+li div { min-width: 0; overflow-wrap: anywhere; }
+li span { color: var(--muted); font-size: .875rem; }
+.slug { margin: .25rem 0 0; }
+.pagination { display: flex; flex-wrap: wrap; gap: .75rem; }
+#channel-notice:empty { margin: 0; }
