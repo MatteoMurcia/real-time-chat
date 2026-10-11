@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-11 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a implementada y verificada localmente, pendiente de revisión y merge de PR #22. CP0-C y revisión de salida CP1-C pendientes.
+Revisión: 3 · Actualización: 2026-10-11 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a implementada y verificada localmente, pendiente de revisión y merge de PR #23. CP0-C y revisión de salida CP1-C pendientes.
 
 ## 1. Cómo usar este plan
 
@@ -466,12 +466,12 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
 
 **Objetivo:** construir recorridos completos, con pruebas transaccionales tempranas antes de pulir interfaz.
 
-- [x] **2.1a — Crear y descubrir canales** · M · Depende de: 1.2b, 0.2b. Implementada en PR #22; pendiente de revisión y merge manual.
+- [x] **2.1a — Crear y descubrir canales** · M · Depende de: 1.2b, 0.2b. Integrada mediante PR #22.
   - Trabajo: Channel/Membership, creación transaccional con membresía inicial, lista paginada y pantalla básica.
   - Aceptación: canal visible al creador y terceros autenticados; nombres/slug inválidos o duplicados rechazados.
   - Verificar: integración de rollback y listado; recorrido manual de creación.
   - Archivos: esquema/migración de canales, `apps/api/src/channels/channels.service.ts`, `channels.controller.ts`, `apps/web/src/app/features/channels/channel-list.ts`, `apps/api/test/channels.spec.ts`. Separar plantilla si rebasa el tamaño objetivo.
-- [ ] **2.2a — Unirse y salir desde la UI** · M · Depende de: 2.1a.
+- [x] **2.2a — Unirse y salir desde la UI** · M · Depende de: 2.1a. Implementada en PR #23; pendiente de revisión y merge manual.
   - Trabajo: PUT/DELETE membership idempotentes, política de acceso común y acciones en la lista.
   - Aceptación: cualquier registrado puede unirse; salir elimina acceso servidor, con estado UI coherente.
   - Verificar: integración de unión/salida repetida y flujo de dos usuarios.
@@ -959,3 +959,16 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Limpieza: stack, redes, volumen y archivo de credenciales temporales eliminados tras verificar etiqueta del proyecto; `real-time-chat_postgres_data` conservado. No se migra la base de trabajo automáticamente.
 - Límites: canales abiertos para registrados; unirse/salir en 2.2a, suscripción autorizada en 2.2b y mensajes después. Rate limiting en 4.1a; sin despliegue remoto, TLS ni auditoría WCAG completa. CP0-C y CP1-C no se dan por aprobados.
 - Siguiente tarea después de revisión y merge manual: **2.2a — Unirse y salir desde la UI**.
+
+### Evidencia 2.2a — Unirse y salir desde la UI (2026-10-11)
+
+- Rama `feature/2.2a-channel-membership` desde `main` en `c629894`, con PR #22 integrada. PR #23; commits separados de API/política, interfaz/E2E y documentación. Merge reservado al usuario.
+- PUT/DELETE `/api/channels/:id/membership`: sesión y CSRF ligados al usuario, UUID validado, cuerpo/query ajenos rechazados, 404 para canal inexistente y 200 tras commit. Unión/salida idempotentes; la unión repetida conserva `joinedAt`. El creador puede salir sin borrar el canal.
+- Bloqueo transaccional por canal y política común `ChannelAccessService.requireMember`; la ausencia de membresía deniega acceso también al creador. Las operaciones dependientes deberán comprobarla bajo el mismo bloqueo. No hay aún rutas de mensajes ni suscripciones de canal.
+- UI con Join/Leave, bloqueo de solicitudes solapadas, foco preservado y anuncios de estado. Un resultado desconocido no cambia la membresía local: Retry mantiene la intención original y Refresh consulta el estado real; sin reintentos automáticos.
+- Verificación: 29 pruebas API, 27 Angular, 12 resultados de integración PostgreSQL y 2 pruebas Docker; lint, typecheck estricto, imágenes compiladas y arranque saludable. `npm audit` sin vulnerabilidades.
+- Control negativo: sustituir temporalmente DELETE por una lectura hace fallar la integración de membresía; código restaurado y 12 resultados positivos después.
+- Chromium: 8 E2E aprobados, incluidos dos usuarios, teclado/doble envío, pérdida de respuesta después del DELETE real, reintento sin volver a unirse, recarga y aislamiento de membresías. Regresiones de autenticación, reconexión y recreación de contenedores aprobadas. Sin desbordamiento a 320/768/1024/1440 px; capturas móvil/escritorio revisadas visualmente.
+- Entorno desechable `chat-e2e` eliminado tras verificar sus etiquetas; archivo privado de credenciales eliminado. Volumen principal `real-time-chat_postgres_data` preservado; sin migraciones ni dependencias nuevas.
+- Límites: otras pestañas actualizan membresía al refrescar. Suscripciones y retirada de rooms pendientes de 2.2b; mensajes posteriores. Sin despliegue ni auditoría WCAG completa. CP0-C, CP1-C y CP2-A siguen pendientes.
+- Siguiente tarea tras revisión y merge manual: **2.2b — Autorizar suscripciones al canal activo**.

@@ -1,19 +1,23 @@
-# Channel creation and discovery
+# Channels and membership
 
 Sign in and open `/workspace`. Create a channel with a display name and a slug.
 The creator becomes its first member. Every authenticated user can discover it;
 the directory shows **Member** or **Open channel** for the current user.
-Joining/leaving, subscriptions and messages are subsequent tasks.
+Use **Join** or **Leave** in the directory to change your membership. The creator
+can also leave; the channel remains discoverable. Subscriptions and messages are
+subsequent tasks.
 
 ## HTTP contract
 
-All paths use the `/api` prefix and return `Cache-Control: no-store`. Both
+All paths use the `/api` prefix and return `Cache-Control: no-store`. All
 endpoints validate the existing HttpOnly session against PostgreSQL.
 
 | Request | Response | Requirements |
 | --- | --- | --- |
 | `POST /channels` with `{ "name": "Design team", "slug": "design-team" }` | 201 `{ channel }` | JSON, exact origin/Referer and session-bound CSRF |
 | `GET /channels?limit=50&cursor=…` | 200 `{ channels, nextCursor }` | Authenticated session |
+| `PUT /channels/:id/membership` | 200 `{ channelId, isMember: true }` | Session, exact origin/Referer and session-bound CSRF |
+| `DELETE /channels/:id/membership` | 200 `{ channelId, isMember: false }` | Same as PUT |
 
 Obtain fresh mutation CSRF from `GET /auth/session/csrf`. Do not supply user IDs,
 creator IDs or membership data: unknown input fields are rejected. A public
@@ -38,7 +42,7 @@ channel contains only `id`, `name`, `slug`, `createdAt` (ISO timestamp) and
 
 Creation uses one Prisma nested write for the channel and initial membership.
 If membership insertion fails, the channel rolls back. Membership has a composite
-user/channel primary key and foreign keys; no delete/update operations are exposed.
+user/channel primary key and foreign keys; channel deletion and editing are not exposed.
 `lastSequence` starts at zero for the planned message sequence, but is not part of
 this API. Membership data is filtered to the current user in a bounded relation
 query, rather than fetching member lists or issuing a query per channel.
@@ -46,6 +50,30 @@ query, rather than fetching member lists or issuing a query per channel.
 Creation is not an idempotent API. The browser blocks double submission but never
 automatically retries a POST. After an uncertain result, it preserves input and
 asks the user to refresh the directory; a confirmed duplicate returns 409.
+
+## Joining and leaving
+
+Membership mutations accept a UUIDv4 channel ID, no query parameters and no body.
+The session determines the user; supplying another
+user ID is rejected. Both methods are idempotent: repeated PUT preserves
+`joinedAt`, and repeated DELETE succeeds when the membership is already absent.
+Unknown channels return 404 even on DELETE; malformed IDs return 400. Session
+failures return 401, CSRF/origin failures 403, and database failures a safe 500.
+
+Each mutation locks the channel row inside its transaction before updating the
+membership. Concurrent mutations on that channel serialize; success is returned
+only after commit. `ChannelAccessService.requireMember` checks persisted membership
+and denies access after removal, including for the creator. Dependent writes must
+check it within the same channel-locked transaction. Socket subscriptions and
+removal from rooms are task 2.2b; there are no channel message routes yet.
+
+The browser updates membership only after a validated response. It blocks
+overlapping mutations and list refreshes while a request is pending, retains
+keyboard focus, and announces the result. After timeout, network failure or an
+invalid response, it shows **Status unconfirmed**. **Retry** repeats the original
+PUT/DELETE intent with fresh CSRF; it never toggles based on an uncertain result.
+There are no automatic retries. Refresh reconciles with server state; other tabs
+also need a refresh because membership changes are not broadcast yet.
 
 ## Verification and local operation
 
@@ -58,7 +86,11 @@ API tests cover validation, forged creator IDs, session CSRF, concurrent
 uniqueness, creator/observer membership flags, pagination and a forced membership
 constraint failure proving rollback. Chromium covers two independent users,
 keyboard interaction, double submit, duplicates, read failure/recovery and
-320/768/1024/1440 px layouts. Run the documented isolated E2E suite, never against
+320/768/1024/1440 px layouts. Membership integration covers repeated/concurrent
+requests, authorization, access revocation and database failures. Chromium drops
+a successful DELETE response after commit and verifies that manual retry leaves
+the user outside the channel without affecting another user's membership.
+Run the documented isolated E2E suite, never against
 the working database. Rate limiting remains planned in 4.1a.
 
 Reference: [Prisma 7 nested-write transactions](https://www.prisma.io/docs/orm/v7/prisma-client/queries/transactions).
