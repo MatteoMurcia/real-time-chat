@@ -1,0 +1,87 @@
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { TestBed } from '@angular/core/testing';
+import { provideRouter, Router } from '@angular/router';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { ChannelList } from './channel-list';
+
+const channel = { id: 'channel-id', name: 'Design', slug: 'design-team', createdAt: '2026-10-10T12:00:00Z', isMember: true };
+const token = `${'a'.repeat(64)}.1800000000.${'b'.repeat(64)}`;
+beforeEach(() => TestBed.configureTestingModule({ imports: [ChannelList], providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])] }));
+afterEach(() => { TestBed.inject(HttpTestingController).verify(); TestBed.resetTestingModule(); vi.useRealTimers(); });
+
+function setup() {
+  const fixture = TestBed.createComponent(ChannelList);
+  fixture.detectChanges();
+  const element: HTMLElement = fixture.nativeElement;
+  const http = TestBed.inject(HttpTestingController);
+  const fill = (id: string, value: string) => {
+    const input = element.querySelector<HTMLInputElement>(`#${id}`)!;
+    input.value = value; input.dispatchEvent(new Event('input'));
+  };
+  const submit = () => { element.querySelector('form')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); fixture.detectChanges(); };
+  const click = (text: string) => { [...element.querySelectorAll('button')].find(button => button.textContent?.trim() === text)!.click(); fixture.detectChanges(); };
+  return { fixture, element, http, fill, submit, click };
+}
+
+it('validates locally, posts once with session CSRF and refreshes after confirmed creation', () => {
+  const { fixture, element, http, fill, submit } = setup();
+  http.expectOne('/api/channels').flush({ channels: [], nextCursor: null });
+  submit(); http.expectNone('/api/auth/session/csrf');
+  expect(element.querySelector('#channel-name')!.getAttribute('aria-invalid')).toBe('true');
+  fill('channel-name', 'Design'); fill('channel-slug', 'design-team');
+  submit(); submit();
+  http.expectOne('/api/auth/session/csrf').flush({ csrfToken: token });
+  const post = http.expectOne('/api/channels');
+  expect(post.request.method).toBe('POST');
+  expect(post.request.headers.get('X-CSRF-Token')).toBe(token);
+  expect(post.request.body).toEqual({ name: 'Design', slug: 'design-team' });
+  post.flush({ channel });
+  http.expectOne('/api/channels').flush({ channels: [channel], nextCursor: null });
+  fixture.detectChanges();
+  expect(element.textContent).toContain('Created #design-team. You are a member.');
+  expect(element.querySelector<HTMLInputElement>('#channel-name')!.value).toBe('');
+  expect(element.querySelector('li')!.textContent).toContain('Member');
+});
+
+it('keeps the current page on failure and allows pagination and refresh without duplicates', () => {
+  const { fixture, element, http, click } = setup();
+  http.expectOne('/api/channels').flush({ channels: [channel], nextCursor: 'djE6ZGVzaWdu' }); fixture.detectChanges();
+  click('Next channels');
+  http.expectOne('/api/channels?cursor=djE6ZGVzaWdu').flush(null, { status: 503, statusText: 'Unavailable' }); fixture.detectChanges();
+  expect(element.querySelector('li')!.textContent).toContain('Design');
+  expect(element.textContent).toContain('Could not load channels');
+  click('Next channels');
+  http.expectOne('/api/channels?cursor=djE6ZGVzaWdu').flush({ channels: [{ ...channel, id: 'other', name: 'Engineering', isMember: false }], nextCursor: null }); fixture.detectChanges();
+  expect(element.querySelectorAll('li')).toHaveLength(1);
+  expect(element.querySelector('li')!.textContent).toContain('Open channel');
+  click('Back to first page');
+  http.expectOne('/api/channels').flush({ channels: [], nextCursor: null }); fixture.detectChanges();
+  expect(element.textContent).toContain('No channels yet');
+});
+
+it('does not retry uncertain creation, preserves input and cancels requests on destruction', () => {
+  vi.useFakeTimers();
+  const { fixture, element, http, fill, submit, click } = setup();
+  http.expectOne('/api/channels').flush({ channels: [], nextCursor: null });
+  fill('channel-name', 'Design'); fill('channel-slug', 'design-team'); submit();
+  http.expectOne('/api/auth/session/csrf').flush({ csrfToken: token });
+  const post = http.expectOne('/api/channels');
+  vi.advanceTimersByTime(15000); fixture.detectChanges();
+  expect(post.cancelled).toBe(true);
+  expect(element.textContent).toContain('channel may already exist');
+  expect(element.querySelector<HTMLInputElement>('#channel-name')!.value).toBe('Design');
+  http.expectNone('/api/auth/session/csrf');
+  click('Refresh channels'); const pending = http.expectOne('/api/channels'); fixture.destroy();
+  expect(pending.cancelled).toBe(true);
+});
+
+it('rejects malformed pages and sends revoked sessions back to login', () => {
+  const { fixture, element, http, click } = setup();
+  const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+  http.expectOne('/api/channels').flush({ channels: [{ ...channel, isMember: 'yes' }], nextCursor: null }); fixture.detectChanges();
+  expect(element.textContent).toContain('Could not load channels');
+  click('Refresh channels');
+  http.expectOne('/api/channels').flush(null, { status: 401, statusText: 'Unauthorized' });
+  expect(navigate).toHaveBeenCalledWith(['/login'], { queryParams: { reason: 'expired' } });
+});
