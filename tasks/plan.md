@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-11 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a implementada y verificada localmente, pendiente de revisión y merge de PR #23. CP0-C y revisión de salida CP1-C pendientes.
+Revisión: 3 · Actualización: 2026-10-11 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b implementada y verificada localmente, pendiente de revisión y merge de PR #24. CP0-C y revisión de salida CP1-C pendientes.
 
 ## 1. Cómo usar este plan
 
@@ -471,12 +471,12 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
   - Aceptación: canal visible al creador y terceros autenticados; nombres/slug inválidos o duplicados rechazados.
   - Verificar: integración de rollback y listado; recorrido manual de creación.
   - Archivos: esquema/migración de canales, `apps/api/src/channels/channels.service.ts`, `channels.controller.ts`, `apps/web/src/app/features/channels/channel-list.ts`, `apps/api/test/channels.spec.ts`. Separar plantilla si rebasa el tamaño objetivo.
-- [x] **2.2a — Unirse y salir desde la UI** · M · Depende de: 2.1a. Implementada en PR #23; pendiente de revisión y merge manual.
+- [x] **2.2a — Unirse y salir desde la UI** · M · Depende de: 2.1a. Integrada mediante PR #23.
   - Trabajo: PUT/DELETE membership idempotentes, política de acceso común y acciones en la lista.
   - Aceptación: cualquier registrado puede unirse; salir elimina acceso servidor, con estado UI coherente.
   - Verificar: integración de unión/salida repetida y flujo de dos usuarios.
   - Archivos: servicio/controller canales, `apps/api/src/channels/channel-access.service.ts`, lista web, `apps/api/test/membership.spec.ts`.
-- [ ] **2.2b — Autorizar suscripciones al canal activo** · M · Depende de: 2.2a, 1.3a.
+- [x] **2.2b — Autorizar suscripciones al canal activo** · M · Depende de: 2.2a, 1.3a. Implementada en PR #24; pendiente de revisión y merge manual.
   - Trabajo: separar subscribe de join; indexar conexiones y coordinar salida/suscripción para no dejar rooms obsoletas.
   - Aceptación: tercero no miembro no se suscribe; salir retira todas sus suscripciones de ese canal antes del ack.
   - Verificar: dos sockets del mismo usuario y carrera entre subscribe/leave en ambos órdenes.
@@ -972,3 +972,15 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Entorno desechable `chat-e2e` eliminado tras verificar sus etiquetas; archivo privado de credenciales eliminado. Volumen principal `real-time-chat_postgres_data` preservado; sin migraciones ni dependencias nuevas.
 - Límites: otras pestañas actualizan membresía al refrescar. Suscripciones y retirada de rooms pendientes de 2.2b; mensajes posteriores. Sin despliegue ni auditoría WCAG completa. CP0-C, CP1-C y CP2-A siguen pendientes.
 - Siguiente tarea tras revisión y merge manual: **2.2b — Autorizar suscripciones al canal activo**.
+### Evidencia 2.2b — Autorizar suscripciones al canal activo (2026-10-11)
+
+- Rama `feature/2.2b-channel-subscriptions` desde `main` en `0e67d55`, con PR #23 integrada. PR #24; commits incrementales de coordinación, gateway/integración, prueba del proxy y documentación. Merge reservado al usuario.
+- `channel:subscribe` y `channel:unsubscribe` reciben exclusivamente `{ channelId }` y responden con ack tipado seguro. Sesión consultada en cada operación; subscribe comprueba membresía bajo bloqueo del canal. No crean ni borran membresías. Cada socket conserva como máximo un canal activo; al reconectar debe suscribirse de nuevo.
+- Índice de sockets por usuario con limpieza al desconectar. Cola local por canal que abarca transacción, commit y cambio de rooms; PUT/DELETE y subscribe/unsubscribe comparten coordinación. DELETE retira todos los sockets de ese usuario y emite `channel:access-revoked` antes de responder; no afecta a otros usuarios. No se hacen llamadas de red bajo el bloqueo de fila.
+- Pruebas: 30 API unitarias, 27 Angular en build Docker, 13 resultados de integración PostgreSQL y 2 pruebas de configuración Docker. Lint, typecheck estricto, compilación y arranque saludable; auditoría sin vulnerabilidades.
+- Integración con sockets reales: no miembro denegado, payload/identidad falsificada rechazados, unión separada de suscripción, cambio de canal, unsubscribe repetido sin borrar membresía, dos sockets retirados, otro usuario preservado, errores de BD sin fuga ni falsa retirada, sesión revocada/caducada, desconexión/reconexión. Barreras explícitas fuerzan subscribe→leave y leave→subscribe bajo el bloqueo real, sin retardos probabilísticos.
+- Control negativo: omitir temporalmente la retirada de rooms hace fallar la aserción de integración; implementación restaurada y los 13 resultados pasan después.
+- 9 E2E aprobados contra imágenes compiladas, incluido el nuevo caso con tres sockets por Nginx, salida HTTP y rechazo posterior. Regresiones de navegador, sesión, reconexión y recreación de contenedores aprobadas.
+- Entorno desechable `chat-e2e` eliminado tras verificar su etiqueta; credenciales temporales eliminadas. Volumen principal `real-time-chat_postgres_data` preservado. Sin cambios de esquema ni dependencias.
+- Límites: una instancia de API y adaptador Socket.IO síncrono en memoria; escalar requiere coordinación distribuida además de un adaptador compartido. UI de conversación en 2.3b; desconexión inmediata por logout, expiración inactiva y filtro de distribución en 3.4a. No hay mensajes todavía. CP0-C y CP1-C siguen pendientes.
+- Siguiente paso tras revisión y merge manual: **Checkpoint CP2-A**. La evidencia de carreras está preparada; no se marca aprobado automáticamente.

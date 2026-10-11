@@ -12,6 +12,7 @@ import { ChatGateway } from './realtime/chat.gateway.js';
 import { ChannelsController } from './channels/channels.controller.js';
 import { ChannelsService } from './channels/channels.service.js';
 import { ChannelAccessService } from './channels/channel-access.service.js';
+import { ConnectionsService } from './realtime/connections.service.js';
 
 @Module({
   controllers: [LiveController, RegistrationController, SessionController, ChannelsController],
@@ -24,6 +25,7 @@ export class AppModule {
       providers: [
         { provide: 'APP_ORIGIN', useValue: appOrigin },
         ChatGateway,
+        ConnectionsService,
         { provide: DatabaseService, useFactory: () => new DatabaseService(databaseUrl) },
         { provide: CsrfService, useFactory: () => new CsrfService(appOrigin) },
         RegistrationService,
