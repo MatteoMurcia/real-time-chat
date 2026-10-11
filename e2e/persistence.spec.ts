@@ -1,8 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { expect, test } from '@playwright/test';
+import { io } from 'socket.io-client';
 
-test('preserves accounts and sessions after recreating the compiled stack', async ({ page, context }) => {
+test('preserves accounts, sessions and message idempotency after recreating the compiled stack', async ({ page, context }) => {
   test.setTimeout(180000);
   const project = process.env.E2E_COMPOSE_PROJECT ?? '';
   const envFile = process.env.E2E_COMPOSE_ENV_FILE ?? '';
@@ -37,6 +38,23 @@ test('preserves accounts and sessions after recreating the compiled stack', asyn
   await expect(page).toHaveURL(/\/login\?registered=1$/);
   await signIn();
   const cookie = (await context.cookies()).find(item => item.name === 'chat_session')!;
+  const origin = process.env.E2E_BASE_URL!;
+  const csrf = (await (await context.request.get('/api/auth/session/csrf', { headers: { origin } })).json()).csrfToken;
+  const channelResponse = await context.request.post('/api/channels', {
+    headers: { origin, 'x-csrf-token': csrf }, data: { name: `Persistent ${randomUUID()}`, slug: `persist-${randomUUID()}` },
+  });
+  expect(channelResponse.status()).toBe(201);
+  const { channel } = await channelResponse.json();
+  const message = { channelId: channel.id, clientMessageId: randomUUID(), body: 'Survives container recreation' };
+  const send = async () => {
+    const socket = io(origin, { autoConnect: false, reconnection: false, timeout: 3000, transports: ['websocket'], extraHeaders: { origin, cookie: `${cookie.name}=${cookie.value}` } });
+    try {
+      await new Promise<void>((resolve, reject) => { socket.once('connect', resolve); socket.once('connect_error', reject); socket.connect(); });
+      return await socket.timeout(3000).emitWithAck('message:send', message);
+    } finally { socket.disconnect(); }
+  };
+  const originalMessage = await send();
+  expect(originalMessage).toMatchObject({ ok: true, data: { ...message, sequence: '1' } });
 
   try {
     compose('down', '--timeout', '5');
@@ -50,6 +68,7 @@ test('preserves accounts and sessions after recreating the compiled stack', asyn
   await expect(page).toHaveURL(/\/workspace$/);
   await expect(page.getByText('Live connection established.', { exact: true })).toBeVisible();
   expect((await context.cookies()).find(item => item.name === 'chat_session')?.value).toBe(cookie.value);
+  expect(await send()).toEqual(originalMessage);
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(page).toHaveURL(/\/login\?reason=signed-out$/);
   await signIn();
