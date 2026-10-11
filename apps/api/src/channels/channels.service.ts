@@ -3,6 +3,7 @@ import type { ChannelPage, CreateChannelRequest, CreateChannelResponse, Membersh
 import { DatabaseService } from '../database/database.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { ChannelAccessService, validateChannelId } from './channel-access.service.js';
+import { ConnectionsService } from '../realtime/connections.service.js';
 
 const validSlug = (slug: string) => slug.length >= 3 && slug.length <= 48 && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug);
 const publicChannel = { id: true, name: true, slug: true, createdAt: true } as const;
@@ -33,17 +34,20 @@ export function validateChannelPage(value: unknown): { limit: number; after?: st
 
 @Injectable()
 export class ChannelsService {
-  constructor(private readonly db: DatabaseService, private readonly access: ChannelAccessService) {}
+  constructor(private readonly db: DatabaseService, private readonly access: ChannelAccessService, private readonly connections: ConnectionsService) {}
 
   async setMembership(userId: string, id: string, isMember: boolean): Promise<MembershipResponse> {
     const channelId = validateChannelId(id);
-    await this.db.$transaction(async tx => {
-      await this.access.lockChannel(tx, channelId);
-      if (isMember) {
-        await tx.membership.upsert({ where: { userId_channelId: { userId, channelId } }, create: { userId, channelId }, update: {} });
-      } else {
-        await tx.membership.deleteMany({ where: { userId, channelId } });
-      }
+    await this.connections.withChannel(channelId, async () => {
+      await this.db.$transaction(async tx => {
+        await this.access.lockChannel(tx, channelId);
+        if (isMember) {
+          await tx.membership.upsert({ where: { userId_channelId: { userId, channelId } }, create: { userId, channelId }, update: {} });
+        } else {
+          await tx.membership.deleteMany({ where: { userId, channelId } });
+        }
+      });
+      if (!isMember) this.connections.revokeChannel(userId, channelId);
     });
     return { channelId, isMember };
   }
