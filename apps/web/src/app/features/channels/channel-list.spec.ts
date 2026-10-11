@@ -54,6 +54,7 @@ it('keeps the current page on failure and allows pagination and refresh without 
   click('Next channels');
   http.expectOne('/api/channels?cursor=djE6ZGVzaWdu').flush({ channels: [{ ...channel, id: 'other', name: 'Engineering', isMember: false }], nextCursor: null }); fixture.detectChanges();
   expect(element.querySelectorAll('li')).toHaveLength(1);
+  expect(document.activeElement).toBe(element.querySelector('#channels-title'));
   expect(element.querySelector('li')!.textContent).toContain('Open channel');
   click('Back to first page');
   http.expectOne('/api/channels').flush({ channels: [], nextCursor: null }); fixture.detectChanges();

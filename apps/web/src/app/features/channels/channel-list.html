@@ -1,5 +1,5 @@
 <section aria-labelledby="channels-title">
-  <h2 id="channels-title">Channels</h2>
+  <h2 id="channels-title" tabindex="-1">Channels</h2>
   <p>Discover your team’s open channels. All registered teammates can see this directory.</p>
   <button type="button" (click)="load()" [disabled]="loading() || pending()">Refresh channels</button>
   @if (loading()) { <p role="status">Loading channels…</p> }

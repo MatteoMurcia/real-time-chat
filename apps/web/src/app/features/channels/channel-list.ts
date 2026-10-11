@@ -44,7 +44,14 @@ export class ChannelList {
     this.loading.set(true);
     this.listError.set('');
     this.client.list(cursor).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.loading.set(false))).subscribe({
-      next: page => { this.channels.set(page.channels); this.nextCursor.set(page.nextCursor); this.currentCursor.set(cursor); },
+      next: page => {
+        const changedPage = cursor !== this.currentCursor();
+        this.channels.set(page.channels); this.nextCursor.set(page.nextCursor); this.currentCursor.set(cursor);
+        if (changedPage) {
+          this.changeDetector.detectChanges();
+          this.element.nativeElement.querySelector<HTMLElement>('#channels-title')?.focus();
+        }
+      },
       error: (error: unknown) => {
         this.handleUnauthorized(error);
         this.listError.set('Could not load channels. Try again.');
