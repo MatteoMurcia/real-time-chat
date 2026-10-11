@@ -18,6 +18,7 @@ model User {
   sessions     Session[]
   channels     Channel[]
   memberships  Membership[]
+  messages     Message[]
 }
 
 model Channel {
@@ -30,6 +31,22 @@ model Channel {
   lastSequence BigInt       @default(0)
   createdAt    DateTime     @default(now()) @db.Timestamptz(3)
   memberships  Membership[]
+  messages     Message[]
+}
+
+model Message {
+  id              String   @id @default(uuid()) @db.Uuid
+  channelId       String   @db.Uuid
+  authorId        String   @db.Uuid
+  clientMessageId String   @db.Uuid
+  sequence        BigInt
+  body            String   @db.VarChar(2000)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  channel         Channel  @relation(fields: [channelId], references: [id], onDelete: Restrict)
+  author          User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@unique([authorId, clientMessageId])
+  @@unique([channelId, sequence])
 }
 
 model Membership {
