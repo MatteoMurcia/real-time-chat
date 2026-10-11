@@ -86,3 +86,54 @@ it('rejects malformed pages and sends revoked sessions back to login', () => {
   http.expectOne('/api/channels').flush(null, { status: 401, statusText: 'Unauthorized' });
   expect(navigate).toHaveBeenCalledWith(['/login'], { queryParams: { reason: 'expired' } });
 });
+
+it('confirms membership changes before updating and blocks overlapping reads or mutations', () => {
+  const { fixture, element, http, click } = setup();
+  http.expectOne('/api/channels').flush({ channels: [channel], nextCursor: null }); fixture.detectChanges();
+  click('Leave'); click('Refresh channels');
+  http.expectNone('/api/channels');
+  expect(element.querySelector('li')!.textContent).toContain('Member');
+  expect(element.querySelector<HTMLButtonElement>('#membership-channel-id')!.disabled).toBe(true);
+  http.expectOne('/api/auth/session/csrf').flush({ csrfToken: token });
+  const request = http.expectOne('/api/channels/channel-id/membership');
+  expect(request.request.method).toBe('DELETE');
+  expect(request.request.body).toBe(null);
+  expect(request.request.headers.get('X-CSRF-Token')).toBe(token);
+  request.flush({ channelId: channel.id, isMember: false }); fixture.detectChanges();
+  expect(element.querySelector('li')!.textContent).toContain('Open channel');
+  expect(document.activeElement).toBe(element.querySelector('#membership-channel-id'));
+  click('Join');
+  http.expectOne('/api/auth/session/csrf').flush({ csrfToken: token });
+  const join = http.expectOne('/api/channels/channel-id/membership');
+  expect(join.request.method).toBe('PUT'); join.flush({ channelId: channel.id, isMember: true }); fixture.detectChanges();
+  expect(element.querySelector('li')!.textContent).toContain('Member');
+});
+
+it('retains the original action after timeout and requires explicit retry or refreshed state', () => {
+  vi.useFakeTimers();
+  const { fixture, element, http, click } = setup();
+  http.expectOne('/api/channels').flush({ channels: [channel], nextCursor: null }); fixture.detectChanges();
+  click('Leave'); http.expectOne('/api/auth/session/csrf').flush({ csrfToken: token });
+  const lost = http.expectOne('/api/channels/channel-id/membership');
+  vi.advanceTimersByTime(15000); fixture.detectChanges();
+  expect(lost.cancelled).toBe(true);
+  expect(element.querySelector('li')!.textContent).toContain('Status unconfirmed');
+  http.expectNone('/api/auth/session/csrf');
+  click('Retry'); http.expectOne('/api/auth/session/csrf').flush({ csrfToken: token });
+  const retry = http.expectOne('/api/channels/channel-id/membership');
+  expect(retry.request.method).toBe('DELETE');
+  retry.flush({ channelId: 'different-channel', isMember: false }); fixture.detectChanges();
+  expect(element.textContent).toContain('Membership could not be confirmed');
+  click('Refresh channels');
+  http.expectOne('/api/channels').flush({ channels: [{ ...channel, isMember: false }], nextCursor: null }); fixture.detectChanges();
+  expect(element.textContent).not.toContain('Status unconfirmed');
+  expect(element.querySelector('li')!.textContent).toContain('Open channel');
+});
+
+it('cancels an in-flight membership request when leaving the workspace', () => {
+  const { fixture, http, click } = setup();
+  http.expectOne('/api/channels').flush({ channels: [channel], nextCursor: null }); fixture.detectChanges();
+  click('Leave'); http.expectOne('/api/auth/session/csrf').flush({ csrfToken: token });
+  const request = http.expectOne('/api/channels/channel-id/membership'); fixture.destroy();
+  expect(request.cancelled).toBe(true);
+});

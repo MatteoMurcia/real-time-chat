@@ -24,6 +24,9 @@ export class ChannelList {
   protected readonly channels = signal<PublicChannel[]>([]);
   protected readonly loading = signal(false);
   protected readonly pending = signal(false);
+  protected readonly membershipPending = signal<string | null>(null);
+  protected readonly membershipError = signal<{ channelId: string; desired: boolean; message: string } | null>(null);
+  protected readonly membershipNotice = signal('');
   protected readonly listError = signal('');
   protected readonly createError = signal('');
   protected readonly notice = signal('');
@@ -40,13 +43,15 @@ export class ChannelList {
   constructor() { this.load(); }
 
   protected load(cursor: string | null = null): void {
-    if (this.loading() || this.pending()) return;
+    if (this.loading() || this.pending() || this.membershipPending()) return;
     this.loading.set(true);
     this.listError.set('');
     this.client.list(cursor).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.loading.set(false))).subscribe({
       next: page => {
         const changedPage = cursor !== this.currentCursor();
         this.channels.set(page.channels); this.nextCursor.set(page.nextCursor); this.currentCursor.set(cursor);
+        this.membershipError.set(null);
+        this.membershipNotice.set('');
         if (changedPage) {
           this.changeDetector.detectChanges();
           this.element.nativeElement.querySelector<HTMLElement>('#channels-title')?.focus();
@@ -60,7 +65,7 @@ export class ChannelList {
   }
 
   protected submit(): void {
-    if (this.pending() || this.loading()) return;
+    if (this.pending() || this.loading() || this.membershipPending()) return;
     this.createError.set('');
     this.notice.set('');
     this.form.markAllAsTouched();
@@ -89,6 +94,33 @@ export class ChannelList {
         this.element.nativeElement.querySelector<HTMLElement>('#channel-error')?.focus();
       },
     });
+  }
+
+  protected changeMembership(channel: PublicChannel): void {
+    const previousError = this.membershipError();
+    if (this.loading() || this.pending() || this.membershipPending() || (previousError && previousError.channelId !== channel.id)) return;
+    const desired = previousError?.desired ?? !channel.isMember;
+    this.membershipPending.set(channel.id);
+    this.membershipNotice.set('');
+    this.client.setMembership(channel.id, desired).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.membershipPending.set(null))).subscribe({
+      next: result => {
+        this.channels.update(channels => channels.map(item => item.id === result.channelId ? { ...item, isMember: result.isMember } : item));
+        this.membershipError.set(null);
+        this.membershipNotice.set(`${desired ? 'Joined' : 'Left'} #${channel.slug}.`);
+        this.finishMembership(channel.id);
+      },
+      error: (error: unknown) => {
+        this.handleUnauthorized(error);
+        this.membershipError.set({ channelId: channel.id, desired, message: 'Membership could not be confirmed. Retry the same action or refresh channels to check its current state.' });
+        this.finishMembership(channel.id);
+      },
+    });
+  }
+
+  private finishMembership(channelId: string): void {
+    this.membershipPending.set(null);
+    this.changeDetector.detectChanges();
+    this.element.nativeElement.querySelector<HTMLElement>(`#membership-${channelId}`)?.focus();
   }
 
   private handleUnauthorized(error: unknown): void {

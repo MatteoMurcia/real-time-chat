@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { expect, test, type Page } from '@playwright/test';
 
-test('creates a channel once and lets another authenticated user discover it', async ({ page, browser }, testInfo) => {
+test('creates a channel and manages independent memberships including a lost leave response', async ({ page, browser }, testInfo) => {
   const suffix = randomUUID();
   const slug = `team-${suffix}`;
   const name = `Team ${suffix}`;
@@ -65,8 +65,47 @@ test('creates a channel once and lets another authenticated user discover it', a
   const other = await browser.newContext({ baseURL: process.env.E2E_BASE_URL! });
   try {
     const second = await other.newPage();
+    second.on('pageerror', error => errors.push(error.message));
     await signUp(second, 'observer');
-    await expect(second.getByRole('listitem').filter({ hasText: `#${slug}` })).toContainText('Open channel');
+    const otherRow = second.getByRole('listitem').filter({ hasText: `#${slug}` });
+    await expect(otherRow).toContainText('Open channel');
+    let membershipAttempts = 0;
+    let releaseJoin!: () => void;
+    const joinHeld = new Promise<void>(resolve => { releaseJoin = resolve; });
+    await second.route('**/api/channels/*/membership', async route => {
+      membershipAttempts++;
+      await joinHeld;
+      await route.continue();
+    });
+    await otherRow.getByRole('button', { name: `Join ${name}`, exact: true }).focus();
+    await second.keyboard.press('Enter');
+    await expect(otherRow.getByRole('button')).toBeDisabled();
+    await second.keyboard.press('Enter');
+    releaseJoin();
+    await expect(otherRow.getByRole('button', { name: `Leave ${name}`, exact: true })).toBeEnabled();
+    await expect(otherRow.getByRole('button')).toBeFocused();
+    expect(membershipAttempts).toBe(1);
+    await second.unroute('**/api/channels/*/membership');
+    await second.route('**/api/channels/*/membership', async route => {
+      expect(route.request().method()).toBe('DELETE');
+      const committed = await route.fetch({ maxRedirects: 0, maxRetries: 0 });
+      expect(committed.status()).toBe(200);
+      expect((await committed.json()).isMember).toBe(false);
+      await route.abort('failed');
+    }, { times: 1 });
+    await otherRow.getByRole('button', { name: `Leave ${name}`, exact: true }).click();
+    await expect(otherRow).toContainText('Status unconfirmed');
+    for (const width of [320, 768, 1024, 1440]) {
+      await second.setViewportSize({ width, height: 900 });
+      expect(await second.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+      if (width === 320 || width === 1440) await second.screenshot({ path: testInfo.outputPath(`membership-${width}.png`), fullPage: true });
+    }
+    await otherRow.getByRole('button', { name: `Retry Leave ${name}`, exact: true }).click();
+    await expect(otherRow.getByRole('button', { name: `Join ${name}`, exact: true })).toBeEnabled();
+    await second.reload();
+    await expect(otherRow).toContainText('Open channel');
+    await page.getByRole('button', { name: 'Refresh channels', exact: true }).click();
+    await expect(row.getByRole('button', { name: `Leave ${name}`, exact: true })).toBeEnabled();
     const response = await second.request.get('/api/channels');
     expect(response.status()).toBe(200);
   } finally { await other.close(); }

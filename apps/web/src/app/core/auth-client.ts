@@ -25,11 +25,11 @@ export class AuthClient {
   private readonly http = inject(HttpClient);
 
   register(input: RegistrationRequest) {
-    return this.post('/api/auth/register', input).pipe(map(body => { readUser(body); }));
+    return this.mutate('POST', '/api/auth/register', input).pipe(map(body => { readUser(body); }));
   }
 
   login(input: LoginRequest) {
-    return this.post('/api/auth/login', input).pipe(map(readSession));
+    return this.mutate('POST', '/api/auth/login', input).pipe(map(readSession));
   }
 
   me() {
@@ -37,21 +37,21 @@ export class AuthClient {
   }
 
   logout() {
-    return this.authenticatedPost('/api/auth/logout', null).pipe(map(() => undefined));
+    return this.authenticatedRequest('POST', '/api/auth/logout').pipe(map(() => undefined));
   }
 
-  authenticatedPost(url: string, input: unknown) {
-    return this.post(url, input, '/api/auth/session/csrf');
+  authenticatedRequest(method: 'POST' | 'PUT' | 'DELETE', url: string, input: unknown = null) {
+    return this.mutate(method, url, input, '/api/auth/session/csrf');
   }
 
-  private post(url: string, input: unknown, csrfUrl = '/api/auth/csrf') {
+  private mutate(method: 'POST' | 'PUT' | 'DELETE', url: string, input: unknown, csrfUrl = '/api/auth/csrf') {
     return this.http.get<unknown>(csrfUrl).pipe(
       switchMap(body => {
         if (!body || typeof body !== 'object' || !('csrfToken' in body)
           || typeof body.csrfToken !== 'string' || !/^[a-f0-9]{64}\.[0-9]{10}\.[a-f0-9]{64}$/.test(body.csrfToken)) {
           throw new Error('Invalid CSRF response');
         }
-        return this.http.post<unknown>(url, input, { headers: { 'X-CSRF-Token': body.csrfToken } });
+        return this.http.request<unknown>(method, url, { body: input, headers: { 'X-CSRF-Token': body.csrfToken } });
       }),
       timeout(15000),
     );

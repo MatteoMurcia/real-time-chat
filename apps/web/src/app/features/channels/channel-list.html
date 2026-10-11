@@ -1,20 +1,32 @@
 <section aria-labelledby="channels-title">
   <h2 id="channels-title" tabindex="-1">Channels</h2>
   <p>Discover your team’s open channels. All registered teammates can see this directory.</p>
-  <button type="button" (click)="load()" [disabled]="loading() || pending()">Refresh channels</button>
+  <button type="button" (click)="load()" [disabled]="loading() || pending() || membershipPending()">Refresh channels</button>
+  <p role="status">{{ membershipNotice() }}</p>
   @if (loading()) { <p role="status">Loading channels…</p> }
   @if (listError()) { <p class="error-summary" role="alert">{{ listError() }}</p> }
   @if (!loading() && !listError() && !channels().length) { <p>No channels yet. Create the first one below.</p> }
   <ul aria-label="Available channels" [attr.aria-busy]="loading()">
     @for (channel of channels(); track channel.id) {
-      <li><div><strong>{{ channel.name }}</strong><p class="slug">#{{ channel.slug }}</p></div><span>{{ channel.isMember ? 'Member' : 'Open channel' }}</span></li>
+      <li [attr.aria-busy]="membershipPending() === channel.id">
+        <div><strong>{{ channel.name }}</strong><p class="slug">#{{ channel.slug }}</p></div>
+        <div class="membership-action">
+          <span>{{ membershipError()?.channelId === channel.id ? 'Status unconfirmed' : channel.isMember ? 'Member' : 'Open channel' }}</span>
+          <button type="button" [id]="'membership-' + channel.id" (click)="changeMembership(channel)"
+            [disabled]="loading() || pending() || membershipPending() || (membershipError() && membershipError()?.channelId !== channel.id)"
+            [attr.aria-label]="(membershipError()?.channelId === channel.id ? 'Retry ' : '') + (channel.isMember ? 'Leave ' : 'Join ') + channel.name">
+            {{ membershipPending() === channel.id ? 'Updating…' : membershipError()?.channelId === channel.id ? 'Retry' : channel.isMember ? 'Leave' : 'Join' }}
+          </button>
+        </div>
+        @if (membershipError()?.channelId === channel.id) { <p class="error-summary" role="alert">{{ membershipError()?.message }}</p> }
+      </li>
     }
   </ul>
   <div class="pagination">
-    @if (currentCursor()) { <button type="button" (click)="load()" [disabled]="loading() || pending()">Back to first page</button> }
-    @if (nextCursor()) { <button type="button" (click)="load(nextCursor())" [disabled]="loading() || pending()">Next channels</button> }
+    @if (currentCursor()) { <button type="button" (click)="load()" [disabled]="loading() || pending() || membershipPending()">Back to first page</button> }
+    @if (nextCursor()) { <button type="button" (click)="load(nextCursor())" [disabled]="loading() || pending() || membershipPending()">Next channels</button> }
   </div>
-  <p class="note">Joining channels and messaging are coming next.</p>
+  <p class="note">Channels are open to registered teammates. Messaging is coming next.</p>
 </section>
 <section aria-labelledby="create-channel-title">
   <h2 id="create-channel-title">Create a channel</h2>
@@ -34,7 +46,7 @@
         <input id="channel-slug" formControlName="slug" required autocapitalize="none" spellcheck="false" aria-describedby="channel-slug-help" [attr.aria-invalid]="form.controls.slug.touched && form.controls.slug.invalid ? 'true' : null">
         <p id="channel-slug-help" class="field-help">3–48 lowercase letters or numbers, separated by single hyphens. Example: design-team.</p>
       </div>
-      <button type="submit" [disabled]="pending() || loading()">{{ pending() ? 'Creating channel…' : 'Create channel' }}</button>
+      <button type="submit" [disabled]="pending() || loading() || membershipPending()">{{ pending() ? 'Creating channel…' : 'Create channel' }}</button>
     </fieldset>
   </form>
 </section>
