@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-11 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b implementada y verificada localmente, pendiente de revisión y merge de PR #24. CP0-C y revisión de salida CP1-C pendientes.
+Revisión: 3 · Actualización: 2026-10-11 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A verificado, pendiente de revisión y merge de PR #25. CP0-C y revisión de salida CP1-C pendientes.
 
 ## 1. Cómo usar este plan
 
@@ -476,13 +476,13 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
   - Aceptación: cualquier registrado puede unirse; salir elimina acceso servidor, con estado UI coherente.
   - Verificar: integración de unión/salida repetida y flujo de dos usuarios.
   - Archivos: servicio/controller canales, `apps/api/src/channels/channel-access.service.ts`, lista web, `apps/api/test/membership.spec.ts`.
-- [x] **2.2b — Autorizar suscripciones al canal activo** · M · Depende de: 2.2a, 1.3a. Implementada en PR #24; pendiente de revisión y merge manual.
+- [x] **2.2b — Autorizar suscripciones al canal activo** · M · Depende de: 2.2a, 1.3a. Integrada mediante PR #24.
   - Trabajo: separar subscribe de join; indexar conexiones y coordinar salida/suscripción para no dejar rooms obsoletas.
   - Aceptación: tercero no miembro no se suscribe; salir retira todas sus suscripciones de ese canal antes del ack.
   - Verificar: dos sockets del mismo usuario y carrera entre subscribe/leave en ambos órdenes.
   - Archivos: `apps/api/src/realtime/gateway.ts`, `connections.service.ts`, servicio acceso, `apps/api/test/subscriptions.spec.ts`, `packages/contracts/src/channels.ts`.
 
-**Checkpoint CP2-A:** permisos efectivos en HTTP/socket; probar salida mientras otra conexión intenta entrar.
+**Checkpoint CP2-A — VERIFICADO (2026-10-11):** permisos HTTP/socket revisados y ambas carreras subscribe/leave comprobadas con barreras sobre PostgreSQL real. Sin hallazgos bloqueantes para una instancia local. [Informe y límites](../docs/checkpoints/cp2-a.md); PR #25 pendiente de revisión y merge manual.
 
 - [ ] **2.3a — Persistir mensajes con orden e idempotencia básicos** · M · Depende de: 2.2b.
   - Trabajo: Message, bloqueo por canal, contador transaccional y clave única de envío; conectar al gateway.
@@ -984,3 +984,14 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Entorno desechable `chat-e2e` eliminado tras verificar su etiqueta; credenciales temporales eliminadas. Volumen principal `real-time-chat_postgres_data` preservado. Sin cambios de esquema ni dependencias.
 - Límites: una instancia de API y adaptador Socket.IO síncrono en memoria; escalar requiere coordinación distribuida además de un adaptador compartido. UI de conversación en 2.3b; desconexión inmediata por logout, expiración inactiva y filtro de distribución en 3.4a. No hay mensajes todavía. CP0-C y CP1-C siguen pendientes.
 - Siguiente paso tras revisión y merge manual: **Checkpoint CP2-A**. La evidencia de carreras está preparada; no se marca aprobado automáticamente.
+### Evidencia CP2-A — Permisos HTTP/socket (2026-10-11)
+
+- Base revisada: `main` en `f726fde`, con PR #24 integrada. Rama `docs/cp2-a-channel-permissions`; PR #25, dos commits de informe y cierre del plan. Sin cambios de aplicación, esquema ni dependencias.
+- Resultado: **VERIFICADO para una instancia local**, sin hallazgos bloqueantes. Matriz de criterios, archivos y límites en [docs/checkpoints/cp2-a.md](../docs/checkpoints/cp2-a.md).
+- Identidad derivada de sesión; CSRF/origen en mutaciones HTTP; no miembro rechazado al suscribirse; subscribe/unsubscribe separados de join/leave. DELETE confirmado retira las rooms de los dos sockets del usuario y preserva las de otro usuario. El creador también pierde acceso al salir.
+- Ambas carreras verificadas mediante barreras bajo bloqueo de fila: subscribe primero permite entrada y la salida posterior la elimina; leave primero provoca FORBIDDEN en la suscripción en espera. La cola abarca commit y retirada de rooms antes de responder.
+- Integración repetida sobre PostgreSQL nuevo `cp2a_test`: **13 resultados correctos, cero omitidos/fallos**, incluidos errores de BD, identidad falsificada, sesiones revocadas/caducadas y reconexión. Comando: `npm run test:integration --workspace @real-time-chat/api`.
+- Fuentes de aplicación, contratos, E2E y Docker idénticas al head verificado de PR #24 (`52f8a10`). CI de `main` `38147333820` aprobada durante el checkpoint, incluidos Quality, Containers y 9 E2E. Se reutiliza la evidencia del control negativo de 2.2b; no se mutó de nuevo la aplicación ni se reconstruyó localmente el mismo código.
+- Proyecto temporal `cp2a-review`, redes, volumen y credenciales eliminados tras comprobar etiqueta; volumen `real-time-chat_postgres_data` conservado.
+- Límites: una instancia y adaptador síncrono; sin prueba de carga, TLS ni despliegue. Mensajes/historial aún no existen; su autorización se verifica en sus tareas. Cierre inmediato por logout y caducidad inactiva en 3.4a. CP0-C y CP1-C permanecen pendientes.
+- Siguiente tarea tras revisión y merge manual: **2.3a — Persistir mensajes con orden e idempotencia básicos**.
