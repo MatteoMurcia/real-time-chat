@@ -16,6 +16,7 @@ import { verifyMembership } from './membership.js';
 import { verifySubscriptions } from './subscriptions.js';
 import { verifyMessages } from './messages.js';
 import { verifyHistory } from './history.js';
+import { verifyMessageIdempotency } from './message-idempotency.js';
 
 test('migrations, user/session constraints and application connection lifecycle', async (t) => {
   const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -43,6 +44,7 @@ test('migrations, user/session constraints and application connection lifecycle'
   await t.test('joins and leaves channels idempotently with session-scoped access', () => verifyMembership(app, db));
   await t.test('authorizes channel subscriptions and orders both subscribe/leave races', { timeout: 20000 }, () => verifySubscriptions(app, db));
   await t.test('persists ordered messages, deduplicates retries and rejects failed commits', { timeout: 20000 }, () => verifyMessages(app, db));
+  await t.test('resolves concurrent message keys without leaking unauthorized results', { timeout: 20000 }, () => verifyMessageIdempotency(app, db));
   await t.test('paginates an authorized message snapshot across equal timestamps and concurrent new messages', () => verifyHistory(app, db));
   const email = `${randomUUID()}@example.test`;
   const user = await db.user.create({ data: { email, displayName: 'Integration test', passwordHash: 'test-only-hash' } });
