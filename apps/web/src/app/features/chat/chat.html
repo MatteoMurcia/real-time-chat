@@ -1,0 +1,33 @@
+<section aria-labelledby="conversation-title">
+  <div class="heading">
+    <h2 id="conversation-title" tabindex="-1">#{{ channel().slug }}</h2>
+    <button type="button" (click)="closed.emit()">Close conversation</button>
+  </div>
+  <p role="status">{{ store.notice() }}</p>
+  @if (!store.ready()) { <p>Sending is paused until the live subscription is ready.</p> }
+  <p class="field-help">Live messages only (latest 100). Closing this view clears its local messages and drafts; saved messages remain on the server. History is not available yet.</p>
+  <div class="messages" role="log" aria-label="Conversation messages" aria-live="polite" tabindex="0" (scroll)="onScroll($event)">
+    @if (!store.messages().length && !store.outgoing().length) { <p>No live messages yet. Say hello.</p> }
+    @for (message of store.messages(); track message.id) {
+      <article class="message" [attr.data-message-id]="message.id">
+        <div class="meta"><strong>{{ message.author.displayName }}</strong> <time [attr.datetime]="message.createdAt">{{ message.createdAt | date:'short' }}</time></div>
+        <p class="body">{{ message.body }}</p>
+        <small>Confirmed</small>
+      </article>
+    }
+    @for (item of store.outgoing(); track item.request.clientMessageId) {
+      <article class="message outgoing">
+        <strong>You</strong><p class="body">{{ item.request.body }}</p>
+        <small>{{ item.state === 'pending' ? 'Sending…' : item.state === 'rejected' ? 'Rejected — copy the text to send a corrected message.' : 'Unconfirmed — it may already be saved.' }}</small>
+        @if (item.state === 'unconfirmed') { <button type="button" [disabled]="!store.ready()" (click)="store.retry(item)">Retry confirmation</button> }
+      </article>
+    }
+  </div>
+  <button class="latest" type="button" (click)="scrollToLatest()">{{ following() ? 'Scroll to latest message' : 'Show latest messages' }}</button>
+  <form (submit)="$event.preventDefault(); send()">
+    <label for="message-body">Message</label>
+    <textarea id="message-body" rows="3" [formControl]="draft" aria-describedby="message-help" (keydown)="onKey($event)"></textarea>
+    <p id="message-help" class="field-help">1–2,000 characters. Enter to send; Shift+Enter for a new line. Drafts stay here while reconnecting.</p>
+    <button type="submit" [disabled]="!store.ready() || !draft.value.trim()">Send message</button>
+  </form>
+</section>

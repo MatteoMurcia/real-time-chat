@@ -1,0 +1,11 @@
+:host { display: block; }
+.heading, .meta { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem; }
+h2 { overflow-wrap: anywhere; min-width: 0; }
+.messages { max-height: 26rem; overflow-y: auto; overflow-wrap: anywhere; border-block: 1px solid var(--line); padding: .75rem 0; }
+.message { padding: .75rem; margin: .5rem 0; border-radius: .5rem; background: var(--background); }
+.body { white-space: pre-wrap; overflow-wrap: anywhere; margin: .5rem 0; }
+time, small { color: var(--muted); font-size: .875rem; }
+.outgoing { border: 1px dashed var(--line); }
+.outgoing button { display: block; margin-top: .5rem; }
+.latest { margin-top: .75rem; }
+textarea { box-sizing: border-box; display: block; width: 100%; min-height: 7rem; resize: vertical; margin-top: .5rem; padding: .75rem; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: .25rem; }

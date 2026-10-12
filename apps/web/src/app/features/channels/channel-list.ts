@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, DestroyRef, ElementRef, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, DestroyRef, ElementRef, inject, output, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, type AbstractControl } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -16,6 +16,8 @@ import { ChannelsClient } from './channels-client';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ChannelList {
+  readonly opened = output<PublicChannel>();
+  readonly left = output<string>();
   private readonly client = inject(ChannelsClient);
   private readonly destroyRef = inject(DestroyRef);
   private readonly element = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -104,6 +106,7 @@ export class ChannelList {
     this.membershipNotice.set('');
     this.client.setMembership(channel.id, desired).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.membershipPending.set(null))).subscribe({
       next: result => {
+        if (!result.isMember) this.left.emit(result.channelId);
         this.channels.update(channels => channels.map(item => item.id === result.channelId ? { ...item, isMember: result.isMember } : item));
         this.membershipError.set(null);
         this.membershipNotice.set(`${desired ? 'Joined' : 'Left'} #${channel.slug}.`);

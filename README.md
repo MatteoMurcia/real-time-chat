@@ -26,7 +26,11 @@ unconfirmed response. Socket subscriptions require current membership; leaving
 removes all of the user's subscriptions to that channel before the HTTP response.
 The API persists messages with per-channel ordering and retry deduplication,
 then acknowledges and emits them after commit. See [message contracts and limits](docs/messages.md).
-The conversation UI remains pending. See [local Socket.IO setup](docs/local-development.md)
+Members can open a live conversation, exchange plain text with author/time and
+confirmation, and retry unconfirmed sends without changing their keys. The UI
+deduplicates ack/event delivery and resubscribes after reconnecting. It currently
+shows the latest 100 live messages; history and missed-message recovery remain
+pending. See [local Socket.IO setup](docs/local-development.md)
 for localhost configuration and the isolated restart test.
 See [container persistence checks](docs/local-development.md#stop-recreate-and-verify-persistence-manually)
 for recreating containers, preserving sessions and testing a separate empty database.
@@ -560,14 +564,15 @@ checking, without rendering the protected view first.
 An expiry timer clears the in-memory identity and leaves the workspace when the
 reported absolute expiry is reached. This is a UI control; server-side session
 validation remains the authority, including when the client clock is inaccurate.
-The workspace currently confirms the signed-in identity and reserves space for
-future conversations. Its Sign out button prevents duplicate submission and
+The workspace shows the signed-in identity, channel directory and live conversation.
+Its Sign out button prevents duplicate submission and
 returns to login after confirmed logout (or 401 indicating no valid session).
 It clears the identity and expiry timer; an older in-flight `/me` response cannot
 restore the cleared identity. Network errors, 403 and timeouts retain local state
 and show a focused error with manual retry, never falsely claiming successful
 revocation. Other open tabs discover revocation on their next session check;
-immediate cross-tab notification is not implemented. Messaging remains pending.
+immediate cross-tab logout notification is not implemented. Live message delivery
+checks recipient sessions; active disconnection remains task 3.4a.
 
 The Playwright suite uses Chromium against a real Compose stack. It creates
 accounts, so use an isolated project and environment file. Copy `.env.example` to
