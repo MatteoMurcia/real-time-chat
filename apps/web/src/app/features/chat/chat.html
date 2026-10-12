@@ -7,11 +7,11 @@
   <p class="visually-hidden" role="status">{{ store.liveNotice() }}</p>
   @if (!store.ready()) { <p>Sending is paused until the live subscription is ready.</p> }
   <p class="field-help">The latest 50 saved messages load when you open a channel. Load earlier pages to read more. Drafts and unconfirmed sends stay only in this view.</p>
-  @if (store.historyLoading()) { <p role="status">Loading history…</p> }
-  @if (store.historyError()) { <p role="alert" class="error-summary">{{ store.historyError() }}</p> }
+  <div class="history-controls">
   @if (store.olderCursor() || store.historyError()) {
-    <button type="button" (click)="following.set(false); store.loadHistory()" [disabled]="store.historyLoading() || !store.ready()">{{ store.historyError() ? 'Retry history' : 'Load earlier messages' }}</button>
+    <button type="button" (click)="loadHistory()" [disabled]="store.historyLoading() || !store.ready()">{{ store.historyError() ? 'Retry history' : 'Load earlier messages' }}</button>
   }
+  </div>
   <div class="messages" role="log" aria-label="Conversation messages" aria-live="off" tabindex="0" (scroll)="onScroll($event)">
     @if (store.snapshotCursor() && !store.historyLoading() && !store.messages().length && !store.outgoing().length) { <p>No messages yet. Say hello.</p> }
     @for (message of store.messages(); track message.id) {
@@ -29,7 +29,9 @@
       </article>
     }
   </div>
-  <button class="latest" type="button" (click)="scrollToLatest()">{{ following() ? 'Scroll to latest message' : 'Show latest messages' }}</button>
+  @if (store.historyLoading()) { <p role="status">Loading history…</p> }
+  @if (store.historyError()) { <p role="alert" class="error-summary">{{ store.historyError() }}</p> }
+  <button class="latest" type="button" (click)="scrollToLatest()">{{ hasNewMessages() ? 'New messages — show latest' : following() ? 'Scroll to latest message' : 'Show latest messages' }}</button>
   <form (submit)="$event.preventDefault(); send()">
     <label for="message-body">Message</label>
     <textarea id="message-body" rows="3" [formControl]="draft" aria-describedby="message-help" (keydown)="onKey($event)"></textarea>
