@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-12 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b implementada y verificada, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
+Revisión: 3 · Actualización: 2026-10-12 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b integrada mediante PR #30; CP2-C verificado, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
 
 ## 1. Cómo usar este plan
 
@@ -53,6 +53,8 @@ Se conserva el objetivo inicial de 4–6 jornadas como referencia agresiva. El d
 | 6. Extras | Estimar cada extra después de P0 | No incluidos en el total |
 
 Decisión confirmada por el usuario: completar el alcance aunque requiera más tiempo. La dedicación diaria real sigue pendiente; afecta al calendario, no a los criterios de entrega. Si posteriormente se acuerda una fecha de entrega, conservar los criterios P0 y registrar con claridad cualquier trabajo pendiente.
+
+**Recalibración CP2-C (2026-10-12):** las etapas 0–2 están implementadas, con CP0-C y CP1-C todavía pendientes. Quedan **36–53 h concentradas para P0**: 28–40 h de etapas 3–5, 2–4 h para los gates anteriores y 20 % de contingencia. Equivale aproximadamente a 18–27 jornadas de 2 h, 9–14 de 4 h o 5–7 de 8 h, más esperas de revisión. Git registra actividad del 7 al 12 de octubre y unas 33 h naturales entre los merges inicial/final de etapa 2; no son horas trabajadas y no permiten medir velocidad. La cifra restante sigue siendo provisional, sin fecha comprometida ni extras de etapa 6. Registrar esfuerzo real de las próximas sesiones y recalibrar en CP3-C. [Evidencia y supuestos](../docs/checkpoints/cp2-c.md#schedule-recalibration).
 
 Decisión del usuario: **la aplicación se ejecutará solo en local por ahora**. GitHub alojará el código y ejecutará CI, pero no alojará la aplicación. No elegir proveedor, contratar hosting, configurar dominios, publicar imágenes en un registry ni preparar CD en esta entrega. La portabilidad futura se consigue con imágenes, configuración por entorno, migraciones y documentación.
 
@@ -502,13 +504,13 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
   - Aceptación: páginas estables sin duplicados; cursor inválido o de otro canal rechazado; no miembro no lee.
   - Verificar: integración con más de dos páginas y mensajes con fechas iguales.
   - Archivos: `apps/api/src/messaging/history.service.ts`, `history.controller.ts`, contrato mensajes, store web, `apps/api/test/history.spec.ts`.
-- [x] **2.4b — Mantener contexto de lectura al paginar** · M · Depende de: 2.4a. Implementada y verificada; pendiente de revisión y merge manual.
+- [x] **2.4b — Mantener contexto de lectura al paginar** · M · Depende de: 2.4a. Integrada mediante PR #30.
   - Trabajo: carga de anteriores, ancla de scroll y aviso de mensajes recientes.
   - Aceptación: anteponer mensajes no cambia el mensaje observado; un evento no arrastra al usuario al final.
   - Verificar: E2E con historial largo, tamaños variables y fallo recuperable al paginar.
   - Archivos: `apps/web/src/app/features/chat/chat.ts`, `chat.html`, `chat.css`, `e2e/history-scroll.spec.ts`.
 
-**Salida CP2-C:** conversación e historial completos; correr integración de canales/mensajes y E2E principal. Reestimar el calendario con tiempos reales.
+**Checkpoint CP2-C — VERIFICADO (2026-10-12):** conversación e historial completos para una instancia local; 15 resultados de integración PostgreSQL y 13 E2E correctos. Reestimación con evidencia temporal y límites explícitos. [Informe](../docs/checkpoints/cp2-c.md); pendiente de revisión y merge manual. Recuperación de huecos sigue en etapa 3.
 
 ### Etapa 3 — Fiabilidad y sincronización
 
@@ -1058,3 +1060,12 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Verificación local: lint sin avisos; typecheck de API/contratos y web; **32 pruebas API**, **43 Angular**, **2 Docker**, **13 E2E** contra imágenes compiladas con Compose y PostgreSQL aislado. Build web y arranque saludable en Docker. Se corrigió el tipo opcional del ancla detectado por `exactOptionalPropertyTypes` antes de validar el build.
 - Límites: Chromium; sin Firefox/WebKit ni auditoría completa de lector de pantalla. Lista sin virtualización; el ancla se busca entre las páginas cargadas. Recuperación de huecos tras reconexión permanece en etapa 3. Sin despliegue remoto. CP0-C y CP1-C siguen pendientes.
 - Siguiente paso tras revisión y merge manual: **Checkpoint CP2-C**, pendiente de revisión integral y reestimación del calendario.
+
+### Evidencia CP2-C — Conversación e historial (2026-10-12)
+
+- PR #30 integrada; revisión sobre `main` en `89a23ef`. Rama `docs/cp2-c-history-checkpoint`, con commits separados de informe y actualización del plan. Sin cambios de aplicación, dependencias, esquema ni pruebas.
+- Revisados controlador/parser/consulta de historial, locks de acceso, persistencia, publicación, índices, cliente/store, ciclo de conexión y ancla de lectura. Sin hallazgos nuevos que bloqueen el alcance de etapa 2. [Matriz de criterios y límites](../docs/checkpoints/cp2-c.md).
+- Ejecución nueva con PostgreSQL 18.6 aislado: **15 resultados de integración correctos**, incluyendo canales, membresías, suscripciones, rollback/idempotencia e historial. Imágenes compiladas en Compose: **13 E2E correctos en 59,1 s**, con dos usuarios, recreación de contenedores, paginación y lectura a 1280/390 px.
+- Quality y Containers de `main` en `89a23ef` correctos: [ejecución](https://github.com/MatteoMurcia/real-time-chat/actions/runs/38289372325). Los checks de esta PR se registran en GitHub sobre su commit final.
+- Previsión restante P0: **36–53 h concentradas**, con gates pendientes y contingencia; actividad/merges observados no equivalen a horas de dedicación. No reducir alcance ni fijar fecha sin disponibilidad real.
+- CP0-C y CP1-C siguen pendientes. Sin certificación multiinstancia, carga, otros motores de navegador ni accesibilidad completa. Próxima tarea tras revisión y merge manual: **3.1a — Resolver reintentos concurrentes y conflictos**.
