@@ -4,10 +4,16 @@
     <button type="button" (click)="closed.emit()">Close conversation</button>
   </div>
   <p role="status">{{ store.notice() }}</p>
+  <p class="visually-hidden" role="status">{{ store.liveNotice() }}</p>
   @if (!store.ready()) { <p>Sending is paused until the live subscription is ready.</p> }
-  <p class="field-help">Live messages only (latest 100). Closing this view clears its local messages and drafts; saved messages remain on the server. History is not available yet.</p>
-  <div class="messages" role="log" aria-label="Conversation messages" aria-live="polite" tabindex="0" (scroll)="onScroll($event)">
-    @if (!store.messages().length && !store.outgoing().length) { <p>No live messages yet. Say hello.</p> }
+  <p class="field-help">The latest 50 saved messages load when you open a channel. Load earlier pages to read more. Drafts and unconfirmed sends stay only in this view.</p>
+  @if (store.historyLoading()) { <p role="status">Loading history…</p> }
+  @if (store.historyError()) { <p role="alert" class="error-summary">{{ store.historyError() }}</p> }
+  @if (store.olderCursor() || store.historyError()) {
+    <button type="button" (click)="following.set(false); store.loadHistory()" [disabled]="store.historyLoading() || !store.ready()">{{ store.historyError() ? 'Retry history' : 'Load earlier messages' }}</button>
+  }
+  <div class="messages" role="log" aria-label="Conversation messages" aria-live="off" tabindex="0" (scroll)="onScroll($event)">
+    @if (store.snapshotCursor() && !store.historyLoading() && !store.messages().length && !store.outgoing().length) { <p>No messages yet. Say hello.</p> }
     @for (message of store.messages(); track message.id) {
       <article class="message" [attr.data-message-id]="message.id">
         <div class="meta"><strong>{{ message.author.displayName }}</strong> <time [attr.datetime]="message.createdAt">{{ message.createdAt | date:'short' }}</time></div>
