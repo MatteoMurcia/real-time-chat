@@ -27,7 +27,7 @@ export class RealtimeConnection {
         return await this.socket.timeout(5000).emitWithAck(subscribed ? 'channel:subscribe' : 'channel:unsubscribe', { channelId }) as ChannelSubscriptionAck;
       } catch (error) {
         // An unknown room change must not overtake the next selection on this connection.
-        this.socket.disconnect();
+        if (this.socket.id === socketId) this.socket.disconnect();
         throw error;
       }
     });

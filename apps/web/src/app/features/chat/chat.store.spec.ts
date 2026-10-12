@@ -107,6 +107,16 @@ it('clears content and blocks sends when membership is revoked', async () => {
   expect(store.notice()).toContain('Access to this conversation ended');
 });
 
+it('ignores a successful subscription acknowledgement after revocation', async () => {
+  let resolve!: (ack: { ok: boolean; data: { channelId: string; subscribed: boolean } }) => void;
+  connection.subscription.mockImplementationOnce(() => new Promise(done => { resolve = done; }));
+  connection.status.set('reconnecting'); await flush();
+  connection.status.set('connected'); await flush();
+  listeners.get('channel:access-revoked')?.({ channelId: 'channel-1' });
+  resolve({ ok: true, data: { channelId: 'channel-1', subscribed: true } }); await flush();
+  expect(store.ready()).toBe(false); expect(store.notice()).toContain('Access to this conversation ended');
+});
+
 it('distinguishes definite rejection from an uncertain server error', async () => {
   const error = { code: 'VALIDATION_ERROR' as const, message: 'private', requestId: '12345678-1234-4234-8234-123456789abc' };
   connection.send.mockResolvedValueOnce({ ok: false, error });

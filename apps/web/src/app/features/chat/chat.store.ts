@@ -40,7 +40,10 @@ export class ChatStore {
       const connected = this.connection.status() === 'connected';
       const revision = ++this.revision;
       this.subscribed.set(false);
-      if (!connected) this.outgoing.update(items => items.map(item => item.state === 'pending' ? { ...item, state: 'unconfirmed' } : item));
+      if (!connected) {
+        this.outgoing.update(items => items.map(item => item.state === 'pending' ? { ...item, state: 'unconfirmed' } : item));
+        if (channelId) this.notice.set('Live updates paused. Reconnecting does not recover missed messages yet.');
+      }
       if (!channelId || !connected) return;
       this.notice.set('Opening live conversation…');
       void this.connection.subscription(channelId, true).then(ack => {

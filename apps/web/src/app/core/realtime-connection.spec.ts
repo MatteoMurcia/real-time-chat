@@ -46,6 +46,20 @@ it('does not buffer offline sends and abandons uncertain room changes before the
   await expect(first).rejects.toThrow('timeout'); await expect(second).rejects.toThrow('Disconnected');
   expect(fake.disconnect).toHaveBeenCalledOnce(); expect(fake.emitWithAck).toHaveBeenCalledTimes(1);
 });
+
+it('does not disconnect a replacement socket or replay room changes queued on the old one', async () => {
+  const connection = TestBed.inject(RealtimeConnection);
+  fake.connected = true;
+  let reject!: (error: Error) => void;
+  fake.emitWithAck.mockImplementationOnce(() => new Promise((_done, fail) => { reject = fail; }));
+  const first = connection.subscription('first', true);
+  const second = connection.subscription('second', true);
+  await Promise.resolve();
+  fake.id = 'socket-2'; reject(new Error('old socket disconnected'));
+  await expect(first).rejects.toThrow('old socket disconnected');
+  await expect(second).rejects.toThrow('Disconnected');
+  expect(fake.disconnect).not.toHaveBeenCalled(); expect(fake.emitWithAck).toHaveBeenCalledTimes(1);
+});
 afterEach(() => TestBed.resetTestingModule());
 
 it('connects only with a session and cleans up when the session or workspace ends', () => {
