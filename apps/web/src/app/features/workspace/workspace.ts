@@ -5,10 +5,12 @@ import { Router, RouterLink } from '@angular/router';
 import { SessionStore } from '../../core/session.store';
 import { RealtimeConnection } from '../../core/realtime-connection';
 import { ChannelList } from '../channels/channel-list';
+import { Chat } from '../chat/chat';
+import type { PublicChannel } from '@real-time-chat/contracts/channels';
 
 @Component({
   selector: 'app-workspace',
-  imports: [RouterLink, ChannelList],
+  imports: [RouterLink, ChannelList, Chat],
   providers: [RealtimeConnection],
   template: `
     @if (sessions.session(); as current) {
@@ -23,12 +25,14 @@ import { ChannelList } from '../channels/channel-list';
       <button type="button" (click)="logout()" [disabled]="pending()">{{ pending() ? 'Signing out…' : 'Sign out' }}</button>
       @if (pending()) { <p role="status">Closing your session. Please wait.</p> }
       @if (message()) { <p id="logout-error" class="error-summary" role="alert" tabindex="-1">{{ message() }}</p> }
-      <app-channel-list />
+      @if (activeChannel(); as channel) { <app-chat [channel]="channel" (closed)="closeChat()" /> }
+      <app-channel-list (opened)="activeChannel.set($event)" (left)="onLeft($event)" />
     }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class Workspace {
+  protected readonly activeChannel = signal<PublicChannel | null>(null);
   protected readonly connection = inject(RealtimeConnection);
   protected readonly connectionLabels = {
     connecting: 'Connecting to live updates…', connected: 'Live connection established.',
@@ -49,6 +53,15 @@ export class Workspace {
       if (this.sessions.status() === 'anonymous') void this.router.navigate(['/login'], { queryParams: { reason: 'expired' } });
       if (this.sessions.status() === 'signed-out') void this.router.navigate(['/login'], { queryParams: { reason: 'signed-out' } });
     });
+  }
+
+  protected closeChat(): void {
+    this.activeChannel.set(null);
+    this.element.nativeElement.querySelector<HTMLElement>('#channels-title')?.focus();
+  }
+
+  protected onLeft(channelId: string): void {
+    if (this.activeChannel()?.id === channelId) this.activeChannel.set(null);
   }
 
   protected logout(): void {

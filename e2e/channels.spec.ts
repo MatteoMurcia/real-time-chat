@@ -83,7 +83,7 @@ test('creates a channel and manages independent memberships including a lost lea
     await second.keyboard.press('Enter');
     releaseJoin();
     await expect(otherRow.getByRole('button', { name: `Leave ${name}`, exact: true })).toBeEnabled();
-    await expect(otherRow.getByRole('button')).toBeFocused();
+    await expect(otherRow.getByRole('button', { name: `Leave ${name}`, exact: true })).toBeFocused();
     expect(membershipAttempts).toBe(1);
     await second.unroute('**/api/channels/*/membership');
     await second.route('**/api/channels/*/membership', async route => {
