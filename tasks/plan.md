@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-12 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b implementada y verificada, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
+Revisión: 3 · Actualización: 2026-10-12 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B verificado, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
 
 ## 1. Cómo usar este plan
 
@@ -489,13 +489,13 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
   - Aceptación: éxito solo después de commit; mismo identificador no duplica; salida previa bloquea envío.
   - Verificar: PostgreSQL real con envíos concurrentes, rollback y reintento; los fallos de commit no emiten éxito.
   - Archivos: esquema/migración mensajes, `apps/api/src/messaging/send-message.service.ts`, gateway, `packages/contracts/src/messages.ts`, `apps/api/test/send-message.spec.ts`.
-- [x] **2.3b — Conversar desde dos navegadores** · M · Depende de: 2.3a, 2.2b. Implementada y verificada; pendiente de revisión y merge manual.
+- [x] **2.3b — Conversar desde dos navegadores** · M · Depende de: 2.3a, 2.2b. Integrada mediante PR #27.
   - Trabajo: servicio socket Angular, compositor y lista mínima; autor/hora y estado de confirmación.
   - Aceptación: dos contextos ven el mismo mensaje una vez; no hay listeners duplicados tras cambiar de vista.
   - Verificar: E2E conversación con dos usuarios y remontaje de pantalla.
-  - Archivos: `apps/web/src/app/core/socket-client.ts`, `features/chat/chat.ts`, `chat.html`, `chat.store.ts`, `e2e/conversation.spec.ts` con prefijos web correspondientes.
+  - Archivos: `apps/web/src/app/core/realtime-connection.ts`, `apps/web/src/app/features/chat/chat.ts`, `chat.html`, `chat.store.ts` en el mismo directorio, `e2e/conversation.spec.ts`.
 
-**Checkpoint CP2-B:** enviar, observar desde otro usuario y comprobar persistencia; primer caso de duplicado ya protegido en BD.
+**Checkpoint CP2-B — VERIFICADO (2026-10-12):** envío entre dos usuarios, persistencia tras recrear contenedores y duplicado básico protegido en BD/UI. Corregida dependencia del orden de ejecución en mocks de pruebas mediante aislamiento de archivos. [Informe y límites](../docs/checkpoints/cp2-b.md); pendiente de revisión y merge manual.
 
 - [ ] **2.4a — Cargar historial por cursor** · M · Depende de: 2.3b.
   - Trabajo: consulta de cola reciente y páginas anteriores, snapshotCursor y UI de carga/vacío/error.
@@ -1021,3 +1021,15 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Entorno desechable `chat-e2e`, su volumen y credenciales eliminados después de verificar su etiqueta. Volumen principal `real-time-chat_postgres_data` conservado; no se modifica la base de trabajo.
 - Límites visibles y documentados en [docs/messages.md](../docs/messages.md): solo mensajes en vivo; cerrar/cambiar/recargar descarta estado local y claves de reintento, no datos persistidos. Historial en 2.4a, reconciliación completa en 3.1b y recuperación de huecos en 3.2b. Sin despliegue, pruebas Firefox/WebKit ni auditoría WCAG completa. CP0-C y CP1-C siguen pendientes.
 - Siguiente paso después de revisión y merge manual: **Checkpoint CP2-B**; esta tarea no lo marca aprobado.
+
+### Evidencia CP2-B — Conversación, persistencia y duplicados (2026-10-12)
+
+- Base revisada: `main` en `5eef159`, con PR #27 integrada. Rama `chore/cp2-b-message-checkpoint`; commits separados de corrección de configuración, informe y actualización del plan. Merge reservado al usuario.
+- Resultado: **VERIFICADO para una instancia local**, con un hallazgo de pruebas resuelto. Matriz de criterios, revisión, procedencia de resultados y límites en [docs/checkpoints/cp2-b.md](../docs/checkpoints/cp2-b.md).
+- Revisados validador, restricciones SQL, transacción, gateway, coordinación por canal, conexión/store/compositor Angular y pruebas. Éxito posterior a commit; rollback real sin fila/contador/evento; unicidad autor/clave y canal/secuencia; ack/evento convergen y los reintentos autorizados no vuelven a emitir.
+- Fuentes de aplicación, contratos, migraciones, E2E y Docker idénticas a `2fd0366`, head aprobado de PR #27. Su CI `38206991705` pasó 31 pruebas API, 39 Angular, 3 contratos, 14 resultados PostgreSQL, 2 Docker, 10 E2E y builds/auditoría. Containers de `main` volvió a pasar en `38207342667`, incluida conversación y persistencia; Quality falló por el hallazgo descrito a continuación y no se considera aprobado.
+- Hallazgo reproducido: ejecutar primero `chat.store.spec.ts` en un único worker sin aislamiento deja importada la conexión real en la caché y evita aplicar el mock posterior de Socket.IO; 5 fallos y 34 pruebas correctas, iguales a CI. `isolate: true` en Angular produce 39/39 con ese mismo orden forzado. Sin cambiar aserciones, tiempos, pruebas ni código de producción. Configuración temporal de diagnóstico eliminada; política registrada en CONTRIBUTING.
+- Verificación local después del arreglo: `npm run lint`, `npm run typecheck`, `npm test` (31 API, 39 Angular, 3 contratos), `npm run build` y `npm run test:docker` (2) correctos. La PR del checkpoint vuelve a ejecutar Quality/Containers, PostgreSQL y navegadores compilados.
+- No se crean datos ni se migran bases locales durante el checkpoint. Volumen `real-time-chat_postgres_data` conservado. Se reutiliza la prueba de persistencia contra el stack compilado y su volumen aislado ejecutada por CI; no se confunde persistencia con disponibilidad de historial en la UI.
+- Límites: una instancia y entrega best-effort, sin garantía exactly-once. Historial en 2.4a, conflicto concurrente entre canales en 3.1a, reconciliación completa en 3.1b y recuperación de huecos en 3.2b. Sin despliegue, carga ni auditoría completa de accesibilidad. CP0-C y CP1-C siguen pendientes.
+- Siguiente tarea tras revisión y merge manual: **2.4a — Cargar historial por cursor**.
