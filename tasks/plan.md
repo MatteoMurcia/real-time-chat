@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-12 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a implementada y verificada, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
+Revisión: 3 · Actualización: 2026-10-12 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b implementada y verificada, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
 
 ## 1. Cómo usar este plan
 
@@ -497,16 +497,16 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
 
 **Checkpoint CP2-B — VERIFICADO (2026-10-12):** envío entre dos usuarios, persistencia tras recrear contenedores y duplicado básico protegido en BD/UI. Corregida dependencia del orden de ejecución en mocks de pruebas mediante aislamiento de archivos. [Informe y límites](../docs/checkpoints/cp2-b.md); integrado mediante PR #28.
 
-- [x] **2.4a — Cargar historial por cursor** · M · Depende de: 2.3b. Implementada y verificada; pendiente de revisión y merge manual.
+- [x] **2.4a — Cargar historial por cursor** · M · Depende de: 2.3b. Integrada mediante PR #29.
   - Trabajo: consulta de cola reciente y páginas anteriores, snapshotCursor y UI de carga/vacío/error.
   - Aceptación: páginas estables sin duplicados; cursor inválido o de otro canal rechazado; no miembro no lee.
   - Verificar: integración con más de dos páginas y mensajes con fechas iguales.
   - Archivos: `apps/api/src/messaging/history.service.ts`, `history.controller.ts`, contrato mensajes, store web, `apps/api/test/history.spec.ts`.
-- [ ] **2.4b — Mantener contexto de lectura al paginar** · M · Depende de: 2.4a.
+- [x] **2.4b — Mantener contexto de lectura al paginar** · M · Depende de: 2.4a. Implementada y verificada; pendiente de revisión y merge manual.
   - Trabajo: carga de anteriores, ancla de scroll y aviso de mensajes recientes.
   - Aceptación: anteponer mensajes no cambia el mensaje observado; un evento no arrastra al usuario al final.
   - Verificar: E2E con historial largo, tamaños variables y fallo recuperable al paginar.
-  - Archivos: componente/plantilla chat, `chat.css`, store chat, `e2e/history-scroll.spec.ts`.
+  - Archivos: `apps/web/src/app/features/chat/chat.ts`, `chat.html`, `chat.css`, `e2e/history-scroll.spec.ts`.
 
 **Salida CP2-C:** conversación e historial completos; correr integración de canales/mensajes y E2E principal. Reestimar el calendario con tiempos reales.
 
@@ -1047,3 +1047,14 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Limpieza: proyecto temporal `chat-e2e`, redes, volumen y credenciales eliminados tras verificar etiqueta de propiedad. Volumen principal `real-time-chat_postgres_data` conservado.
 - Límites: ancla precisa de scroll y aviso contextual al anteponer en **2.4b**. Sin recuperación automática de huecos al reconectar; resincronización acotada y periódica sigue en etapa 3. Sin virtualización ni límite artificial que descarte páginas ya cargadas; medir si se recorren historiales grandes. Snapshot delimita mensajes confirmados, no congela futuros cambios de nombres/ediciones. Una instancia local; sin despliegue, carga ni auditoría WCAG completa. CP0-C y CP1-C siguen pendientes.
 - Siguiente tarea después de revisión y merge manual: **2.4b — Mantener contexto de lectura al paginar**.
+
+### Evidencia 2.4b — Contexto de lectura al paginar (2026-10-12)
+
+- Rama `feature/2.4b-history-reading-context` desde `main` en `f8c9875`, con PR #29 integrada. Commits separados de implementación/E2E inicial, cobertura móvil/reapertura y documentación; merge reservado al usuario.
+- Ancla sobre el primer mensaje confirmado visible y su desplazamiento relativo al contenedor. Se actualiza al desplazarse, incluso durante una petición pendiente; después del render se compensa el contenido antepuesto. Anclaje nativo deshabilitado para evitar correcciones dobles. Sin dependencias ni cambios de contrato/store/BD.
+- Botón de historial con espacio reservado al agotarse las páginas; carga/error bajo la lista. La acción enfoca la lista sin mover la página, también después de la última página. Los errores conservan mensajes y posición y permiten reintentar.
+- Aviso contextual **New messages — show latest** al recibir eventos mientras se lee arriba. Volver al final limpia el aviso y reanuda el seguimiento; cargar historial no genera avisos. Cerrar/cambiar conversación reinicia el estado local; no es un contador persistente de no leídos.
+- `e2e/history-scroll.spec.ts`: Chromium a 1280 y 390 px, 105 mensajes iniciales de alturas variables, dos páginas anteriores, fallo de red/reintento, desplazamiento durante petición retenida, eventos concurrentes, posición del mensaje con tolerancia inferior a 2 px, foco al agotar páginas, retorno al final, seguimiento y reapertura sin aviso obsoleto. Capturas inspeccionadas; sin errores de página.
+- Verificación local: lint sin avisos; typecheck de API/contratos y web; **32 pruebas API**, **43 Angular**, **2 Docker**, **13 E2E** contra imágenes compiladas con Compose y PostgreSQL aislado. Build web y arranque saludable en Docker. Se corrigió el tipo opcional del ancla detectado por `exactOptionalPropertyTypes` antes de validar el build.
+- Límites: Chromium; sin Firefox/WebKit ni auditoría completa de lector de pantalla. Lista sin virtualización; el ancla se busca entre las páginas cargadas. Recuperación de huecos tras reconexión permanece en etapa 3. Sin despliegue remoto. CP0-C y CP1-C siguen pendientes.
+- Siguiente paso tras revisión y merge manual: **Checkpoint CP2-C**, pendiente de revisión integral y reestimación del calendario.
