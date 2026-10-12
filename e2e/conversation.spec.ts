@@ -89,7 +89,7 @@ test('two independent users converse once, remount, reconnect and lose access on
     await expect(second.getByText(/^Live conversation ready\./)).toBeVisible({ timeout: 20000 });
     await expect(composer).toHaveValue('Draft kept during reconnect');
     await expect(second.getByRole('button', { name: 'Send message', exact: true })).toBeEnabled();
-    await expect(page.getByText('Live connection established.', { exact: true })).toBeVisible();
+    await expect(page.getByText(/^Live conversation ready\./)).toBeVisible();
     await composer.press('Enter');
     await expect(messages(page)).toHaveCount(5); await expect(messages(second)).toHaveCount(2);
 
