@@ -11,15 +11,17 @@ export class SendMessageService {
 
   // The caller holds the local channel queue through commit and emission.
   async send(authorId: string, input: SendMessageRequest): Promise<{ message: PublicMessage; created: boolean }> {
-    try { return await this.db.$transaction(async tx => {
-      await this.access.lockChannel(tx, input.channelId);
-      await this.access.requireMember(authorId, input.channelId, tx);
-      const existing = await this.existing(tx, authorId, input);
-      if (existing) return existing;
-      const channel = await tx.channel.update({ where: { id: input.channelId }, data: { lastSequence: { increment: 1 } }, select: { lastSequence: true } });
-      const message = await tx.message.create({ data: { ...input, authorId, sequence: channel.lastSequence }, select: publicMessage });
-      return { message: serializeMessage(message), created: true };
-    }); } catch (error) {
+    try {
+      return await this.db.$transaction(async tx => {
+        await this.access.lockChannel(tx, input.channelId);
+        await this.access.requireMember(authorId, input.channelId, tx);
+        const existing = await this.existing(tx, authorId, input);
+        if (existing) return existing;
+        const channel = await tx.channel.update({ where: { id: input.channelId }, data: { lastSequence: { increment: 1 } }, select: { lastSequence: true } });
+        const message = await tx.message.create({ data: { ...input, authorId, sequence: channel.lastSequence }, select: publicMessage });
+        return { message: serializeMessage(message), created: true };
+      });
+    } catch (error) {
       if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
       // A competing channel can win the author/key index; the failed transaction is already rolled back.
       return this.db.$transaction(async tx => {

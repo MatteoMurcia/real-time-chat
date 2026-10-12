@@ -9,6 +9,7 @@ import { SessionService } from '../../src/identity/session.service.js';
 import { hashPassword } from '../../src/identity/password.js';
 import { ChannelsService } from '../../src/channels/channels.service.js';
 import { SendMessageService } from '../../src/messaging/send-message.service.js';
+import { ChatGateway } from '../../src/realtime/chat.gateway.js';
 
 export async function verifyMessages(app: INestApplication, db: DatabaseService): Promise<void> {
   const suffix = randomUUID(), password = 'a message integration passphrase';
@@ -39,7 +40,7 @@ export async function verifyMessages(app: INestApplication, db: DatabaseService)
     const flush = async () => { await receiver.timeout(3000).emitWithAck('channel:subscribe', { channelId: channel.id }); };
     rejected(await send(input, outsider), 'FORBIDDEN');
     rejected(await send({ ...input, authorId: users[1]!.id }), 'VALIDATION_ERROR');
-    const replies = (await Promise.all(Array.from({ length: 5 }, () => send()))).map(accepted);
+    const replies = (await Promise.all(Array.from({ length: 10 }, () => send()))).map(accepted);
     assert.ok(replies.every(message => message.id === replies[0]!.id));
     assert.equal(replies[0]!.sequence, '1'); assert.equal(replies[0]!.body, input.body);
     assert.deepEqual(replies[0]!.author, { id: users[0]!.id, displayName: users[0]!.displayName });
@@ -68,11 +69,29 @@ export async function verifyMessages(app: INestApplication, db: DatabaseService)
     }
     const recovered = accepted(await send(retry)); assert.equal(recovered.sequence, '7');
     assert.deepEqual(accepted(await send(retry)), recovered);
+    // Drop only the outgoing ack after the real gateway commits and publishes.
+    const lost = { ...input, clientMessageId: randomUUID(), body: 'Committed without acknowledgement' };
+    let dropped!: () => void, suppress = true;
+    const ackDropped = new Promise<void>(resolve => { dropped = resolve; });
+    app.get(ChatGateway).server.of('/').sockets.get(sender.id!)!.use((packet, next) => {
+      if (suppress && packet[0] === 'message:send' && packet[1]?.clientMessageId === lost.clientMessageId) {
+        assert.equal(typeof packet[packet.length - 1], 'function');
+        packet[packet.length - 1] = () => { suppress = false; dropped(); };
+      }
+      next();
+    });
+    await Promise.all([assert.rejects(sender.timeout(200).emitWithAck('message:send', lost)), ackDropped]);
+    await flush();
+    const saved = events.find(message => message.clientMessageId === lost.clientMessageId)!;
+    assert.ok(saved); assert.ok(await db.message.findUnique({ where: { id: saved.id } }));
+    assert.deepEqual(accepted(await send(lost)), saved);
+    await flush(); assert.equal(events.filter(message => message.id === saved.id).length, 1);
+    assert.equal(await db.message.count({ where: { authorId: users[0]!.id, clientMessageId: lost.clientMessageId } }), 1);
     const independent = (await channels.create(users[0]!.id, { name: `Concurrent ${suffix}`, slug: `concurrent-${suffix}` })).channel;
     rejected(await send({ ...input, channelId: independent.id }), 'CONFLICT');
     const persistence = app.get(SendMessageService);
     const concurrent = { ...input, channelId: independent.id, clientMessageId: randomUUID() };
-    const concurrentResults = await Promise.all(Array.from({ length: 3 }, () => persistence.send(users[0]!.id, concurrent)));
+    const concurrentResults = await Promise.all(Array.from({ length: 10 }, () => persistence.send(users[0]!.id, concurrent)));
     assert.equal(concurrentResults.filter(result => result.created).length, 1);
     assert.ok(concurrentResults.every(result => result.message.id === concurrentResults[0]!.message.id));
     const independentSends = await Promise.all(Array.from({ length: 4 }, () => persistence.send(users[0]!.id, { ...concurrent, clientMessageId: randomUUID() })));
@@ -81,12 +100,21 @@ export async function verifyMessages(app: INestApplication, db: DatabaseService)
     await assert.rejects(db.message.create({ data: invalidRow }));
     await assert.rejects(db.message.create({ data: { ...invalidRow, sequence: 6n, body: '' } }));
     await assert.rejects(db.message.create({ data: { ...invalidRow, sequence: 1n } }), { code: 'P2002' });
+    const disputed = { ...concurrent, clientMessageId: randomUUID() };
+    const disputedResults = await Promise.all(Array.from({ length: 10 }, (_, index) => send({ ...disputed, body: index % 2 ? 'A' : 'B' })));
+    const winner = disputedResults.find(result => result.ok)!; assert.equal(winner.ok, true);
+    for (const result of disputedResults) {
+      if (result.ok) assert.deepEqual(result.data, winner.data); else rejected(result, 'CONFLICT');
+    }
+    assert.equal(disputedResults.filter(result => result.ok).length, 5);
+    assert.equal(await db.message.count({ where: { authorId: users[0]!.id, clientMessageId: disputed.clientMessageId } }), 1);
     const unicode = accepted(await send({ ...input, clientMessageId: randomUUID(), body: '🌍'.repeat(2000) }));
     assert.equal(unicode.body, '🌍'.repeat(2000));
     const sameKeyOtherAuthor = accepted(await send(input, receiver));
     assert.notEqual(sameKeyOtherAuthor.id, replies[0]!.id);
     await channels.setMembership(users[0]!.id, channel.id, false);
     rejected(await send(), 'FORBIDDEN');
+    rejected(await send(lost), 'FORBIDDEN');
     rejected(await send({ ...input, clientMessageId: randomUUID() }), 'FORBIDDEN');
     const current = await sessions.authenticate(cookies[1]);
     await sessions.revoke(current.id);
