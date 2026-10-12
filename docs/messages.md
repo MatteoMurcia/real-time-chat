@@ -1,7 +1,37 @@
 # Persistent messages
 
-The API accepts messages over authenticated Socket.IO. The conversation UI is
-task 2.3b; see [channels.md](channels.md) for membership and subscriptions.
+The API accepts messages over authenticated Socket.IO. Members can open a live
+conversation from the workspace directory; see [channels.md](channels.md) for
+membership and subscriptions.
+
+## Conversation UI
+
+Join a channel and choose **Open chat** in `/workspace`. Two signed-in users in
+independent browser profiles or contexts can exchange plain text, with author,
+server time and confirmation state. Enter sends, Shift+Enter adds a line break,
+and Enter during IME composition does not send. HTML is rendered as literal text.
+The message list follows new content while at the bottom; scrolling up keeps the
+reading position and **Show latest messages** returns to the bottom.
+
+One authenticated socket serves the workspace. Room changes are serialized, sends
+are disabled until subscription is confirmed, and reconnection resubscribes the
+active channel. Closing the conversation removes its event listeners and
+unsubscribes without leaving the membership. Leaving revokes the view's access,
+clears its content and blocks further sends; stale acknowledgements cannot reopen it.
+
+`message:created` and successful send acknowledgements converge on the same
+message ID. Confirmed rows use exact BIGINT sequence ordering. Outgoing messages
+show **Sending**, **Confirmed**, **Unconfirmed** or **Rejected**. A five-second
+timeout or unexpected server error means unconfirmed, not lost. Manual retry
+keeps the original client key and body. Definitive validation/conflict failures
+do not retry automatically; the user can copy and correct the text in the composer.
+
+This stage keeps the latest 100 live messages and pending sends in memory.
+Switching/closing a conversation, navigating away or reloading clears that local
+state, including drafts and retry keys; it does not delete persisted messages.
+Drafts survive a temporary transport interruption while the view stays open.
+History (2.4a), full retry reconciliation (3.1b) and reconnect gap recovery (3.2b)
+remain pending. Messages missed while disconnected are not fetched yet.
 
 ## Wire contract
 

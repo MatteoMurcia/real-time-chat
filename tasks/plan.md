@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-11 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a implementada y verificada, pendiente de revisión y merge de PR #26. CP0-C y revisión de salida CP1-C pendientes.
+Revisión: 3 · Actualización: 2026-10-12 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b implementada y verificada, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
 
 ## 1. Cómo usar este plan
 
@@ -484,12 +484,12 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
 
 **Checkpoint CP2-A — VERIFICADO (2026-10-11):** permisos HTTP/socket revisados y ambas carreras subscribe/leave comprobadas con barreras sobre PostgreSQL real. Sin hallazgos bloqueantes para una instancia local. [Informe y límites](../docs/checkpoints/cp2-a.md); integrado mediante PR #25.
 
-- [x] **2.3a — Persistir mensajes con orden e idempotencia básicos** · M · Depende de: 2.2b. Implementada en PR #26; pendiente de revisión y merge manual.
+- [x] **2.3a — Persistir mensajes con orden e idempotencia básicos** · M · Depende de: 2.2b. Integrada mediante PR #26.
   - Trabajo: Message, bloqueo por canal, contador transaccional y clave única de envío; conectar al gateway.
   - Aceptación: éxito solo después de commit; mismo identificador no duplica; salida previa bloquea envío.
   - Verificar: PostgreSQL real con envíos concurrentes, rollback y reintento; los fallos de commit no emiten éxito.
   - Archivos: esquema/migración mensajes, `apps/api/src/messaging/send-message.service.ts`, gateway, `packages/contracts/src/messages.ts`, `apps/api/test/send-message.spec.ts`.
-- [ ] **2.3b — Conversar desde dos navegadores** · M · Depende de: 2.3a, 2.2b.
+- [x] **2.3b — Conversar desde dos navegadores** · M · Depende de: 2.3a, 2.2b. Implementada y verificada; pendiente de revisión y merge manual.
   - Trabajo: servicio socket Angular, compositor y lista mínima; autor/hora y estado de confirmación.
   - Aceptación: dos contextos ven el mismo mensaje una vez; no hay listeners duplicados tras cambiar de vista.
   - Verificar: E2E conversación con dos usuarios y remontaje de pantalla.
@@ -1007,3 +1007,17 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Documentación de contratos, garantías y límites en [docs/messages.md](../docs/messages.md). Entorno temporal `chat-e2e`, volumen y credenciales eliminados tras verificar etiqueta; `real-time-chat_postgres_data` conservado.
 - Límites: una instancia; emisión best-effort sin outbox. Un fallo posterior a commit puede dejar mensaje persistido sin evento/ack. Recuperación de colisión simultánea de clave entre canales en 3.1a (unicidad ya impide duplicados; el perdedor puede recibir INTERNAL_ERROR). Historial, reconciliación, rate limiting y UI aún en sus tareas. CP0-C y CP1-C siguen pendientes.
 - Siguiente tarea tras revisión y merge manual: **2.3b — Conversar desde dos navegadores**.
+
+### Evidencia 2.3b — Conversación entre dos navegadores (2026-10-12)
+
+- Rama `feature/2.3b-browser-conversation` desde `main` en `03dcbb6`, con PR #26 integrada. Commits separados de coordinación/confirmación, protección frente a reconexiones antiguas, UI/E2E y documentación. Merge reservado al usuario.
+- Se reutiliza `RealtimeConnection`; no se crea un segundo socket ni otra capa equivalente a socket-client. Suscripciones serializadas entre canales, sin buffer de envíos desconectados y con timeout de cinco segundos. Un cambio de room incierto cierra esa conexión para impedir que adelante una selección posterior; una operación antigua no desconecta su sustituta.
+- `ChatStore` queda limitado a la vista: limpia listeners propios, se desuscribe al cerrar, invalida respuestas antiguas al cambiar de canal y vacía contenido al perder membresía. Reconectar conserva borrador y envíos inciertos y vuelve a comprobar la suscripción antes de habilitar envío.
+- Compositor y lista de texto plano con autor, hora del servidor y confirmación; Enter/Shift+Enter/IME, foco al abrir/cerrar, log accesible y desplazamiento al final sin forzar a quien lee arriba. Ack y evento convergen por ID; secuencias comparadas con BigInt y máximo 100 mensajes canónicos en memoria. Reintento manual incierto conserva exactamente clave/canal/texto; error inesperado no se presenta como pérdida definitiva.
+- Verificación local: **39 pruebas Angular, 10 E2E Chromium y 2 pruebas Docker** correctas; lint sin advertencias, typecheck de todos los workspaces, build de producción y stack saludable. Bundle inicial 403.52 kB. API, esquema y dependencias sin cambios; sus suites completas se vuelven a ejecutar en CI.
+- E2E real: dos usuarios/contextos independientes reciben el mismo ID una vez, HTML literal, autor/fecha, envío por botón/teclado e IME, dos desmontajes/reaperturas, reinicio real de la API con borrador conservado y resuscripción, salida del canal y ausencia de recepción posterior. Regresiones de sesiones, membresías, suscripciones y persistencia tras recrear contenedores aprobadas. Sin overflow a 320/768/1024/1440 px; capturas de móvil/escritorio revisadas.
+- Pruebas unitarias adicionales: ack antes/después de evento, claves de otro autor, BIGINT superior a MAX_SAFE_INTEGER, límite de memoria/Unicode, payloads inesperados, timeout/reintento, rechazo definitivo/error incierto, limpieza de listeners, respuestas antiguas y revocación durante suscripción pendiente.
+- Incidencias resueltas: formulario con `ngSubmit` sin directiva de formulario provocaba navegación nativa; se enlazó `submit` con prevención explícita y el E2E ahora verifica envío por botón. El modo offline de Chromium no cerró inmediatamente el WebSocket abierto; la prueba usa parada/arranque de la API aislada con etiqueta verificada.
+- Entorno desechable `chat-e2e`, su volumen y credenciales eliminados después de verificar su etiqueta. Volumen principal `real-time-chat_postgres_data` conservado; no se modifica la base de trabajo.
+- Límites visibles y documentados en [docs/messages.md](../docs/messages.md): solo mensajes en vivo; cerrar/cambiar/recargar descarta estado local y claves de reintento, no datos persistidos. Historial en 2.4a, reconciliación completa en 3.1b y recuperación de huecos en 3.2b. Sin despliegue, pruebas Firefox/WebKit ni auditoría WCAG completa. CP0-C y CP1-C siguen pendientes.
+- Siguiente paso después de revisión y merge manual: **Checkpoint CP2-B**; esta tarea no lo marca aprobado.
