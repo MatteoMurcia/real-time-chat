@@ -134,10 +134,15 @@ but reconnect reconciliation remains pending. There is no outbox or exactly-once
 ack/event may arrive in either order.
 
 The implementation supports one API process and the synchronous in-memory
-adapter. Same-channel retries serialize in PostgreSQL. Simultaneous reuse of a
-key across different channels cannot duplicate data, but the losing unique-key
-transaction can currently return INTERNAL_ERROR; recovery outside the aborted
-transaction belongs to 3.1a. Rate limiting remains 4.1a.
+adapter. Same-channel retries serialize in PostgreSQL. If simultaneous reuse of
+an author/key across different channels loses the unique-index race, the failed
+transaction rolls back its row and sequence increment. A new read transaction
+locks the requested channel and checks membership again before looking up the
+committed key. Different channel/body returns CONFLICT; lost membership returns
+FORBIDDEN. A matching request returns the canonical message with no new broadcast.
+If no matching key exists, the original database error is preserved rather than
+misreported as a successful retry. Recovery performs no second insert or retry
+loop. Rate limiting remains 4.1a.
 
 ## Migration and verification
 
@@ -153,5 +158,15 @@ A deferred PostgreSQL constraint trigger fails at COMMIT after insertion: no
 successful ack/event, row or counter increment survives. Retry after removing
 the trigger succeeds. Proxy tests cover deduplicated delivery, denial after
 leave and recovery of the exact message after recreating all containers.
+
+Task 3.1a adds ten concurrent socket retries and ten direct service transactions,
+plus mixed-body requests for one key. A query barrier makes two channel
+transactions observe the same absent key before insertion; exactly one wins and
+the losing counter rolls back. A second case commits leave before the recovery
+lock and expects FORBIDDEN. An unrelated sequence-index violation remains a
+database error. A test-only Socket.IO middleware discards the acknowledgement
+after the real commit/publication: the client times out, then retries the same
+key and receives the saved message once without another event. These hooks live
+only in integration tests; no production fault-injection option is added.
 
 Reference: [Prisma 7 transactions](https://www.prisma.io/docs/orm/v7/prisma-client/queries/transactions).
