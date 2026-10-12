@@ -77,6 +77,11 @@ runs **Quality** (including PostgreSQL integration and audit) and **Containers**
 rename jobs without updating branch protection. Lint must pass without warnings.
 Later tasks extend integration and E2E coverage.
 
+Angular tests explicitly enable file isolation. The connection tests mock
+`socket.io-client`, while chat-store tests import the real connection class as a
+dependency-injection token. Sharing the module cache makes those mocks depend on
+which file runs first. Keep isolation enabled instead of relying on file order.
+
 ## GitHub settings
 
 Repository policy established in task 0.0c:
