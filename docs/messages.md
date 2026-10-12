@@ -26,12 +26,51 @@ timeout or unexpected server error means unconfirmed, not lost. Manual retry
 keeps the original client key and body. Definitive validation/conflict failures
 do not retry automatically; the user can copy and correct the text in the composer.
 
-This stage keeps the latest 100 live messages and pending sends in memory.
+Opening a channel subscribes first, then loads the latest 50 saved messages.
+**Load earlier messages** fetches previous pages; loading, empty and recoverable
+error states are explicit. Retrying a failed page keeps its cursor and already
+loaded rows. Live events and page results merge by ID in sequence order. Bulk
+history is not announced as live content; new events have a separate announcement.
+Each page is bounded, and loaded pages stay in memory until the view closes.
+Precise scroll anchoring while prepending is the next task, 2.4b.
+
 Switching/closing a conversation, navigating away or reloading clears that local
 state, including drafts and retry keys; it does not delete persisted messages.
 Drafts survive a temporary transport interruption while the view stays open.
-History (2.4a), full retry reconciliation (3.1b) and reconnect gap recovery (3.2b)
-remain pending. Messages missed while disconnected are not fetched yet.
+Reopening loads recent saved history again. Full retry reconciliation (3.1b) and
+reconnect gap recovery (3.2b) remain pending; resubscribing an already open view
+does not automatically fetch messages missed during the interruption.
+
+## History HTTP contract
+
+`GET /api/channels/:id/messages?before=<olderCursor>&limit=50` requires a valid
+session and current channel membership. `before` is optional; `limit` defaults
+to 50 and accepts decimal integers 1–100. Unknown/repeated query fields, invalid
+UUIDs and malformed, noncanonical, future or cross-channel cursors return 400.
+Invalid sessions return 401, nonmembers 403 and nonexistent channels 404.
+Responses use `Cache-Control: no-store` and only the public message projection.
+
+The response is `{ items, olderCursor, snapshotCursor }`. Items are ascending by
+sequence, irrespective of equal timestamps. A null older cursor means no earlier
+page. The first transaction locks the channel, authorizes membership and captures
+the committed `lastSequence` as H. It selects at most `limit + 1` rows descending
+using the existing `(channelId, sequence)` index and returns the selected page
+ascending. The same channel lock orders the read against sends and membership
+changes; a read admitted before leave can complete, subsequent reads are denied.
+
+Version 1 cursors are canonical base64url JSON `[1, channelId, sequence, H]`;
+sequences are decimal strings, never JavaScript numbers. An older cursor uses the
+earliest returned sequence as an exclusive upper boundary and retains H. Each
+page revalidates membership and reads only `sequence < before` and `sequence <= H`.
+New writes therefore cannot move the older pages. The snapshot cursor encodes H
+in both sequence slots; an empty channel encodes zero and has no older cursor.
+An empty snapshot cannot be used as `before`. Clients treat cursors as opaque;
+they are neither signed capabilities nor substitutes for authorization.
+
+The Angular store keeps `snapshotCursor` separate from `olderCursor`; events do
+not advance either. Switching channels or access revocation cancels HTTP work
+and clears both. This is a committed message boundary, not a snapshot of mutable
+author display names or a future edit/delete policy. No schema migration is needed.
 
 ## Wire contract
 
@@ -82,8 +121,8 @@ in that task. Already transmitted events cannot be recalled.
 
 Delivery is best-effort. A crash or delivery-check failure after commit can leave
 a stored message without an event or successful ack. Timeout does not prove
-rollback; retry can recover the canonical message. History and reconnect
-reconciliation remain pending. There is no outbox or exactly-once delivery, and
+rollback; retry can recover the canonical message. Saved history can be loaded,
+but reconnect reconciliation remains pending. There is no outbox or exactly-once delivery, and
 ack/event may arrive in either order.
 
 The implementation supports one API process and the synchronous in-memory

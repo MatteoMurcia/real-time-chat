@@ -29,8 +29,9 @@ then acknowledges and emits them after commit. See [message contracts and limits
 Members can open a live conversation, exchange plain text with author/time and
 confirmation, and retry unconfirmed sends without changing their keys. The UI
 deduplicates ack/event delivery and resubscribes after reconnecting. It currently
-shows the latest 100 live messages; history and missed-message recovery remain
-pending. See [local Socket.IO setup](docs/local-development.md)
+loads the latest 50 saved messages and offers earlier pages using channel-bound
+snapshot cursors. Live events merge by ID without replacing loaded history.
+Reconnect gap recovery remains pending. See [local Socket.IO setup](docs/local-development.md)
 for localhost configuration and the isolated restart test.
 See [container persistence checks](docs/local-development.md#stop-recreate-and-verify-persistence-manually)
 for recreating containers, preserving sessions and testing a separate empty database.
