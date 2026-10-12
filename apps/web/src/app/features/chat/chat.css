@@ -1,7 +1,8 @@
 :host { display: block; }
+.history-controls { min-height: 2.75rem; }
 .heading, .meta { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem; }
 h2 { overflow-wrap: anywhere; min-width: 0; }
-.messages { max-height: 26rem; overflow-y: auto; overflow-wrap: anywhere; border-block: 1px solid var(--line); padding: .75rem 0; }
+.messages { max-height: 26rem; overflow-y: auto; overflow-anchor: none; overflow-wrap: anywhere; border-block: 1px solid var(--line); padding: .75rem 0; }
 .message { padding: .75rem; margin: .5rem 0; border-radius: .5rem; background: var(--background); }
 .body { white-space: pre-wrap; overflow-wrap: anywhere; margin: .5rem 0; }
 time, small { color: var(--muted); font-size: .875rem; }

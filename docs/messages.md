@@ -32,7 +32,15 @@ error states are explicit. Retrying a failed page keeps its cursor and already
 loaded rows. Live events and page results merge by ID in sequence order. Bulk
 history is not announced as live content; new events have a separate announcement.
 Each page is bounded, and loaded pages stay in memory until the view closes.
-Precise scroll anchoring while prepending is the next task, 2.4b.
+Loading earlier pages preserves the first visible confirmed message and its
+offset, including when the reader scrolls during the request. The list owns its
+scroll anchor (native anchoring is disabled); the history button keeps its space
+when exhausted, and loading/error feedback sits below the list to avoid shifting
+the reading viewport. Loading a page focuses the list without scrolling the page.
+While reading above the bottom, live events change the action to **New messages —
+show latest**. Choosing it or scrolling back to the bottom clears the notice and
+resumes following. History pages alone do not trigger this notice. It is local
+to the open conversation, not a persisted unread count.
 
 Switching/closing a conversation, navigating away or reloading clears that local
 state, including drafts and retry keys; it does not delete persisted messages.
