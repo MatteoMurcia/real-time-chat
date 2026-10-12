@@ -3,24 +3,19 @@ import { isApiError } from '@real-time-chat/contracts';
 import type { PublicMessage, SendMessageRequest } from '@real-time-chat/contracts/messages';
 import { RealtimeConnection } from '../../core/realtime-connection';
 import { SessionStore } from '../../core/session.store';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Subscription } from 'rxjs';
+import { HistoryClient } from './history-client';
+import { isMessage } from './message';
 
 interface Outgoing { request: SendMessageRequest; state: 'pending' | 'unconfirmed' | 'rejected' }
-
-function isMessage(value: unknown): value is PublicMessage {
-  if (!value || typeof value !== 'object') return false;
-  const message = value as Partial<PublicMessage>;
-  return typeof message.id === 'string' && typeof message.channelId === 'string'
-    && typeof message.clientMessageId === 'string' && typeof message.sequence === 'string'
-    && /^[1-9]\d{0,18}$/.test(message.sequence) && typeof message.body === 'string'
-    && [...message.body].length <= 2000 && !!message.body.trim()
-    && typeof message.author?.id === 'string' && typeof message.author.displayName === 'string'
-    && typeof message.createdAt === 'string' && Number.isFinite(Date.parse(message.createdAt));
-}
 
 @Injectable()
 export class ChatStore {
   private readonly connection = inject(RealtimeConnection);
   private readonly sessions = inject(SessionStore);
+  private readonly history = inject(HistoryClient);
+  private historyRequest?: Subscription;
   private readonly channelId = signal<string | null>(null);
   private readonly subscribed = signal(false);
   private revision = 0;
@@ -28,10 +23,19 @@ export class ChatStore {
   readonly messages = signal<PublicMessage[]>([]);
   readonly outgoing = signal<Outgoing[]>([]);
   readonly notice = signal('');
+  readonly liveNotice = signal('');
+  readonly historyLoading = signal(false);
+  readonly historyError = signal('');
+  readonly olderCursor = signal<string | null>(null);
+  readonly snapshotCursor = signal<string | null>(null);
   readonly ready = computed(() => this.subscribed() && this.connection.status() === 'connected');
 
   constructor() {
-    const stopMessages = this.connection.listen('message:created', value => { if (isMessage(value)) this.confirm(value); });
+    const stopMessages = this.connection.listen('message:created', value => {
+      if (isMessage(value) && value.channelId === this.channelId()) {
+        this.confirm(value); this.liveNotice.set(`Message ${value.sequence} received from ${value.author.displayName}.`);
+      }
+    });
     const stopRevocations = this.connection.listen('channel:access-revoked', value => {
       if (value && typeof value === 'object' && 'channelId' in value && value.channelId === this.channelId()) this.revoke();
     });
@@ -50,7 +54,8 @@ export class ChatStore {
         if (revision !== this.revision) return;
         if (ack?.ok === true && ack.data?.channelId === channelId && ack.data.subscribed === true) {
           this.subscribed.set(true);
-          this.notice.set('Live conversation ready. Only messages received while this view is open are shown.');
+          this.notice.set('Live conversation ready.');
+          if (!this.snapshotCursor()) this.loadHistory();
         } else if (ack?.ok === false && isApiError(ack.error) && ['FORBIDDEN', 'UNAUTHENTICATED', 'NOT_FOUND'].includes(ack.error.code)) this.revoke();
         else this.notice.set('Could not open the conversation. Close it and try again.');
       }).catch(() => {
@@ -67,10 +72,36 @@ export class ChatStore {
     if (previous === channelId) return;
     ++this.revision;
     ++this.viewRevision;
+    this.historyRequest?.unsubscribe();
+    this.historyLoading.set(false); this.historyError.set('');
+    this.olderCursor.set(null); this.snapshotCursor.set(null);
     this.subscribed.set(false);
     this.channelId.set(channelId);
-    this.messages.set([]); this.outgoing.set([]); this.notice.set('');
+    this.messages.set([]); this.outgoing.set([]); this.notice.set(''); this.liveNotice.set('');
     if (previous) void this.connection.subscription(previous, false).catch(() => undefined);
+  }
+
+  loadHistory(): void {
+    const channelId = this.channelId(), before = this.olderCursor(), revision = this.viewRevision;
+    if (!channelId || !this.ready() || this.historyLoading() || (this.snapshotCursor() && !before)) return;
+    this.historyLoading.set(true); this.historyError.set('');
+    this.historyRequest = this.history.list(channelId, before).subscribe({
+      next: page => {
+        if (revision !== this.viewRevision) return;
+        if (this.snapshotCursor() && page.snapshotCursor !== this.snapshotCursor()) {
+          this.historyLoading.set(false); this.historyError.set('History could not be loaded. Try again.'); return;
+        }
+        for (const message of page.items) this.confirm(message);
+        this.snapshotCursor.set(page.snapshotCursor); this.olderCursor.set(page.olderCursor);
+        this.historyLoading.set(false);
+      },
+      error: (error: unknown) => {
+        if (revision !== this.viewRevision) return;
+        this.historyLoading.set(false);
+        if (error instanceof HttpErrorResponse && [401, 403, 404].includes(error.status)) this.revoke();
+        else this.historyError.set('History could not be loaded. Try again.');
+      },
+    });
   }
 
   send(body: string): boolean {
@@ -109,8 +140,7 @@ export class ChatStore {
     if (message.channelId !== this.channelId()) return;
     this.messages.update(items => {
       if (items.some(item => item.id === message.id)) return items;
-      // shortcut: keep the latest 100 live messages; paginated history arrives in 2.4a.
-      return [...items, message].sort((a, b) => BigInt(a.sequence) < BigInt(b.sequence) ? -1 : 1).slice(-100);
+      return [...items, message].sort((a, b) => BigInt(a.sequence) < BigInt(b.sequence) ? -1 : 1);
     });
     if (message.author.id === this.sessions.session()?.user.id) {
       this.outgoing.update(items => items.filter(item => item.request.clientMessageId !== message.clientMessageId));

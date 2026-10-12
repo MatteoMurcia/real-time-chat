@@ -14,9 +14,11 @@ import { ChannelsService } from './channels/channels.service.js';
 import { ChannelAccessService } from './channels/channel-access.service.js';
 import { ConnectionsService } from './realtime/connections.service.js';
 import { SendMessageService } from './messaging/send-message.service.js';
+import { HistoryService } from './messaging/history.service.js';
+import { HistoryController } from './messaging/history.controller.js';
 
 @Module({
-  controllers: [LiveController, RegistrationController, SessionController, ChannelsController],
+  controllers: [LiveController, RegistrationController, SessionController, ChannelsController, HistoryController],
   providers: [{ provide: APP_FILTER, useClass: ErrorFilter }],
 })
 export class AppModule {
@@ -28,6 +30,7 @@ export class AppModule {
         ChatGateway,
         ConnectionsService,
         SendMessageService,
+        HistoryService,
         { provide: DatabaseService, useFactory: () => new DatabaseService(databaseUrl) },
         { provide: CsrfService, useFactory: () => new CsrfService(appOrigin) },
         RegistrationService,

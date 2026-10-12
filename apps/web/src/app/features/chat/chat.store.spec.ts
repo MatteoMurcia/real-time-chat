@@ -5,6 +5,12 @@ import type { PublicMessage, SendMessageAck } from '@real-time-chat/contracts/me
 import { RealtimeConnection } from '../../core/realtime-connection';
 import { SessionStore } from '../../core/session.store';
 import { ChatStore } from './chat.store';
+import { HistoryClient } from './history-client';
+import { of, Subject, throwError } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import type { MessagePage } from '@real-time-chat/contracts/messages';
+
+const history = { list: vi.fn() };
 
 const listeners = new Map<string, (value: unknown) => void>();
 const connection = {
@@ -27,8 +33,10 @@ beforeEach(async () => {
   vi.clearAllMocks(); listeners.clear(); connection.status.set('connected');
   connection.subscription.mockImplementation(async (channelId, subscribed) => ({ ok: true, data: { channelId, subscribed } }));
   connection.send.mockImplementation(() => new Promise(() => undefined));
+  history.list.mockReturnValue(of({ items: [], olderCursor: null, snapshotCursor: 'snapshot' }));
   TestBed.configureTestingModule({ providers: [ChatStore,
     { provide: RealtimeConnection, useValue: connection },
+    { provide: HistoryClient, useValue: history },
     { provide: SessionStore, useValue: { session: () => ({ user: { id: 'user-1' } }) } },
   ] });
   store = TestBed.inject(ChatStore); store.open('channel-1'); await flush();
@@ -50,15 +58,38 @@ it('deduplicates event-before-ack and ack-before-event without removing another 
   expect(store.messages()).toHaveLength(3); expect(store.outgoing()).toHaveLength(0);
 });
 
-it('orders BIGINT sequences exactly, ignores malformed/other-channel events and bounds live memory', () => {
+it('orders BIGINT sequences exactly and retains loaded messages beyond the old live-only cap', () => {
   event(null); event({}); event(canonical({ sequence: '1e9' })); event(canonical({ channelId: 'other' }));
   expect(store.messages()).toEqual([]);
   event(canonical({ id: 'high', sequence: '9007199254740993' }));
   event(canonical({ id: 'low', sequence: '9007199254740992' }));
   expect(store.messages().map(item => item.id)).toEqual(['low', 'high']);
   for (let i = 1; i <= 110; i++) event(canonical({ id: `m${i}`, sequence: String(i) }));
-  expect(store.messages()).toHaveLength(100);
+  expect(store.messages()).toHaveLength(112);
   expect(store.messages().at(-1)?.id).toBe('high');
+});
+
+it('subscribes before loading history and merges a delayed snapshot with live events once', async () => {
+  const response = new Subject<MessagePage>(); history.list.mockReturnValue(response);
+  store.open('channel-2'); await flush();
+  expect(connection.subscription).toHaveBeenLastCalledWith('channel-2', true);
+  expect(store.historyLoading()).toBe(true);
+  const message = canonical({ channelId: 'channel-2' }); event(message);
+  response.next({ items: [message], olderCursor: 'older', snapshotCursor: 'snapshot' }); response.complete();
+  expect(store.messages()).toEqual([message]); expect(store.olderCursor()).toBe('older');
+  expect(store.snapshotCursor()).toBe('snapshot'); expect(store.historyLoading()).toBe(false);
+});
+
+it('retries an older page without losing rows/cursors and cancels requests when switching or losing access', async () => {
+  history.list.mockReturnValueOnce(of({ items: [canonical({ channelId: 'channel-2', sequence: '2' })], olderCursor: 'older', snapshotCursor: 'snapshot' }));
+  store.open('channel-2'); await flush();
+  history.list.mockReturnValueOnce(throwError(() => new Error('network'))); store.loadHistory();
+  expect(store.messages()).toHaveLength(1); expect(store.olderCursor()).toBe('older'); expect(store.historyError()).not.toBe('');
+  const pending = new Subject<MessagePage>(); history.list.mockReturnValueOnce(pending); store.loadHistory();
+  store.loadHistory(); expect(history.list).toHaveBeenLastCalledWith('channel-2', 'older');
+  expect(pending.observed).toBe(true); store.open('channel-3'); expect(pending.observed).toBe(false);
+  history.list.mockReturnValueOnce(throwError(() => new HttpErrorResponse({ status: 403 }))); await flush();
+  expect(store.messages()).toEqual([]); expect(store.snapshotCursor()).toBeNull(); expect(store.ready()).toBe(false);
 });
 
 it('keeps the exact request for an uncertain retry, then confirms once', async () => {

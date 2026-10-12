@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-12 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B verificado, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
+Revisión: 3 · Actualización: 2026-10-12 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a implementada y verificada, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
 
 ## 1. Cómo usar este plan
 
@@ -495,9 +495,9 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
   - Verificar: E2E conversación con dos usuarios y remontaje de pantalla.
   - Archivos: `apps/web/src/app/core/realtime-connection.ts`, `apps/web/src/app/features/chat/chat.ts`, `chat.html`, `chat.store.ts` en el mismo directorio, `e2e/conversation.spec.ts`.
 
-**Checkpoint CP2-B — VERIFICADO (2026-10-12):** envío entre dos usuarios, persistencia tras recrear contenedores y duplicado básico protegido en BD/UI. Corregida dependencia del orden de ejecución en mocks de pruebas mediante aislamiento de archivos. [Informe y límites](../docs/checkpoints/cp2-b.md); pendiente de revisión y merge manual.
+**Checkpoint CP2-B — VERIFICADO (2026-10-12):** envío entre dos usuarios, persistencia tras recrear contenedores y duplicado básico protegido en BD/UI. Corregida dependencia del orden de ejecución en mocks de pruebas mediante aislamiento de archivos. [Informe y límites](../docs/checkpoints/cp2-b.md); integrado mediante PR #28.
 
-- [ ] **2.4a — Cargar historial por cursor** · M · Depende de: 2.3b.
+- [x] **2.4a — Cargar historial por cursor** · M · Depende de: 2.3b. Implementada y verificada; pendiente de revisión y merge manual.
   - Trabajo: consulta de cola reciente y páginas anteriores, snapshotCursor y UI de carga/vacío/error.
   - Aceptación: páginas estables sin duplicados; cursor inválido o de otro canal rechazado; no miembro no lee.
   - Verificar: integración con más de dos páginas y mensajes con fechas iguales.
@@ -1033,3 +1033,17 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - No se crean datos ni se migran bases locales durante el checkpoint. Volumen `real-time-chat_postgres_data` conservado. Se reutiliza la prueba de persistencia contra el stack compilado y su volumen aislado ejecutada por CI; no se confunde persistencia con disponibilidad de historial en la UI.
 - Límites: una instancia y entrega best-effort, sin garantía exactly-once. Historial en 2.4a, conflicto concurrente entre canales en 3.1a, reconciliación completa en 3.1b y recuperación de huecos en 3.2b. Sin despliegue, carga ni auditoría completa de accesibilidad. CP0-C y CP1-C siguen pendientes.
 - Siguiente tarea tras revisión y merge manual: **2.4a — Cargar historial por cursor**.
+
+### Evidencia 2.4a — Historial por cursor (2026-10-12)
+
+- Rama `feature/2.4a-message-history` desde `main` en `1f3e8c8`, con PR #28 integrada. Commits incrementales de contrato/API, cliente/store/UI, E2E y documentación. Merge reservado al usuario.
+- GET `/api/channels/:id/messages`: sesión, membresía bajo bloqueo de canal y `Cache-Control: no-store`. Captura H del contador confirmado; consulta indexada descendente limitada a `limit + 1` y salida ascendente. Reutiliza proyección/serialización pública del envío. Sin migraciones ni dependencias nuevas.
+- Cursores canónicos base64url de tupla versionada con canal, secuencia y H como strings BIGINT. Páginas anteriores conservan H y usan límite exclusivo; consulta inicial 50, máximo 100. Rechaza campos extra, arrays/repeticiones, límites inválidos, cursores ajenos/malformados/no canónicos/futuros y secuencias fuera de rango. Canal vacío devuelve snapshot cero y ningún cursor anterior. Cursor opaco no concede permiso.
+- Angular confirma suscripción antes de solicitar el historial; muestra carga/vacío/error recuperable y Load earlier messages. Mezcla por ID y orden exacto de secuencia, preservando eventos durante la respuesta. `snapshotCursor` y `olderCursor` separados; eventos no los avanzan. Reintentos mantienen página/filas; cambio de canal y pérdida de acceso cancelan solicitudes y vacían cursores. Se elimina el recorte de 100 filas para conservar páginas cargadas; memoria proporcional a lo que se carga en la vista.
+- Verificación: **32 pruebas API, 43 Angular, 15 resultados de integración PostgreSQL, 2 Docker y 11 E2E Chromium** correctos. Lint, typecheck de todos los workspaces, builds en Docker y arranque saludable; bundle inicial 406.30 kB.
+- Integración con 105 mensajes de la misma fecha: tres páginas, orden exacto, IDs únicos, repetición estable de página y H sin cambios tras insertar el mensaje 106. Comprueba sesión/membresía, revocación entre páginas, canal vacío/inexistente, proyección pública, límites y cursores ajenos/futuros. Base aislada `history_test`; no se usa la base de trabajo.
+- E2E contra imágenes compiladas: error inicial 503 y reintento, evento nuevo durante respuesta retenida, tres páginas sin duplicados, fallo de red al cargar anteriores sin perder filas, 106 IDs distintos, reapertura tras recarga y limpieza por revocación. Conversación existente actualizada para comprobar que reabrir restaura mensajes. Las 11 regresiones pasan, incluida recreación completa con volumen conservado. Captura móvil revisada; pruebas existentes de 320/768/1024/1440 px sin overflow.
+- Pruebas Angular: páginas malformadas/ajenas/duplicadas/desordenadas rechazadas, respuesta retrasada y evento canónico convergen, recuperación del error conserva cursor, cancelación al cambiar de canal y 403 vacía estado. Aislamiento de archivos de CP2-B conservado.
+- Limpieza: proyecto temporal `chat-e2e`, redes, volumen y credenciales eliminados tras verificar etiqueta de propiedad. Volumen principal `real-time-chat_postgres_data` conservado.
+- Límites: ancla precisa de scroll y aviso contextual al anteponer en **2.4b**. Sin recuperación automática de huecos al reconectar; resincronización acotada y periódica sigue en etapa 3. Sin virtualización ni límite artificial que descarte páginas ya cargadas; medir si se recorren historiales grandes. Snapshot delimita mensajes confirmados, no congela futuros cambios de nombres/ediciones. Una instancia local; sin despliegue, carga ni auditoría WCAG completa. CP0-C y CP1-C siguen pendientes.
+- Siguiente tarea después de revisión y merge manual: **2.4b — Mantener contexto de lectura al paginar**.

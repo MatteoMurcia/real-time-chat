@@ -70,10 +70,10 @@ test('two independent users converse once, remount, reconnect and lose access on
     for (let i = 0; i < 2; i++) {
       await second.getByRole('button', { name: 'Close conversation', exact: true }).click();
       await expect(second.locator('#channels-title')).toBeFocused();
-      await open(second); await expect(messages(second)).toHaveCount(0);
+      await open(second); await expect(messages(second)).toHaveCount(2 + i);
       await send(page, `After remount ${i}`);
-      await expect(messages(second)).toHaveCount(1);
-      await expect(messages(second)).toContainText(`After remount ${i}`);
+      await expect(messages(second)).toHaveCount(3 + i);
+      await expect(messages(second).last()).toContainText(`After remount ${i}`);
     }
 
     const project = process.env.E2E_COMPOSE_PROJECT ?? '';
@@ -91,10 +91,10 @@ test('two independent users converse once, remount, reconnect and lose access on
     await expect(second.getByRole('button', { name: 'Send message', exact: true })).toBeEnabled();
     await expect(page.getByText(/^Live conversation ready\./)).toBeVisible();
     await composer.press('Enter');
-    await expect(messages(page)).toHaveCount(5); await expect(messages(second)).toHaveCount(2);
+    await expect(messages(page)).toHaveCount(5); await expect(messages(second)).toHaveCount(5);
 
     await send(page, 'Long message '.repeat(100));
-    await expect(messages(second)).toHaveCount(3);
+    await expect(messages(second)).toHaveCount(6);
     for (const width of [320, 768, 1024, 1440]) {
       await second.setViewportSize({ width, height: 900 });
       expect(await second.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
