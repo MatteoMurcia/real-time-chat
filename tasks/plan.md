@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-12 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b integrada mediante PR #30; CP2-C integrado mediante PR #31; 3.1a implementada y verificada, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
+Revisión: 3 · Actualización: 2026-10-13 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b integrada mediante PR #30; CP2-C integrado mediante PR #31; 3.1a integrada mediante PR #32; 3.1b implementada y verificada, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
 
 ## 1. Cómo usar este plan
 
@@ -238,7 +238,7 @@ Son decisiones del proyecto, configurables y revisables con evidencia, no capaci
 | Texto | 1–2.000 puntos de código Unicode; rechazar texto solo en blanco |
 | Frame/payload socket | Máximo 16 KiB |
 | Página de historial/canales | 50 por defecto, máximo 100 |
-| Confirmación | Timeout 5 s; un reintento automático con la misma clave, luego acción manual |
+| Confirmación | Deadline UI 5 s; un reintento automático con la misma clave si hay conexión, luego acción manual. Ack tardío aceptado hasta 30 s por intento; errores explícitos no disparan retry automático |
 | Reconciliación | 15 s en canal visible/conectado; reintentos de consulta con backoff acotado |
 | Sesión | 24 h absolutas; configurable para pruebas |
 | Envíos | 30 por 10 s por usuario, sumando sus sockets |
@@ -516,12 +516,12 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
 
 **Objetivo:** que fallos y carreras tengan un resultado definido y probado. Las garantías se incorporan a los recorridos anteriores, no a un subsistema paralelo.
 
-- [x] **3.1a — Resolver reintentos concurrentes y conflictos** · M · Depende de: 2.3a. Implementada y verificada; pendiente de revisión y merge manual.
+- [x] **3.1a — Resolver reintentos concurrentes y conflictos** · M · Depende de: 2.3a. Integrada mediante PR #32.
   - Trabajo: completar tratamiento de clave única, lectura autorizada tras conflicto y respuestas perdidas.
   - Aceptación: diez solicitudes simultáneas con una clave producen una fila; contenido distinto devuelve CONFLICT; reintento después de salir devuelve FORBIDDEN.
   - Verificar: integración real con barreras; simular commit exitoso y ack perdido.
   - Archivos: `apps/api/src/messaging/send-message.service.ts`, `apps/api/test/integration/messages.ts`, `message-idempotency.ts` y `database.spec.ts` en el mismo directorio.
-- [ ] **3.1b — Reconciliar pendiente, timeout y ack tardío** · M · Depende de: 3.1a, 2.3b.
+- [x] **3.1b — Reconciliar pendiente, timeout y ack tardío** · M · Depende de: 3.1a, 2.3b. Implementada y verificada; pendiente de revisión y merge manual.
   - Trabajo: reducer de mensaje canónico/optimista, reintento acotado y estado “sin confirmar”.
   - Aceptación: ack antes/después de evento converge a un mensaje; retry mantiene clave; 403/validación no generan bucle.
   - Verificar: unitarias de las permutaciones y E2E de confirmación perdida.
@@ -1079,3 +1079,14 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Verificación: **16 resultados de integración PostgreSQL correctos** en base aislada `retry_test`; lint sin avisos y typecheck de todos los workspaces; build/32 pruebas API dentro de Docker. **13 E2E Chromium correctos en 57,9 s** contra Compose compilado. CI final registrado en la PR.
 - Revisado el diff de servicio, gateway consumidor de `created`, permisos, contratos y fixtures. Sin cambio de esquema, contrato ni dependencias. [Garantías y límites](../docs/messages.md).
 - Límites: una instancia local y eventos best-effort; no exactly-once. Reconciliación de estado de UI/ack tardío sigue en **3.1b**, recuperación de huecos en **3.2a–3.3b**. CP0-C y CP1-C siguen pendientes. Próximo paso tras revisión y merge manual: **3.1b — Reconciliar pendiente, timeout y ack tardío**.
+
+### Evidencia 3.1b — Pendiente, timeout y ack tardío (2026-10-13)
+
+- Rama `feature/3.1b-message-confirmation-state` desde `main` en `d2d79fa`, con PR #32 integrada. Commits separados de reducer/store/transporte/UI y unitarias, E2E y documentación. Merge reservado al usuario.
+- Reducer puro para mensajes canónicos e intentos salientes: deduplicación por ID, orden BIGINT exacto y reconciliación por autor/canal/clave/cuerpo. Un error de un intento anterior no cambia el intento actual ni resucita una fila confirmada. Retry consulta el estado vigente, evitando envíos por doble clic o referencias obsoletas.
+- Deadline de UI de **5 s**, un único retry automático con la misma petición si la suscripción sigue lista y luego acción manual. Sin retry automático de errores explícitos, validación, conflicto, rate limit ni autorización; sin envío offline. La UI distingue Sending, Retrying confirmation, Unconfirmed y Rejected mediante estado anunciado.
+- Socket.IO retiene cada ack hasta **30 s** para aceptar confirmaciones posteriores al deadline de UI, con limpieza por expiración/desconexión. Cambiar/cerrar la vista cancela sus deadlines e invalida respuestas anteriores. Las confirmaciones válidas tardías convergen aunque provengan del intento inicial.
+- Pruebas de regresión fallaron antes de la corrección: faltaba el retry automático y un FORBIDDEN antiguo revocaba la vista durante el intento nuevo. Verificación final: **60 pruebas Angular correctas**, lint y typecheck de todos los workspaces; imágenes compiladas/arranque saludable en Docker, con **32 pruebas API** en el build.
+- **14 E2E Chromium correctos** contra Compose aislado. `e2e/message-retry.spec.ts` retiene/libera un ack tardío, descarta evento y acks de los dos primeros intentos de otro mensaje, confirma por retry manual con idéntica clave y verifica IDs persistidos mediante historial. Envía contenido inválido a la API real para demostrar rechazo sin bucle. Interceptor solo en tests; captura inspeccionada y sin errores de página.
+- Revisados estado, temporizadores, transporte, consumidores y limpieza de vista. Sin cambio de esquema, API, dependencias ni desactivación de aislamiento de tests. [Comportamiento y límites](../docs/messages.md).
+- Límites: callbacks de ack acotados a 30 s por intento; borradores y claves no sobreviven al cierre/recarga. Recuperación de huecos sigue en 3.2a–3.3b. Chromium; sin auditoría completa de lectores de pantalla. CP0-C y CP1-C pendientes. Próximo paso tras revisión y merge manual: **Checkpoint CP3-A**.

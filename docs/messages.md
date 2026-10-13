@@ -21,10 +21,26 @@ clears its content and blocks further sends; stale acknowledgements cannot reope
 
 `message:created` and successful send acknowledgements converge on the same
 message ID. Confirmed rows use exact BIGINT sequence ordering. Outgoing messages
-show **Sending**, **Confirmed**, **Unconfirmed** or **Rejected**. A five-second
-timeout or unexpected server error means unconfirmed, not lost. Manual retry
-keeps the original client key and body. Definitive validation/conflict failures
-do not retry automatically; the user can copy and correct the text in the composer.
+show **Sending**, **Retrying confirmation**, **Confirmed**, **Unconfirmed** or
+**Rejected**. If the first attempt has no result after five seconds and the live
+subscription is ready, the UI retries once automatically with the same request
+key and body. After another five seconds it stays **Unconfirmed** and offers
+manual retry. A timeout is not evidence that the message was lost.
+
+Automatic retry is limited to that first deadline. Offline sends, explicit server
+errors and malformed replies do not start a retry loop. Validation, conflict and
+rate-limit failures are rejected; access errors end the conversation. Unexpected
+failures remain unconfirmed. Manual retry requires a current unconfirmed row;
+stale clicks cannot resend a pending, rejected or already confirmed message.
+
+Socket acknowledgements are retained for at most 30 seconds per attempt, separately
+from the five-second UI deadline. A valid late acknowledgement, live event or
+history row converges on one canonical ID; confirming an outgoing row also matches
+its author, channel, client key and body. Errors from older attempts cannot change
+a newer attempt or undo confirmation. Changing/closing the view clears retry
+deadlines and ignores its old responses; the transport callbacks expire within
+their bounded window or on disconnection. After that window, manual retry/history
+can still resolve the saved message. This is not persistent offline state.
 
 Opening a channel subscribes first, then loads the latest 50 saved messages.
 **Load earlier messages** fetches previous pages; loading, empty and recoverable
@@ -45,8 +61,8 @@ to the open conversation, not a persisted unread count.
 Switching/closing a conversation, navigating away or reloading clears that local
 state, including drafts and retry keys; it does not delete persisted messages.
 Drafts survive a temporary transport interruption while the view stays open.
-Reopening loads recent saved history again. Full retry reconciliation (3.1b) and
-reconnect gap recovery (3.2b) remain pending; resubscribing an already open view
+Reopening loads recent saved history again. Reconnect gap recovery (3.2b)
+remains pending; resubscribing an already open view
 does not automatically fetch messages missed during the interruption.
 
 ## History HTTP contract
@@ -168,5 +184,14 @@ database error. A test-only Socket.IO middleware discards the acknowledgement
 after the real commit/publication: the client times out, then retries the same
 key and receives the saved message once without another event. These hooks live
 only in integration tests; no production fault-injection option is added.
+
+Task 3.1b adds reducer/store tests for ack/event/timeout permutations, stale
+attempt failures, preserved request identity, one automatic retry, definitive
+errors, offline state and view teardown. `e2e/message-retry.spec.ts` intercepts
+WebSocket frames against the real compiled API: it releases an ack after the UI
+deadline, drops both initial/automatic confirmations, retries manually, and
+checks the persisted IDs through history. Invalid text is sent to the real API
+to verify rejection does not trigger a retry. The transport interceptor exists
+only in Playwright tests.
 
 Reference: [Prisma 7 transactions](https://www.prisma.io/docs/orm/v7/prisma-client/queries/transactions).
