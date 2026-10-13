@@ -17,6 +17,8 @@ import { verifySubscriptions } from './subscriptions.js';
 import { verifyMessages } from './messages.js';
 import { verifyHistory } from './history.js';
 import { verifyMessageIdempotency } from './message-idempotency.js';
+import { verifyMessageSync } from './message-sync.js';
+import { verifySyncCommitBoundary } from './message-sync-races.js';
 
 test('migrations, user/session constraints and application connection lifecycle', async (t) => {
   const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -46,6 +48,8 @@ test('migrations, user/session constraints and application connection lifecycle'
   await t.test('persists ordered messages, deduplicates retries and rejects failed commits', { timeout: 20000 }, () => verifyMessages(app, db));
   await t.test('resolves concurrent message keys without leaking unauthorized results', { timeout: 20000 }, () => verifyMessageIdempotency(app, db));
   await t.test('paginates an authorized message snapshot across equal timestamps and concurrent new messages', () => verifyHistory(app, db));
+  await t.test('recovers an authorized bounded message interval despite ongoing traffic', { timeout: 20000 }, () => verifyMessageSync(app, db));
+  await t.test('waits for commit or rollback before capturing the sync boundary', { timeout: 20000 }, () => verifySyncCommitBoundary(app, db));
   const email = `${randomUUID()}@example.test`;
   const user = await db.user.create({ data: { email, displayName: 'Integration test', passwordHash: 'test-only-hash' } });
   t.after(async () => {

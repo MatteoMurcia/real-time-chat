@@ -33,7 +33,8 @@ manual retry. Late acknowledgements converge without duplicating confirmed rows.
 It deduplicates ack/event delivery and resubscribes after reconnecting. It currently
 loads the latest 50 saved messages and offers earlier pages using channel-bound
 snapshot cursors. Live events merge by ID without replacing loaded history.
-Reconnect gap recovery remains pending. See [local Socket.IO setup](docs/local-development.md)
+The API also serves ascending recovery pages within a fixed committed boundary;
+browser reconnect gap recovery remains pending. See [local Socket.IO setup](docs/local-development.md)
 for localhost configuration and the isolated restart test.
 See [container persistence checks](docs/local-development.md#stop-recreate-and-verify-persistence-manually)
 for recreating containers, preserving sessions and testing a separate empty database.

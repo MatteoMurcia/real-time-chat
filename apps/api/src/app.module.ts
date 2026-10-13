@@ -16,6 +16,7 @@ import { ConnectionsService } from './realtime/connections.service.js';
 import { SendMessageService } from './messaging/send-message.service.js';
 import { HistoryService } from './messaging/history.service.js';
 import { HistoryController } from './messaging/history.controller.js';
+import { SyncService } from './messaging/sync.service.js';
 
 @Module({
   controllers: [LiveController, RegistrationController, SessionController, ChannelsController, HistoryController],
@@ -31,6 +32,7 @@ export class AppModule {
         ConnectionsService,
         SendMessageService,
         HistoryService,
+        SyncService,
         { provide: DatabaseService, useFactory: () => new DatabaseService(databaseUrl) },
         { provide: CsrfService, useFactory: () => new CsrfService(appOrigin) },
         RegistrationService,
