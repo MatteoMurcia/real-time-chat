@@ -13,3 +13,5 @@ export interface PublicMessage {
 export type SendMessageAck = { ok: true; data: PublicMessage } | { ok: false; error: ApiError };
 
 export interface MessagePage { items: PublicMessage[]; olderCursor: string | null; snapshotCursor: string }
+
+export interface MessageSyncPage { items: PublicMessage[]; nextCursor: string; until: string; hasMore: boolean }
