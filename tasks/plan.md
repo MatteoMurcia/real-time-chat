@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-12 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b integrada mediante PR #30; CP2-C verificado, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
+Revisión: 3 · Actualización: 2026-10-12 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b integrada mediante PR #30; CP2-C integrado mediante PR #31; 3.1a implementada y verificada, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
 
 ## 1. Cómo usar este plan
 
@@ -510,17 +510,17 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
   - Verificar: E2E con historial largo, tamaños variables y fallo recuperable al paginar.
   - Archivos: `apps/web/src/app/features/chat/chat.ts`, `chat.html`, `chat.css`, `e2e/history-scroll.spec.ts`.
 
-**Checkpoint CP2-C — VERIFICADO (2026-10-12):** conversación e historial completos para una instancia local; 15 resultados de integración PostgreSQL y 13 E2E correctos. Reestimación con evidencia temporal y límites explícitos. [Informe](../docs/checkpoints/cp2-c.md); pendiente de revisión y merge manual. Recuperación de huecos sigue en etapa 3.
+**Checkpoint CP2-C — VERIFICADO (2026-10-12):** conversación e historial completos para una instancia local; 15 resultados de integración PostgreSQL y 13 E2E correctos. Reestimación con evidencia temporal y límites explícitos. [Informe](../docs/checkpoints/cp2-c.md); integrado mediante PR #31. Recuperación de huecos sigue en etapa 3.
 
 ### Etapa 3 — Fiabilidad y sincronización
 
 **Objetivo:** que fallos y carreras tengan un resultado definido y probado. Las garantías se incorporan a los recorridos anteriores, no a un subsistema paralelo.
 
-- [ ] **3.1a — Resolver reintentos concurrentes y conflictos** · M · Depende de: 2.3a.
+- [x] **3.1a — Resolver reintentos concurrentes y conflictos** · M · Depende de: 2.3a. Implementada y verificada; pendiente de revisión y merge manual.
   - Trabajo: completar tratamiento de clave única, lectura autorizada tras conflicto y respuestas perdidas.
   - Aceptación: diez solicitudes simultáneas con una clave producen una fila; contenido distinto devuelve CONFLICT; reintento después de salir devuelve FORBIDDEN.
   - Verificar: integración real con barreras; simular commit exitoso y ack perdido.
-  - Archivos: servicio envío, gateway, contrato mensajes, `apps/api/test/message-idempotency.spec.ts`.
+  - Archivos: `apps/api/src/messaging/send-message.service.ts`, `apps/api/test/integration/messages.ts`, `message-idempotency.ts` y `database.spec.ts` en el mismo directorio.
 - [ ] **3.1b — Reconciliar pendiente, timeout y ack tardío** · M · Depende de: 3.1a, 2.3b.
   - Trabajo: reducer de mensaje canónico/optimista, reintento acotado y estado “sin confirmar”.
   - Aceptación: ack antes/después de evento converge a un mensaje; retry mantiene clave; 403/validación no generan bucle.
@@ -1069,3 +1069,13 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Quality y Containers de `main` en `89a23ef` correctos: [ejecución](https://github.com/MatteoMurcia/real-time-chat/actions/runs/38289372325). Los checks de esta PR se registran en GitHub sobre su commit final.
 - Previsión restante P0: **36–53 h concentradas**, con gates pendientes y contingencia; actividad/merges observados no equivalen a horas de dedicación. No reducir alcance ni fijar fecha sin disponibilidad real.
 - CP0-C y CP1-C siguen pendientes. Sin certificación multiinstancia, carga, otros motores de navegador ni accesibilidad completa. Próxima tarea tras revisión y merge manual: **3.1a — Resolver reintentos concurrentes y conflictos**.
+
+### Evidencia 3.1a — Reintentos concurrentes y conflictos (2026-10-12)
+
+- Rama `feature/3.1a-message-retry-conflicts` desde `main` en `f0fca31`, con PR #31 integrada. Commits incrementales de corrección/regresión, ampliación de integración y documentación; merge reservado al usuario.
+- Reproducida con barrera de consultas la carrera entre dos transacciones de canales distintos que leen la misma clave ausente. Antes, la perdedora no devolvía el conflicto esperado. Ahora `P2002` se trata fuera de la transacción abortada, con un nuevo lock/membresía antes de consultar la clave confirmada. Canal/cuerpo diferente devuelve `CONFLICT`; membresía revocada antes de la relectura devuelve `FORBIDDEN`. Sin segunda inserción ni bucle de retry.
+- Diez envíos socket con la misma clave y diez transacciones directas producen un único mensaje; contenido A/B simultáneo conserva el ganador y rechaza el resto. La transacción perdedora revierte el incremento de secuencia. Una violación de índice de secuencia sin clave canónica existente conserva el error de BD.
+- Middleware exclusivo del test descarta el ack después del commit y publicación reales. Se comprueban timeout, fila persistida, respuesta canónica al reintentar, ausencia de evento duplicado y `FORBIDDEN` al reintentar tras salir. No se modifica el gateway ni se añaden opciones de fallo a producción.
+- Verificación: **16 resultados de integración PostgreSQL correctos** en base aislada `retry_test`; lint sin avisos y typecheck de todos los workspaces; build/32 pruebas API dentro de Docker. **13 E2E Chromium correctos en 57,9 s** contra Compose compilado. CI final registrado en la PR.
+- Revisado el diff de servicio, gateway consumidor de `created`, permisos, contratos y fixtures. Sin cambio de esquema, contrato ni dependencias. [Garantías y límites](../docs/messages.md).
+- Límites: una instancia local y eventos best-effort; no exactly-once. Reconciliación de estado de UI/ack tardío sigue en **3.1b**, recuperación de huecos en **3.2a–3.3b**. CP0-C y CP1-C siguen pendientes. Próximo paso tras revisión y merge manual: **3.1b — Reconciliar pendiente, timeout y ack tardío**.
