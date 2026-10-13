@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-13 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b integrada mediante PR #30; CP2-C integrado mediante PR #31; 3.1a integrada mediante PR #32; 3.1b implementada y verificada, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
+Revisión: 3 · Actualización: 2026-10-13 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b integrada mediante PR #30; CP2-C integrado mediante PR #31; 3.1a integrada mediante PR #32; 3.1b integrada mediante PR #33; CP3-A verificado, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
 
 ## 1. Cómo usar este plan
 
@@ -521,13 +521,13 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
   - Aceptación: diez solicitudes simultáneas con una clave producen una fila; contenido distinto devuelve CONFLICT; reintento después de salir devuelve FORBIDDEN.
   - Verificar: integración real con barreras; simular commit exitoso y ack perdido.
   - Archivos: `apps/api/src/messaging/send-message.service.ts`, `apps/api/test/integration/messages.ts`, `message-idempotency.ts` y `database.spec.ts` en el mismo directorio.
-- [x] **3.1b — Reconciliar pendiente, timeout y ack tardío** · M · Depende de: 3.1a, 2.3b. Implementada y verificada; pendiente de revisión y merge manual.
+- [x] **3.1b — Reconciliar pendiente, timeout y ack tardío** · M · Depende de: 3.1a, 2.3b. Integrada mediante PR #33.
   - Trabajo: reducer de mensaje canónico/optimista, reintento acotado y estado “sin confirmar”.
   - Aceptación: ack antes/después de evento converge a un mensaje; retry mantiene clave; 403/validación no generan bucle.
   - Verificar: unitarias de las permutaciones y E2E de confirmación perdida.
   - Archivos: `apps/web/src/app/features/chat/message.reducer.ts`, `message.reducer.spec.ts`, store/plantilla chat, `e2e/message-retry.spec.ts`.
 
-**Checkpoint CP3-A:** demostrar “guardado pero sin respuesta” y recuperar sin duplicar. No etiquetar timeout como prueba de pérdida.
+**Checkpoint CP3-A — VERIFICADO (2026-10-13):** demostrado “guardado pero sin respuesta” mediante consulta independiente a PostgreSQL y recuperación sin duplicar. Timeout significa incertidumbre, no prueba de pérdida. 16 resultados de integración, 60 pruebas Angular y 14 E2E correctos. [Informe](../docs/checkpoints/cp3-a.md); pendiente de revisión y merge manual.
 
 - [ ] **3.2a — Servir recuperación acotada por H** · M · Depende de: 2.4a, 3.1a.
   - Trabajo: endpoint sync con after/until y paginación ascendente; captura de H confirmado.
@@ -1090,3 +1090,12 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - **14 E2E Chromium correctos** contra Compose aislado. `e2e/message-retry.spec.ts` retiene/libera un ack tardío, descarta evento y acks de los dos primeros intentos de otro mensaje, confirma por retry manual con idéntica clave y verifica IDs persistidos mediante historial. Envía contenido inválido a la API real para demostrar rechazo sin bucle. Interceptor solo en tests; captura inspeccionada y sin errores de página.
 - Revisados estado, temporizadores, transporte, consumidores y limpieza de vista. Sin cambio de esquema, API, dependencias ni desactivación de aislamiento de tests. [Comportamiento y límites](../docs/messages.md).
 - Límites: callbacks de ack acotados a 30 s por intento; borradores y claves no sobreviven al cierre/recarga. Recuperación de huecos sigue en 3.2a–3.3b. Chromium; sin auditoría completa de lectores de pantalla. CP0-C y CP1-C pendientes. Próximo paso tras revisión y merge manual: **Checkpoint CP3-A**.
+
+### Evidencia CP3-A — Guardado sin respuesta y reconciliación (2026-10-13)
+
+- PR #33 integrada; revisión sobre `main` en `4d67c77`. Rama `docs/cp3-a-retry-checkpoint`, con commits separados de informe y plan. Sin cambios de aplicación, esquema, dependencias ni pruebas permanentes.
+- Revisados persistencia, recuperación de clave única, autorización, publicación, reducer, guards de intento/vista, deadlines y callbacks de ack. Sin nuevos hallazgos bloqueantes. [Criterios, evidencia y límites](../docs/checkpoints/cp3-a.md).
+- Ejecución nueva sobre PostgreSQL 18.6 aislado `cp3a_test`: **16 resultados de integración correctos**. Se consulta la fila antes de reintentar tras perder el ack; misma clave devuelve el mismo ID, sin segunda fila ni publicación. Carrera entre canales y revocación durante recuperación verificadas.
+- **14 E2E Chromium correctos en 1,5 min** sobre Compose compilado. Ack tardío, evento/acks descartados, retry automático único y manual con petición idéntica, rechazo real sin bucle y comparación con IDs del historial persistido.
+- Mutación temporal de la igualdad de intento en el reducer: **10 tests fallaron**. Código original restaurado; **60 pruebas Angular correctas**. Quality y Containers se registran en la PR sobre su commit final.
+- Límites: callbacks de ack de 30 s por intento y estado pendiente en memoria; eventos best-effort, sin garantía exactly-once ni recuperación de huecos del receptor todavía. CP0-C y CP1-C siguen pendientes. Próxima tarea tras revisión y merge manual: **3.2a — Servir recuperación acotada por H**.
