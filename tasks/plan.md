@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-13 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b integrada mediante PR #30; CP2-C integrado mediante PR #31; 3.1a integrada mediante PR #32; 3.1b integrada mediante PR #33; CP3-A integrado mediante PR #34; 3.2a implementada y verificada, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
+Revisión: 3 · Actualización: 2026-10-13 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b integrada mediante PR #30; CP2-C integrado mediante PR #31; 3.1a integrada mediante PR #32; 3.1b integrada mediante PR #33; CP3-A integrado mediante PR #34; 3.2a integrada mediante PR #35; 3.2b implementada y verificada, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
 
 ## 1. Cómo usar este plan
 
@@ -529,16 +529,16 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
 
 **Checkpoint CP3-A — VERIFICADO (2026-10-13):** demostrado “guardado pero sin respuesta” mediante consulta independiente a PostgreSQL y recuperación sin duplicar. Timeout significa incertidumbre, no prueba de pérdida. 16 resultados de integración, 60 pruebas Angular y 14 E2E correctos. [Informe](../docs/checkpoints/cp3-a.md); integrado mediante PR #34.
 
-- [x] **3.2a — Servir recuperación acotada por H** · M · Depende de: 2.4a, 3.1a. Implementada y verificada; pendiente de revisión y merge manual.
+- [x] **3.2a — Servir recuperación acotada por H** · M · Depende de: 2.4a, 3.1a. Integrada mediante PR #35.
   - Trabajo: endpoint sync con after/until y paginación ascendente; captura de H confirmado.
   - Aceptación: una recuperación termina con tráfico continuo; páginas solo contienen (C,H]; autorización en cada página.
   - Verificar: más de dos páginas, canal vacío, cursor inválido y commit retrasado concurrente; nunca saltar un mensaje que confirma tarde.
   - Archivos: `apps/api/src/messaging/sync.service.ts`, `sync-query.ts`, controller historial, contrato mensajes, `apps/api/test/message-sync.spec.ts`, integración `message-sync.ts`/`message-sync-races.ts` y [ADR-001](../docs/decisions/001-bounded-message-recovery.md).
-- [ ] **3.2b — Resincronizar el canal visible** · M · Depende de: 3.2a, 3.1b.
+- [x] **3.2b — Resincronizar el canal visible** · M · Depende de: 3.2a, 3.1b. Implementada y verificada; pendiente de revisión y merge manual.
   - Trabajo: cursor C separado de olderCursor; recuperación al conectar, entrar, recuperar foco y por intervalo.
   - Aceptación: solo una recuperación activa; se cancelan consultas de canal obsoleto; eventos vivos no avanzan C.
   - Verificar: unitarias de disparadores/cancelación con reloj controlado y E2E de reconexión.
-  - Archivos: `apps/web/src/app/features/chat/sync.service.ts`, `sync.service.spec.ts`, store chat, socket-client, `e2e/reconnect.spec.ts`.
+  - Archivos: `apps/web/src/app/features/chat/sync.service.ts`, `sync.service.spec.ts`, store/plantilla/estilos chat, `e2e/reconnect.spec.ts`. Reutiliza el estado y la resuscripción del socket-client sin modificarlo.
 
 **Checkpoint CP3-B:** desconectar, enviar más de una página, reiniciar API y recuperar todo lo pendiente de recibir.
 
@@ -1108,3 +1108,13 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Prueba de carrera retiene una transacción después de insertar y observa el bloqueo real con `pg_blocking_pids`; sync espera al commit/rollback antes de fijar H. Incluye recuperación posterior y secuencias mayores que el entero seguro de JavaScript. Quitar temporalmente el lock hace fallar la prueba; restaurado, **18 resultados de integración PostgreSQL correctos** sobre `sync_test` aislada.
 - Verificación: lint y typecheck correctos; **34 pruebas API y 60 Angular** correctas en imágenes Docker compiladas, stack saludable. **14 E2E Chromium correctos en 1,4 min**; ruta nueva por Nginx devuelve 401 seguro sin sesión. Quality y Containers finales se registran en la PR.
 - Revisados contrato, autorización, consultas, límites, consumidores, fixtures y error envelope existente. Sin cambios de UI ni desactivación de pruebas. No se certifica rendimiento bajo carga; páginas serializan brevemente con escrituras del canal. CP0-C y CP1-C siguen pendientes. Siguiente tarea tras revisión y merge manual: **3.2b — Resincronizar el canal visible**; el navegador aún no consume este endpoint.
+### Evidencia 3.2b — Resincronización del canal visible (2026-10-13)
+
+- Rama `feature/3.2b-visible-channel-sync` desde `main` en `25a16d9`, con PR #35 integrada. Commits separados de cliente HTTP/paginación, ciclo del store y UI, E2E y documentación. Merge reservado al usuario.
+- Cursor C separado de `olderCursor` y `snapshotCursor`: se inicia con la primera instantánea y avanza después de incorporar una página completa de sync. Eventos, acks y páginas anteriores no lo adelantan. Cliente HTTP valida canal, orden BIGINT, IDs, cursores, progreso y H estable; timeout de 5 s por página y cancelación por unsubscribe.
+- Recuperación al abrir, confirmar resuscripción, recuperar foco/visibilidad y cada 15 s mientras el documento está visible y listo. Intervalo configurable mediante `SYNC_INTERVAL_MS`. Solo una recuperación activa; ocultar, desconectar, cambiar/cerrar canal o destruir la vista cancela HTTP. Destrucción limpia timer/listeners.
+- Error transitorio conserva filas/C y ofrece reintento manual además de futuros disparadores. 401/403/404 limpia la vista. 400 reinicia el estado y carga una instantánea nueva sin encadenar otro sync inmediato. Los mensajes recuperados reutilizan deduplicación y ancla de lectura; borrador conservado durante reconexión.
+- TDD de cliente/store; **74 pruebas Angular correctas**, lint y typecheck de todos los workspaces correctos. Mutación temporal quitando el guard de recuperación activa: la prueba detectó 4 llamadas donde esperaba 1; código restaurado y suite verde. Build web/74 pruebas en imagen Docker y stack saludable. Sin cambios de API, esquema, dependencias ni socket-client.
+- **15 E2E Chromium correctos en 1,5 min** contra Compose aislado. Nuevo escenario: abrir canal vacío, desconectar navegador, persistir 105 mensajes con otro socket autenticado, reiniciar API y recuperar tres páginas con H fijo y los mismos IDs. Verifica borrador, fallo 503 al recuperar foco, retry sin duplicados y cierre. La aserción de cierre espera al desmontaje observable del log; captura inspeccionada y botones separados.
+- Interceptores de historial restringidos a su ruta para no capturar sync; escenario de ack perdido bloquea HTTP recovery explícitamente para conservar su cobertura propia. Regresión de conversación, historial/scroll, persistencia, auth y suscripciones correcta. Quality y Containers finales se registran en la PR.
+- Revisados consumidores, guards de vista, temporizadores, validación de páginas y errores. Límites: estado solo en memoria, recuperación pausada en pestaña oculta, sin garantía de latencia ni certificación multiinstancia/otros motores/lector de pantalla completo. CP0-C y CP1-C siguen pendientes. Siguiente paso tras revisión y merge manual: **Checkpoint CP3-B**; pruebas ampliadas de carga inicial y hueco commit-emisión siguen en 3.3a–3.3b.

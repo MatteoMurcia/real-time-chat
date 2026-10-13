@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed for owner review; implemented by task 3.2a.
+Accepted through PR #35; implemented by task 3.2a.
 
 ## Date
 
@@ -56,8 +56,9 @@ snapshot of mutable author profiles. Deletion/edit policy and data-generation
 tokens would require an explicit future contract. No schema or dependency changes.
 
 The application still targets one API instance. This endpoint does not itself
-schedule browser recovery or guarantee exactly-once delivery. Client orchestration
-and commit-without-event demonstrations remain in 3.2b–3.3b.
+schedule browser recovery or guarantee exactly-once delivery. Task 3.2b adds
+visible-channel orchestration; further initial-load races and commit-without-event
+demonstrations remain in 3.3a–3.3b.
 
 ## Evidence
 

@@ -35,11 +35,11 @@ stale clicks cannot resend a pending, rejected or already confirmed message.
 
 Socket acknowledgements are retained for at most 30 seconds per attempt, separately
 from the five-second UI deadline. A valid late acknowledgement, live event or
-history row converges on one canonical ID; confirming an outgoing row also matches
+history/recovery row converges on one canonical ID; confirming an outgoing row also matches
 its author, channel, client key and body. Errors from older attempts cannot change
 a newer attempt or undo confirmation. Changing/closing the view clears retry
 deadlines and ignores its old responses; the transport callbacks expire within
-their bounded window or on disconnection. After that window, manual retry/history
+their bounded window or on disconnection. After that window, manual retry/history/recovery
 can still resolve the saved message. This is not persistent offline state.
 
 Opening a channel subscribes first, then loads the latest 50 saved messages.
@@ -61,9 +61,38 @@ to the open conversation, not a persisted unread count.
 Switching/closing a conversation, navigating away or reloading clears that local
 state, including drafts and retry keys; it does not delete persisted messages.
 Drafts survive a temporary transport interruption while the view stays open.
-Reopening loads recent saved history again. Reconnect gap recovery (3.2b)
-remains pending; resubscribing an already open view
-does not automatically fetch messages missed during the interruption.
+Reopening loads recent saved history again. After resubscribing, an already open
+conversation recovers missed messages from its last fully incorporated boundary,
+including across API restarts.
+
+### Recovery lifecycle
+
+The first history response seeds a separate `syncCursor` C; older-page cursors and
+the history snapshot remain unchanged by recovery. The store merges each validated
+sync page before advancing C, including a final empty page. Events and send acks
+never advance C. New recovered rows use the existing reading anchor and new-message
+notification; they do not pull a reader away from earlier messages.
+
+Recovery runs after opening/loading the initial snapshot, after successful
+resubscription, on window focus or becoming visible, and every 15 seconds while
+the document is visible and the live subscription is ready. `SYNC_INTERVAL_MS`
+is an Angular injection token for overriding that interval. Only one recovery is
+active per open conversation; additional triggers during it are coalesced. Each
+HTTP page has a five-second timeout and all pages keep the first returned H.
+
+Hiding the document, disconnecting, changing/closing the channel or destroying
+the view cancels its active HTTP work. Closing/destroying also clears the cursor,
+timer and focus/visibility listeners as appropriate. Hidden or disconnected views
+retain their loaded state and C and recover again when ready and visible.
+
+Transient/malformed-response failures keep incorporated rows and the last C, show
+an error and offer **Retry recovery**; focus/interval can also retry. A failed
+page never advances C. A later recovery may capture a new H from the retained C.
+401/403/404 clears the view. A 400 invalid-boundary response discards local message
+and cursor state, invalidates pending callbacks, and reloads a fresh snapshot;
+it waits for the next trigger before syncing again to avoid an immediate error
+loop. The composer draft remains local to the component. No persistent offline
+queue or delivery deadline is promised.
 
 ## History HTTP contract
 
@@ -109,7 +138,7 @@ request another page with `after=nextCursor` and the **same returned `until`**.
 On the last page (including an empty interval), `nextCursor` equals `until`:
 the entire interval has been checked. Advance the client's C only after merging
 the complete page. Start a later recovery without `until` to capture a new H.
-Live events alone must never advance C. The UI integration is task 3.2b.
+Live events alone must never advance C; the Angular store enforces this separation.
 
 Both query cursors use the existing canonical version-1 snapshot representation
 `[1, channelId, sequence, sequence]`, with decimal strings and zero supported.
@@ -177,8 +206,8 @@ in that task. Already transmitted events cannot be recalled.
 Delivery is best-effort. A crash or delivery-check failure after commit can leave
 a stored message without an event or successful ack. Timeout does not prove
 rollback; retry can recover the canonical message. Saved history can be loaded,
-but reconnect reconciliation remains pending. There is no outbox or exactly-once delivery, and
-ack/event may arrive in either order.
+and reconnect/visible-tab reconciliation reads committed messages. There is no
+outbox or exactly-once delivery, and ack/event may arrive in either order.
 
 The implementation supports one API process and the synchronous in-memory
 adapter. Same-channel retries serialize in PostgreSQL. If simultaneous reuse of
@@ -192,6 +221,20 @@ misreported as a successful retry. Recovery performs no second insert or retry
 loop. Rate limiting remains 4.1a.
 
 ## Migration and verification
+
+`sync.service.spec.ts` checks fixed-H pagination, cancellation, timeout, invalid
+pages, sequence order and non-progressing responses. Store tests use controlled
+time for focus/visibility/interval triggers, single active recovery, cancellation,
+retaining C after failure, invalid-cursor reset and authorization errors. Removing
+the active-recovery guard makes the overlap regression test fail.
+
+`e2e/reconnect.spec.ts` opens an empty channel, disconnects the browser, writes
+105 messages through a separate authenticated socket, restarts the isolated API
+and checks all three recovered pages and exact IDs without reloading the view.
+It also verifies draft retention, fixed H, recoverable HTTP failure, manual retry
+without duplicates and focus after closing. History fault routes match only the
+history endpoint; the late-ack E2E deliberately makes HTTP recovery unavailable
+to keep its original acknowledgement-specific assertions meaningful.
 
 The additive `20261011150000_create_messages` migration creates Message and its
 indexes/constraints. Follow the [Compose update guide](local-development.md):
