@@ -6,11 +6,13 @@ import { RealtimeConnection } from '../../core/realtime-connection';
 import { SessionStore } from '../../core/session.store';
 import { ChatStore } from './chat.store';
 import { HistoryClient } from './history-client';
-import { of, Subject, throwError } from 'rxjs';
+import { SyncService } from './sync.service';
+import { EMPTY, of, Subject, throwError } from 'rxjs';
 import { HttpErrorResponse } from '@angular/common/http';
-import type { MessagePage } from '@real-time-chat/contracts/messages';
+import type { MessagePage, MessageSyncPage } from '@real-time-chat/contracts/messages';
 
 const history = { list: vi.fn() };
+const sync = { recover: vi.fn() };
 
 const listeners = new Map<string, (value: unknown) => void>();
 const connection = {
@@ -30,18 +32,87 @@ const event = (value: unknown) => listeners.get('message:created')?.(value);
 let store: ChatStore;
 
 beforeEach(async () => {
+  vi.useFakeTimers();
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
   vi.clearAllMocks(); listeners.clear(); connection.status.set('connected');
+  sync.recover.mockReturnValue(EMPTY);
   connection.subscription.mockImplementation(async (channelId, subscribed) => ({ ok: true, data: { channelId, subscribed } }));
   connection.send.mockImplementation(() => new Promise(() => undefined));
   history.list.mockReturnValue(of({ items: [], olderCursor: null, snapshotCursor: 'snapshot' }));
   TestBed.configureTestingModule({ providers: [ChatStore,
     { provide: RealtimeConnection, useValue: connection },
     { provide: HistoryClient, useValue: history },
+    { provide: SyncService, useValue: sync },
     { provide: SessionStore, useValue: { session: () => ({ user: { id: 'user-1' } }) } },
   ] });
   store = TestBed.inject(ChatStore); store.open('channel-1'); await flush();
 });
-afterEach(() => { TestBed.resetTestingModule(); vi.useRealTimers(); });
+afterEach(() => { TestBed.resetTestingModule(); vi.restoreAllMocks(); vi.useRealTimers(); });
+
+it('seeds C from the snapshot, advances only after recovery pages and preserves it on errors and older history', async () => {
+  expect(sync.recover).toHaveBeenCalledWith('channel-1', 'snapshot');
+  const pending = new Subject<MessageSyncPage>(); sync.recover.mockReturnValue(pending);
+  store.recover(); event(canonical({ id: 'live', sequence: '9' }));
+  expect(store.syncCursor()).toBe('snapshot');
+  pending.next({ items: [canonical()], nextCursor: 'page-1', until: 'H', hasMore: true });
+  expect(store.messages().map(item => item.id)).toEqual(['message-1', 'live']);
+  expect(store.syncCursor()).toBe('page-1');
+  pending.error(new HttpErrorResponse({ status: 503 }));
+  expect(store.syncError()).not.toBe(''); expect(store.syncLoading()).toBe(false);
+  sync.recover.mockReturnValue(EMPTY); store.recover();
+  expect(sync.recover).toHaveBeenLastCalledWith('channel-1', 'page-1');
+  store.olderCursor.set('older');
+  history.list.mockReturnValue(of({ items: [], olderCursor: null, snapshotCursor: 'snapshot' }));
+  store.loadHistory(); expect(store.syncCursor()).toBe('page-1');
+});
+
+it('coalesces focus and interval triggers, pauses hidden/offline and cancels on destroy', async () => {
+  sync.recover.mockClear(); const pending = new Subject<MessageSyncPage>(); sync.recover.mockReturnValue(pending);
+  window.dispatchEvent(new Event('focus')); await vi.advanceTimersByTimeAsync(45000);
+  expect(sync.recover).toHaveBeenCalledOnce(); expect(pending.observed).toBe(true);
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden'); document.dispatchEvent(new Event('visibilitychange'));
+  expect(pending.observed).toBe(false); await vi.advanceTimersByTimeAsync(30000);
+  expect(sync.recover).toHaveBeenCalledOnce();
+  vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible'); document.dispatchEvent(new Event('visibilitychange'));
+  expect(sync.recover).toHaveBeenCalledTimes(2);
+  connection.status.set('reconnecting'); await flush(); expect(pending.observed).toBe(false);
+  await vi.advanceTimersByTimeAsync(30000); window.dispatchEvent(new Event('focus'));
+  expect(sync.recover).toHaveBeenCalledTimes(2);
+  connection.status.set('connected'); await flush(); expect(sync.recover).toHaveBeenCalledTimes(3);
+  TestBed.resetTestingModule(); expect(pending.observed).toBe(false);
+  window.dispatchEvent(new Event('focus')); document.dispatchEvent(new Event('visibilitychange'));
+  await vi.advanceTimersByTimeAsync(30000); expect(sync.recover).toHaveBeenCalledTimes(3);
+});
+
+it('recovers every 15 seconds when visible even without focus events', async () => {
+  sync.recover.mockClear();
+  await vi.advanceTimersByTimeAsync(14999); expect(sync.recover).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(1); expect(sync.recover).toHaveBeenCalledOnce();
+  await vi.advanceTimersByTimeAsync(15000); expect(sync.recover).toHaveBeenCalledTimes(2);
+});
+
+it('cancels obsolete recovery when switching channels and never merges its late page', async () => {
+  const pending = new Subject<MessageSyncPage>(); sync.recover.mockReturnValue(pending); store.recover();
+  sync.recover.mockReturnValue(EMPTY); store.open('channel-2'); await flush();
+  expect(pending.observed).toBe(false);
+  pending.next({ items: [canonical()], nextCursor: 'old', until: 'old', hasMore: false });
+  expect(store.messages()).toEqual([]); expect(store.syncCursor()).toBe('snapshot');
+  expect(sync.recover).toHaveBeenLastCalledWith('channel-2', 'snapshot');
+});
+
+it.each([401, 403, 404])('clears the view after recovery returns %s', status => {
+  event(canonical()); sync.recover.mockReturnValue(throwError(() => new HttpErrorResponse({ status })));
+  store.recover(); expect(store.messages()).toEqual([]); expect(store.ready()).toBe(false);
+  expect(store.syncCursor()).toBeNull();
+});
+
+it('replaces an invalid cursor with a fresh snapshot without an immediate retry loop', () => {
+  event(canonical()); sync.recover.mockClear();
+  sync.recover.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 400 })));
+  history.list.mockReturnValue(of({ items: [], olderCursor: null, snapshotCursor: 'fresh' }));
+  store.recover(); expect(store.messages()).toEqual([]); expect(store.syncCursor()).toBe('fresh');
+  expect(sync.recover).toHaveBeenCalledOnce(); expect(store.historyError()).toBe('');
+});
 
 it('retries a timeout only once automatically, then requires a current manual action', async () => {
   vi.useFakeTimers(); store.send('Hello');

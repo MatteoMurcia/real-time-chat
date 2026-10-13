@@ -31,10 +31,10 @@ test('loads three history pages, merges live traffic, retries errors and clears 
     await new Promise<void>((resolve, reject) => { socket.once('connect', resolve); socket.once('connect_error', reject); socket.connect(); });
     for (let i = 1; i <= 105; i++) await send(`Saved message ${i}`);
     await page.getByRole('button', { name: 'Refresh channels', exact: true }).click();
-    await page.route('**/api/channels/*/messages*', route => route.fulfill({ status: 503, body: '{}' }), { times: 1 });
+    await page.route(/\/api\/channels\/[^/]+\/messages(?:\?.*)?$/, route => route.fulfill({ status: 503, body: '{}' }), { times: 1 });
     await page.getByRole('button', { name: `Open chat ${name}`, exact: true }).click();
     await expect(page.getByText('History could not be loaded. Try again.', { exact: true })).toBeVisible();
-    await page.route('**/api/channels/*/messages*', async route => {
+    await page.route(/\/api\/channels\/[^/]+\/messages(?:\?.*)?$/, async route => {
       const snapshot = await route.fetch();
       await send('Live while snapshot is in flight');
       await route.fulfill({ response: snapshot });
@@ -44,7 +44,7 @@ test('loads three history pages, merges live traffic, retries errors and clears 
     await expect(rows).toHaveCount(51);
     await expect(rows.first()).toContainText('Saved message 56');
     await expect(rows.last()).toContainText('Live while snapshot is in flight');
-    await page.route('**/api/channels/*/messages*', route => route.abort('failed'), { times: 1 });
+    await page.route(/\/api\/channels\/[^/]+\/messages(?:\?.*)?$/, route => route.abort('failed'), { times: 1 });
     await page.getByRole('button', { name: 'Load earlier messages', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Retry history', exact: true })).toBeEnabled();
     await expect(rows).toHaveCount(51);
