@@ -96,6 +96,37 @@ not advance either. Switching channels or access revocation cancels HTTP work
 and clears both. This is a committed message boundary, not a snapshot of mutable
 author display names or a future edit/delete policy. No schema migration is needed.
 
+## Bounded recovery HTTP contract
+
+`GET /api/channels/:id/messages/sync?after=<C>&until=<H>&limit=50` returns
+`{ items, nextCursor, until, hasMore }`. `after` is required; start with the
+history response's `snapshotCursor`, including the zero boundary of an empty
+channel. `until` is omitted on the first recovery request so the server captures
+the committed H. `limit` defaults to 50 and accepts 1–100.
+
+Items are ascending and strictly within `(after, H]`. When `hasMore` is true,
+request another page with `after=nextCursor` and the **same returned `until`**.
+On the last page (including an empty interval), `nextCursor` equals `until`:
+the entire interval has been checked. Advance the client's C only after merging
+the complete page. Start a later recovery without `until` to capture a new H.
+Live events alone must never advance C. The UI integration is task 3.2b.
+
+Both query cursors use the existing canonical version-1 snapshot representation
+`[1, channelId, sequence, sequence]`, with decimal strings and zero supported.
+Older-history page cursors are not sync boundaries. Cross-channel, malformed,
+noncanonical, reversed (`after > until`) or future boundaries return 400, as do
+unknown/repeated fields. These unsigned cursors describe positions, not authority;
+the client is responsible for retaining H across requests.
+
+Every page authenticates the session, locks the channel and rechecks membership.
+The same lock used by sends makes H a committed prefix: an earlier uncommitted
+writer must finish or roll back before H is read. Reads admitted before a leave
+may complete; pages after it commits return 403. Invalid sessions return 401,
+missing channels 404. Responses are `no-store` and expose only public fields.
+The indexed query reads at most `limit + 1` rows, with no OFFSET or total count.
+New traffic above H does not extend the current recovery. See
+[ADR-001](decisions/001-bounded-message-recovery.md) for the guarantee and limits.
+
 ## Wire contract
 
 Emit `message:send` with an acknowledgement callback and exactly
