@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-13 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b integrada mediante PR #30; CP2-C integrado mediante PR #31; 3.1a integrada mediante PR #32; 3.1b integrada mediante PR #33; CP3-A integrado mediante PR #34; 3.2a integrada mediante PR #35; 3.2b implementada y verificada, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
+Revisión: 3 · Actualización: 2026-10-13 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b integrada mediante PR #30; CP2-C integrado mediante PR #31; 3.1a integrada mediante PR #32; 3.1b integrada mediante PR #33; CP3-A integrado mediante PR #34; 3.2a integrada mediante PR #35; 3.2b integrada mediante PR #36; CP3-B verificado, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
 
 ## 1. Cómo usar este plan
 
@@ -534,13 +534,13 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
   - Aceptación: una recuperación termina con tráfico continuo; páginas solo contienen (C,H]; autorización en cada página.
   - Verificar: más de dos páginas, canal vacío, cursor inválido y commit retrasado concurrente; nunca saltar un mensaje que confirma tarde.
   - Archivos: `apps/api/src/messaging/sync.service.ts`, `sync-query.ts`, controller historial, contrato mensajes, `apps/api/test/message-sync.spec.ts`, integración `message-sync.ts`/`message-sync-races.ts` y [ADR-001](../docs/decisions/001-bounded-message-recovery.md).
-- [x] **3.2b — Resincronizar el canal visible** · M · Depende de: 3.2a, 3.1b. Implementada y verificada; pendiente de revisión y merge manual.
+- [x] **3.2b — Resincronizar el canal visible** · M · Depende de: 3.2a, 3.1b. Integrada mediante PR #36.
   - Trabajo: cursor C separado de olderCursor; recuperación al conectar, entrar, recuperar foco y por intervalo.
   - Aceptación: solo una recuperación activa; se cancelan consultas de canal obsoleto; eventos vivos no avanzan C.
   - Verificar: unitarias de disparadores/cancelación con reloj controlado y E2E de reconexión.
   - Archivos: `apps/web/src/app/features/chat/sync.service.ts`, `sync.service.spec.ts`, store/plantilla/estilos chat, `e2e/reconnect.spec.ts`. Reutiliza el estado y la resuscripción del socket-client sin modificarlo.
 
-**Checkpoint CP3-B:** desconectar, enviar más de una página, reiniciar API y recuperar todo lo pendiente de recibir.
+**Checkpoint CP3-B:** verificado sobre `fbe0623`; desconexión, 105 mensajes en tres páginas, reinicio de API y recuperación ordenada sin duplicados. [Informe](../docs/checkpoints/cp3-b.md). Pendiente de revisión y merge manual.
 
 - [ ] **3.3a — Resolver carreras de carga inicial y eventos** · M · Depende de: 3.2b, 2.4b.
   - Trabajo: implementar orden subscribe → snapshot H → merge y descarte de respuestas anteriores.
@@ -1118,3 +1118,12 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - **15 E2E Chromium correctos en 1,5 min** contra Compose aislado. Nuevo escenario: abrir canal vacío, desconectar navegador, persistir 105 mensajes con otro socket autenticado, reiniciar API y recuperar tres páginas con H fijo y los mismos IDs. Verifica borrador, fallo 503 al recuperar foco, retry sin duplicados y cierre. La aserción de cierre espera al desmontaje observable del log; captura inspeccionada y botones separados.
 - Interceptores de historial restringidos a su ruta para no capturar sync; escenario de ack perdido bloquea HTTP recovery explícitamente para conservar su cobertura propia. Regresión de conversación, historial/scroll, persistencia, auth y suscripciones correcta. Quality y Containers finales se registran en la PR.
 - Revisados consumidores, guards de vista, temporizadores, validación de páginas y errores. Límites: estado solo en memoria, recuperación pausada en pestaña oculta, sin garantía de latencia ni certificación multiinstancia/otros motores/lector de pantalla completo. CP0-C y CP1-C siguen pendientes. Siguiente paso tras revisión y merge manual: **Checkpoint CP3-B**; pruebas ampliadas de carga inicial y hueco commit-emisión siguen en 3.3a–3.3b.
+### Evidencia CP3-B — Recuperación acotada (2026-10-13)
+
+- PR #36 integrada; revisión sobre `main` en `fbe0623`. Rama `docs/cp3-b-recovery-checkpoint`, con commits separados de informe y plan. Merge reservado al usuario.
+- Revisados endpoint, autorización por página, validación de cursores, bloqueo de canal, H fijo, avance de C tras merge y cancelación del cliente. Sin bloqueos identificados ni cambios de aplicación, esquema, dependencias o pruebas permanentes.
+- PostgreSQL aislado: **18 pruebas de integración correctas**, incluidas escrituras entre páginas, commit/rollback retenido, BIGINT y revocación.
+- Mutación temporal de la comparación de H: **2 de 74 pruebas Angular fallaron**; restaurado el original, **74 correctas**. Código de aplicación idéntico a la base revisada.
+- Chromium contra Compose compilado: **15 E2E correctos en 1,5 minutos**. Navegador desconectado, 105 mensajes enviados desde otro cliente Socket.IO, reinicio de API y tres páginas recuperadas con IDs canónicos exactos; borrador conservado y error 503 recuperable mediante reintento.
+- [Informe CP3-B](../docs/checkpoints/cp3-b.md): garantías, evidencia y límites. Sin garantía de latencia, persistencia de estado del cliente, despliegue, carga o certificación multiinstancia/otros motores. CP0-C y CP1-C siguen pendientes.
+- Siguiente tarea tras revisión y merge manual: **3.3a — Resolver carreras de carga inicial y eventos**. La demostración específica de commit sin emisión queda en **3.3b**.
