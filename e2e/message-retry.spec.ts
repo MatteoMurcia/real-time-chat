@@ -9,6 +9,8 @@ test('reconciles late and lost confirmations with one automatic retry and the or
   const held: { socket: WebSocketRoute; frame: string }[] = [];
   let upgraded = false;
   page.on('pageerror', error => errors.push(error.message));
+  // Keep HTTP recovery unavailable so this scenario exercises acknowledgement recovery itself.
+  await page.route('**/api/channels/*/messages/sync?*', route => route.abort('failed'));
   await page.routeWebSocket('**/socket.io/**', socket => {
     const server = socket.connectToServer();
     const acks = new Map<string, 'hold' | 'drop' | 'pass'>();

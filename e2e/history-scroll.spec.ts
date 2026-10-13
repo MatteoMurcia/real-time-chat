@@ -52,13 +52,13 @@ for (const width of [1280, 390]) {
       await expect(rows).toHaveCount(51);
       await expect(page.getByRole('button', { name: 'New messages — show latest', exact: true })).toBeVisible();
       await expectAnchor(initial);
-      await page.route('**/api/channels/*/messages*', route => route.abort('failed'), { times: 1 });
+      await page.route(/\/api\/channels\/[^/]+\/messages(?:\?.*)?$/, route => route.abort('failed'), { times: 1 });
       await page.getByRole('button', { name: 'Load earlier messages', exact: true }).click();
       await expect(page.getByRole('button', { name: 'Retry history', exact: true })).toBeEnabled();
       await expectAnchor(initial);
       let release!: () => void;
       const held = new Promise<void>(resolve => { release = resolve; });
-      await page.route('**/api/channels/*/messages*', async route => {
+      await page.route(/\/api\/channels\/[^/]+\/messages(?:\?.*)?$/, async route => {
         const response = await route.fetch(); await held; await route.fulfill({ response });
       }, { times: 1 });
       await page.getByRole('button', { name: 'Retry history', exact: true }).click();

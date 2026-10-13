@@ -145,7 +145,7 @@ export class ChatStore {
         const count = this.messages().length;
         for (const message of page.items) this.confirm(message);
         this.syncCursor.set(page.nextCursor);
-        if (this.messages().length > count) this.liveNotice.set(`Recovered messages through ${page.items.at(-1)!.sequence}.`);
+        if (this.messages().length > count) this.liveNotice.set(`Conversation updated. ${this.messages().length} messages loaded.`);
       },
       error: (error: unknown) => {
         if (revision !== this.viewRevision) return;
