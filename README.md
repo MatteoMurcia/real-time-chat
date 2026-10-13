@@ -28,7 +28,9 @@ The API persists messages with per-channel ordering and retry deduplication,
 then acknowledges and emits them after commit. See [message contracts and limits](docs/messages.md).
 Members can open a live conversation, exchange plain text with author/time and
 confirmation, and retry unconfirmed sends without changing their keys. The UI
-deduplicates ack/event delivery and resubscribes after reconnecting. It currently
+retries once automatically after five seconds without confirmation, then offers
+manual retry. Late acknowledgements converge without duplicating confirmed rows.
+It deduplicates ack/event delivery and resubscribes after reconnecting. It currently
 loads the latest 50 saved messages and offers earlier pages using channel-bound
 snapshot cursors. Live events merge by ID without replacing loaded history.
 Reconnect gap recovery remains pending. See [local Socket.IO setup](docs/local-development.md)

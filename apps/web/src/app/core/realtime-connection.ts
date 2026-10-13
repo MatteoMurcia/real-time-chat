@@ -37,7 +37,8 @@ export class RealtimeConnection {
 
   send(input: SendMessageRequest): Promise<SendMessageAck> {
     if (!this.socket.connected) return Promise.reject(new Error('Disconnected'));
-    return this.socket.timeout(5000).emitWithAck('message:send', input) as Promise<SendMessageAck>;
+    // The store's 5s deadline permits one retry; retain late acks for a bounded 30s per attempt.
+    return this.socket.timeout(30000).emitWithAck('message:send', input) as Promise<SendMessageAck>;
   }
 
   constructor() {

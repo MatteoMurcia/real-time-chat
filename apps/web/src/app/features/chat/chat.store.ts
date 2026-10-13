@@ -7,8 +7,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Subscription } from 'rxjs';
 import { HistoryClient } from './history-client';
 import { isMessage } from './message';
-
-interface Outgoing { request: SendMessageRequest; state: 'pending' | 'unconfirmed' | 'rejected' }
+import { reduceMessages, type MessageState, type Outgoing } from './message.reducer';
 
 @Injectable()
 export class ChatStore {
@@ -20,8 +19,10 @@ export class ChatStore {
   private readonly subscribed = signal(false);
   private revision = 0;
   private viewRevision = 0;
-  readonly messages = signal<PublicMessage[]>([]);
-  readonly outgoing = signal<Outgoing[]>([]);
+  private readonly messageState = signal<MessageState>({ messages: [], outgoing: [] });
+  private readonly deadlines = new Set<ReturnType<typeof setTimeout>>();
+  readonly messages = computed(() => this.messageState().messages);
+  readonly outgoing = computed(() => this.messageState().outgoing);
   readonly notice = signal('');
   readonly liveNotice = signal('');
   readonly historyLoading = signal(false);
@@ -45,7 +46,7 @@ export class ChatStore {
       const revision = ++this.revision;
       this.subscribed.set(false);
       if (!connected) {
-        this.outgoing.update(items => items.map(item => item.state === 'pending' ? { ...item, state: 'unconfirmed' } : item));
+        this.updateMessages({ type: 'disconnect' });
         if (channelId) this.notice.set('Live updates paused. Reconnecting does not recover missed messages yet.');
       }
       if (!channelId || !connected) return;
@@ -72,12 +73,14 @@ export class ChatStore {
     if (previous === channelId) return;
     ++this.revision;
     ++this.viewRevision;
+    for (const deadline of this.deadlines) clearTimeout(deadline);
+    this.deadlines.clear();
     this.historyRequest?.unsubscribe();
     this.historyLoading.set(false); this.historyError.set('');
     this.olderCursor.set(null); this.snapshotCursor.set(null);
     this.subscribed.set(false);
     this.channelId.set(channelId);
-    this.messages.set([]); this.outgoing.set([]); this.notice.set(''); this.liveNotice.set('');
+    this.messageState.set({ messages: [], outgoing: [] }); this.notice.set(''); this.liveNotice.set('');
     if (previous) void this.connection.subscription(previous, false).catch(() => undefined);
   }
 
@@ -110,45 +113,51 @@ export class ChatStore {
       this.notice.set('Write 1–2,000 characters of valid text.'); return false;
     }
     const request = { channelId: this.channelId()!, clientMessageId: crypto.randomUUID(), body };
-    this.outgoing.update(items => [...items, { request, state: 'pending' }]);
-    void this.deliver(request);
+    this.updateMessages({ type: 'queue', request });
+    void this.deliver(request, 1);
     return true;
   }
 
   retry(item: Outgoing): void {
-    if (!this.ready() || item.state !== 'unconfirmed') return;
-    this.setState(item.request, 'pending');
-    void this.deliver(item.request);
+    const current = this.outgoing().find(value => value.request === item.request);
+    if (!this.ready() || current?.state !== 'unconfirmed') return;
+    this.updateMessages({ type: 'retry', request: current.request });
+    void this.deliver(current.request, current.attempt + 1);
   }
 
-  private async deliver(request: SendMessageRequest): Promise<void> {
+  private async deliver(request: SendMessageRequest, attempt: number): Promise<void> {
     const revision = this.viewRevision;
+    const current = () => revision === this.viewRevision && this.outgoing().some(item => item.request === request && item.attempt === attempt);
+    const deadline = setTimeout(() => {
+      this.deadlines.delete(deadline);
+      if (!current()) return;
+      this.updateMessages({ type: 'unconfirmed', request, attempt });
+      const item = this.outgoing().find(value => value.request === request);
+      if (attempt === 1 && item) this.retry(item);
+    }, 5000);
+    this.deadlines.add(deadline);
     try {
       const ack = await this.connection.send(request);
       if (revision !== this.viewRevision) return;
       if (ack?.ok === true && isMessage(ack.data) && ack.data.channelId === request.channelId
         && ack.data.clientMessageId === request.clientMessageId && ack.data.body === request.body
         && ack.data.author.id === this.sessions.session()?.user.id) this.confirm(ack.data);
+      else if (!current()) return;
       else if (ack?.ok === false && isApiError(ack.error)) {
         if (['FORBIDDEN', 'UNAUTHENTICATED', 'NOT_FOUND'].includes(ack.error.code)) this.revoke();
-        else this.setState(request, ['VALIDATION_ERROR', 'CONFLICT', 'RATE_LIMITED'].includes(ack.error.code) ? 'rejected' : 'unconfirmed');
-      } else this.setState(request, 'unconfirmed');
-    } catch { if (revision === this.viewRevision) this.setState(request, 'unconfirmed'); }
+        else this.updateMessages({ type: ['VALIDATION_ERROR', 'CONFLICT', 'RATE_LIMITED'].includes(ack.error.code) ? 'rejected' : 'unconfirmed', request, attempt });
+      } else this.updateMessages({ type: 'unconfirmed', request, attempt });
+    } catch { if (current()) this.updateMessages({ type: 'unconfirmed', request, attempt }); }
+    finally { clearTimeout(deadline); this.deadlines.delete(deadline); }
   }
 
   private confirm(message: PublicMessage): void {
     if (message.channelId !== this.channelId()) return;
-    this.messages.update(items => {
-      if (items.some(item => item.id === message.id)) return items;
-      return [...items, message].sort((a, b) => BigInt(a.sequence) < BigInt(b.sequence) ? -1 : 1);
-    });
-    if (message.author.id === this.sessions.session()?.user.id) {
-      this.outgoing.update(items => items.filter(item => item.request.clientMessageId !== message.clientMessageId));
-    }
+    this.updateMessages({ type: 'confirm', message, userId: this.sessions.session()?.user.id });
   }
 
-  private setState(request: SendMessageRequest, state: Outgoing['state']): void {
-    this.outgoing.update(items => items.map(item => item.request === request ? { ...item, state } : item));
+  private updateMessages(action: Parameters<typeof reduceMessages>[1]): void {
+    this.messageState.update(state => reduceMessages(state, action));
   }
 
   private revoke(): void {
