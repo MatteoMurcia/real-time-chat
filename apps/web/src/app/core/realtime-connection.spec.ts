@@ -47,6 +47,17 @@ it('does not buffer offline sends and abandons uncertain room changes before the
   expect(fake.disconnect).toHaveBeenCalledOnce(); expect(fake.emitWithAck).toHaveBeenCalledTimes(1);
 });
 
+it('keeps the send acknowledgement alive beyond the UI deadline with a bounded retention window', async () => {
+  const connection = TestBed.inject(RealtimeConnection); fake.connected = true;
+  let release!: (value: unknown) => void;
+  fake.emitWithAck.mockImplementationOnce(() => new Promise(done => { release = done; }));
+  const input = { channelId: 'c', clientMessageId: 'm', body: 'Hello' };
+  const pending = connection.send(input);
+  expect(fake.timeout).toHaveBeenCalledWith(30000);
+  expect(fake.emitWithAck).toHaveBeenCalledWith('message:send', input);
+  release({ ok: true }); await expect(pending).resolves.toEqual({ ok: true });
+});
+
 it('does not disconnect a replacement socket or replay room changes queued on the old one', async () => {
   const connection = TestBed.inject(RealtimeConnection);
   fake.connected = true;

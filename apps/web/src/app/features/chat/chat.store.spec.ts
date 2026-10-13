@@ -41,7 +41,72 @@ beforeEach(async () => {
   ] });
   store = TestBed.inject(ChatStore); store.open('channel-1'); await flush();
 });
-afterEach(() => TestBed.resetTestingModule());
+afterEach(() => { TestBed.resetTestingModule(); vi.useRealTimers(); });
+
+it('retries a timeout only once automatically, then requires a current manual action', async () => {
+  vi.useFakeTimers(); store.send('Hello');
+  const request = store.outgoing()[0]!.request;
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(connection.send).toHaveBeenCalledTimes(2);
+  expect(connection.send.mock.calls[1]![0]).toBe(request);
+  await vi.advanceTimersByTimeAsync(5000);
+  const stale = store.outgoing()[0]!; expect(stale.state).toBe('unconfirmed');
+  await vi.advanceTimersByTimeAsync(60000); expect(connection.send).toHaveBeenCalledTimes(2);
+  store.retry(stale); store.retry(stale);
+  expect(connection.send).toHaveBeenCalledTimes(3);
+  event(canonical({ clientMessageId: request.clientMessageId })); store.retry(stale);
+  expect(connection.send).toHaveBeenCalledTimes(3);
+});
+
+it('ignores an older attempt failure while its retry is pending, then confirms by event', async () => {
+  vi.useFakeTimers();
+  let resolve!: (ack: SendMessageAck) => void;
+  connection.send.mockImplementationOnce(() => new Promise(done => { resolve = done; }));
+  store.send('Hello'); const request = store.outgoing()[0]!.request;
+  await vi.advanceTimersByTimeAsync(5000);
+  resolve({ ok: false, error: { code: 'FORBIDDEN', message: 'old', requestId: '12345678-1234-4234-8234-123456789abc' } }); await flush();
+  expect(store.ready()).toBe(true); expect(store.outgoing()[0]?.state).toBe('pending');
+  event(canonical({ clientMessageId: request.clientMessageId }));
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(store.messages()).toHaveLength(1); expect(store.outgoing()).toEqual([]);
+});
+
+it('accepts a late ack from the first attempt and ignores the retry failure after confirmation', async () => {
+  vi.useFakeTimers();
+  const replies: ((ack: SendMessageAck) => void)[] = [];
+  connection.send.mockImplementation(() => new Promise(done => { replies.push(done); }));
+  store.send('Hello'); const request = store.outgoing()[0]!.request;
+  await vi.advanceTimersByTimeAsync(5000);
+  const message = canonical({ clientMessageId: request.clientMessageId });
+  replies[0]!({ ok: true, data: message }); await flush();
+  replies[1]!({ ok: false, error: { code: 'INTERNAL_ERROR', message: 'private', requestId: '12345678-1234-4234-8234-123456789abc' } }); await flush();
+  event(message); await vi.advanceTimersByTimeAsync(30000);
+  expect(store.messages()).toEqual([message]); expect(store.outgoing()).toEqual([]);
+  expect(connection.send).toHaveBeenCalledTimes(2);
+});
+
+it.each(['VALIDATION_ERROR', 'CONFLICT', 'RATE_LIMITED', 'FORBIDDEN', 'UNAUTHENTICATED'] as const)('never retries %s automatically', async code => {
+  vi.useFakeTimers();
+  connection.send.mockResolvedValueOnce({ ok: false, error: { code, message: 'private', requestId: '12345678-1234-4234-8234-123456789abc' } });
+  store.send('Hello'); await flush(); await vi.advanceTimersByTimeAsync(60000);
+  expect(connection.send).toHaveBeenCalledOnce();
+  if (code === 'FORBIDDEN' || code === 'UNAUTHENTICATED') {
+    expect(store.ready()).toBe(false); expect(store.outgoing()).toEqual([]);
+  } else {
+    const item = store.outgoing()[0]!; expect(item.state).toBe('rejected'); store.retry(item);
+    expect(connection.send).toHaveBeenCalledOnce();
+  }
+});
+
+it('cancels retry deadlines on view change/destroy and never retries offline', async () => {
+  vi.useFakeTimers(); store.send('Hello');
+  connection.status.set('reconnecting'); await flush();
+  await vi.advanceTimersByTimeAsync(5000); expect(connection.send).toHaveBeenCalledOnce();
+  connection.status.set('connected'); await flush();
+  store.open('channel-2'); await flush(); store.send('New view');
+  TestBed.resetTestingModule(); await vi.advanceTimersByTimeAsync(60000);
+  expect(connection.send).toHaveBeenCalledTimes(2);
+});
 
 it('deduplicates event-before-ack and ack-before-event without removing another author’s pending key', async () => {
   let resolve!: (ack: SendMessageAck) => void;
