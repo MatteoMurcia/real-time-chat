@@ -1,4 +1,4 @@
-import { computed, DestroyRef, effect, inject, Injectable, signal } from '@angular/core';
+import { computed, DestroyRef, DOCUMENT, effect, inject, Injectable, signal } from '@angular/core';
 import { isApiError } from '@real-time-chat/contracts';
 import type { PublicMessage, SendMessageRequest } from '@real-time-chat/contracts/messages';
 import { RealtimeConnection } from '../../core/realtime-connection';
@@ -6,6 +6,7 @@ import { SessionStore } from '../../core/session.store';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Subscription } from 'rxjs';
 import { HistoryClient } from './history-client';
+import { SYNC_INTERVAL_MS, SyncService } from './sync.service';
 import { isMessage } from './message';
 import { reduceMessages, type MessageState, type Outgoing } from './message.reducer';
 
@@ -14,7 +15,10 @@ export class ChatStore {
   private readonly connection = inject(RealtimeConnection);
   private readonly sessions = inject(SessionStore);
   private readonly history = inject(HistoryClient);
+  private readonly sync = inject(SyncService);
+  private readonly document = inject(DOCUMENT);
   private historyRequest?: Subscription;
+  private syncRequest?: Subscription;
   private readonly channelId = signal<string | null>(null);
   private readonly subscribed = signal(false);
   private revision = 0;
@@ -29,9 +33,17 @@ export class ChatStore {
   readonly historyError = signal('');
   readonly olderCursor = signal<string | null>(null);
   readonly snapshotCursor = signal<string | null>(null);
+  readonly syncCursor = signal<string | null>(null);
+  readonly syncLoading = signal(false);
+  readonly syncError = signal('');
   readonly ready = computed(() => this.subscribed() && this.connection.status() === 'connected');
 
   constructor() {
+    const recover = () => this.recover();
+    const visibility = () => this.document.visibilityState === 'visible' ? this.recover() : this.stopSync();
+    this.document.defaultView?.addEventListener('focus', recover);
+    this.document.addEventListener('visibilitychange', visibility);
+    const interval = setInterval(recover, inject(SYNC_INTERVAL_MS));
     const stopMessages = this.connection.listen('message:created', value => {
       if (isMessage(value) && value.channelId === this.channelId()) {
         this.confirm(value); this.liveNotice.set(`Message ${value.sequence} received from ${value.author.displayName}.`);
@@ -46,8 +58,9 @@ export class ChatStore {
       const revision = ++this.revision;
       this.subscribed.set(false);
       if (!connected) {
+        this.stopSync();
         this.updateMessages({ type: 'disconnect' });
-        if (channelId) this.notice.set('Live updates paused. Reconnecting does not recover missed messages yet.');
+        if (channelId) this.notice.set('Live updates paused. Missed messages will be recovered after reconnecting.');
       }
       if (!channelId || !connected) return;
       this.notice.set('Opening live conversation…');
@@ -57,6 +70,7 @@ export class ChatStore {
           this.subscribed.set(true);
           this.notice.set('Live conversation ready.');
           if (!this.snapshotCursor()) this.loadHistory();
+          else this.recover();
         } else if (ack?.ok === false && isApiError(ack.error) && ['FORBIDDEN', 'UNAUTHENTICATED', 'NOT_FOUND'].includes(ack.error.code)) this.revoke();
         else this.notice.set('Could not open the conversation. Close it and try again.');
       }).catch(() => {
@@ -64,6 +78,9 @@ export class ChatStore {
       });
     });
     inject(DestroyRef).onDestroy(() => {
+      clearInterval(interval);
+      this.document.defaultView?.removeEventListener('focus', recover);
+      this.document.removeEventListener('visibilitychange', visibility);
       stopMessages(); stopRevocations(); this.open(null);
     });
   }
@@ -72,19 +89,25 @@ export class ChatStore {
     const previous = this.channelId();
     if (previous === channelId) return;
     ++this.revision;
+    this.resetContent();
+    this.subscribed.set(false);
+    this.channelId.set(channelId);
+    this.notice.set('');
+    if (previous) void this.connection.subscription(previous, false).catch(() => undefined);
+  }
+
+  private resetContent(): void {
     ++this.viewRevision;
+    this.stopSync(); this.syncCursor.set(null); this.syncError.set('');
     for (const deadline of this.deadlines) clearTimeout(deadline);
     this.deadlines.clear();
     this.historyRequest?.unsubscribe();
     this.historyLoading.set(false); this.historyError.set('');
     this.olderCursor.set(null); this.snapshotCursor.set(null);
-    this.subscribed.set(false);
-    this.channelId.set(channelId);
-    this.messageState.set({ messages: [], outgoing: [] }); this.notice.set(''); this.liveNotice.set('');
-    if (previous) void this.connection.subscription(previous, false).catch(() => undefined);
+    this.messageState.set({ messages: [], outgoing: [] }); this.liveNotice.set('');
   }
 
-  loadHistory(): void {
+  loadHistory(recover = true): void {
     const channelId = this.channelId(), before = this.olderCursor(), revision = this.viewRevision;
     if (!channelId || !this.ready() || this.historyLoading() || (this.snapshotCursor() && !before)) return;
     this.historyLoading.set(true); this.historyError.set('');
@@ -97,6 +120,10 @@ export class ChatStore {
         for (const message of page.items) this.confirm(message);
         this.snapshotCursor.set(page.snapshotCursor); this.olderCursor.set(page.olderCursor);
         this.historyLoading.set(false);
+        if (this.syncCursor() === null) {
+          this.syncCursor.set(page.snapshotCursor);
+          if (recover) this.recover();
+        }
       },
       error: (error: unknown) => {
         if (revision !== this.viewRevision) return;
@@ -105,6 +132,35 @@ export class ChatStore {
         else this.historyError.set('History could not be loaded. Try again.');
       },
     });
+  }
+
+  recover(): void {
+    const channelId = this.channelId(), after = this.syncCursor(), revision = this.viewRevision;
+    if (!channelId || !this.ready() || this.document.visibilityState !== 'visible' || this.syncLoading()) return;
+    if (after === null) { this.loadHistory(); return; }
+    this.syncLoading.set(true); this.syncError.set('');
+    this.syncRequest = this.sync.recover(channelId, after).subscribe({
+      next: page => {
+        if (revision !== this.viewRevision) return;
+        const count = this.messages().length;
+        for (const message of page.items) this.confirm(message);
+        this.syncCursor.set(page.nextCursor);
+        if (this.messages().length > count) this.liveNotice.set(`Recovered messages through ${page.items.at(-1)!.sequence}.`);
+      },
+      error: (error: unknown) => {
+        if (revision !== this.viewRevision) return;
+        this.syncLoading.set(false);
+        if (error instanceof HttpErrorResponse && [401, 403, 404].includes(error.status)) this.revoke();
+        else if (error instanceof HttpErrorResponse && error.status === 400) {
+          this.resetContent(); this.loadHistory(false);
+        } else this.syncError.set('Could not recover missed messages. Your loaded messages are kept. Try again.');
+      },
+      complete: () => { if (revision === this.viewRevision) this.syncLoading.set(false); },
+    });
+  }
+
+  private stopSync(): void {
+    this.syncRequest?.unsubscribe(); this.syncLoading.set(false);
   }
 
   send(body: string): boolean {

@@ -30,6 +30,17 @@ it('finishes on an empty final interval', () => {
   expect(completed).toBe(true);
 });
 
+it('merges three ascending pages and completes without moving H', () => {
+  const sequences: string[] = []; let completed = false;
+  service.recover('channel', 'C').subscribe({ next: page => sequences.push(...page.items.map(row => row.sequence)), complete: () => { completed = true; } });
+  for (let i = 1; i <= 3; i++) {
+    const after = i === 1 ? 'C' : `page${i - 1}`;
+    http.expectOne(`/api/channels/channel/messages/sync?after=${after}${i === 1 ? '' : '&until=H'}`)
+      .flush({ items: [{ ...item, id: String(i), sequence: String(i) }], nextCursor: i === 3 ? 'H' : `page${i}`, until: 'H', hasMore: i < 3 });
+  }
+  expect(sequences).toEqual(['1', '2', '3']); expect(completed).toBe(true);
+});
+
 it('rejects malformed, foreign, duplicate, unordered and non-progressing pages', () => {
   const valid = { items: [item], nextCursor: 'H', until: 'H', hasMore: false };
   for (const page of [null, {}, { ...valid, hasMore: 'false' }, { ...valid, nextCursor: 'bad=' },

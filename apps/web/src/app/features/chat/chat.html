@@ -31,6 +31,11 @@
   </div>
   @if (store.historyLoading()) { <p role="status">Loading history…</p> }
   @if (store.historyError()) { <p role="alert" class="error-summary">{{ store.historyError() }}</p> }
+  @if (store.syncLoading()) { <p role="status">Recovering missed messages…</p> }
+  @if (store.syncError()) {
+    <p role="alert" class="error-summary">{{ store.syncError() }}</p>
+    <button type="button" (click)="store.recover()" [disabled]="!store.ready() || store.syncLoading()">Retry recovery</button>
+  }
   <button class="latest" type="button" (click)="scrollToLatest()">{{ hasNewMessages() ? 'New messages — show latest' : following() ? 'Scroll to latest message' : 'Show latest messages' }}</button>
   <form (submit)="$event.preventDefault(); send()">
     <label for="message-body">Message</label>
