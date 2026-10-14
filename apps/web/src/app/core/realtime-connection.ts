@@ -43,9 +43,14 @@ export class RealtimeConnection {
 
   constructor() {
     this.socket.on('connect', () => this.phase.set('connected'));
-    this.socket.on('disconnect', () => this.phase.set(this.socket.active ? 'reconnecting' : 'disconnected'));
+    this.socket.on('session:ended', () => { this.phase.set('unauthenticated'); this.sessions.end(); });
+    this.socket.on('disconnect', () => {
+      if (this.phase() !== 'unauthenticated') this.phase.set(this.socket.active ? 'reconnecting' : 'disconnected');
+    });
     this.socket.on('connect_error', (error: Error & { data?: unknown }) => {
-      if (isApiError(error.data) && error.data.code === 'UNAUTHENTICATED') this.phase.set('unauthenticated');
+      if (isApiError(error.data) && error.data.code === 'UNAUTHENTICATED') {
+        this.phase.set('unauthenticated'); this.sessions.end();
+      }
       else this.phase.set(this.socket.active ? 'reconnecting' : 'unavailable');
     });
     effect(onCleanup => {

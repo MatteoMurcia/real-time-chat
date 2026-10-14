@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-14 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b integrada mediante PR #30; CP2-C integrado mediante PR #31; 3.1a integrada mediante PR #32; 3.1b integrada mediante PR #33; CP3-A integrado mediante PR #34; 3.2a integrada mediante PR #35; 3.2b integrada mediante PR #36; CP3-B integrado mediante PR #37; 3.3a integrada mediante PR #38; 3.3b verificada, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
+Revisión: 3 · Actualización: 2026-10-14 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b integrada mediante PR #30; CP2-C integrado mediante PR #31; 3.1a integrada mediante PR #32; 3.1b integrada mediante PR #33; CP3-A integrado mediante PR #34; 3.2a integrada mediante PR #35; 3.2b integrada mediante PR #36; CP3-B integrado mediante PR #37; 3.3a integrada mediante PR #38; 3.3b integrada mediante PR #39; 3.4a verificada, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
 
 ## 1. Cómo usar este plan
 
@@ -547,12 +547,12 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
   - Aceptación: evento simultáneo con snapshot no desaparece; selección A→B→A no mezcla canales ni mueve cursores indebidamente.
   - Verificar: respuestas HTTP retardadas y eventos intercalados antes/durante/después de snapshot.
   - Archivos: `chat.store.races.spec.ts`, `e2e/channel-races.spec.ts`, documentación. Reutiliza store, reducer, clientes HTTP y serialización de suscripciones existentes sin cambios de ejecución.
-- [x] **3.3b — Probar hueco entre commit y emisión** · M · Depende de: 3.3a. Verificada; pendiente de revisión y merge manual.
+- [x] **3.3b — Probar hueco entre commit y emisión** · M · Depende de: 3.3a. Integrada mediante PR #39.
   - Trabajo: pruebas de integración/E2E con supresión de emisión exclusiva de test; revisar orden y cursor al final.
   - Aceptación: un receptor conectado recupera el mensaje persistido sin evento; recuperación repetida no duplica.
   - Verificar: prueba con reloj o disparador controlado y otra con tráfico concurrente hasta H; fixture no incluida en producción.
   - Archivos: `apps/api/test/fixtures/message-emitter.ts`, `apps/api/test/integration/commit-emission.ts`, runner de integración existente, `e2e/sync-gap.spec.ts`, documentación. Sin cambios de configuración Playwright ni de ejecución de la aplicación.
-- [ ] **3.4a — Cerrar conexiones revocadas y caducadas** · M · Depende de: 1.2c, 2.2b, 3.2b.
+- [x] **3.4a — Cerrar conexiones revocadas y caducadas** · M · Depende de: 1.2c, 2.2b, 3.2b. Verificada; pendiente de revisión y merge manual.
   - Trabajo: índice sockets/sesión, temporizador de expiración y limpieza de estado cliente; comprobar permisos al reconectar y excluir sesiones revocadas/caducadas al distribuir eventos, aunque el temporizador se retrase. El filtro de sesión antes de emitir mensajes se adelantó en 2.3a; completar aquí desconexión activa y sus carreras.
   - Aceptación: logout desconecta todas las conexiones de esa sesión; una sesión idle caduca; otra sesión permanece válida.
   - Verificar: multi-socket, logout durante reconexión y salida de canal estando desconectado; comprobar que no quedan temporizadores.
@@ -1147,3 +1147,13 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Mutación: retirar temporalmente `lte: high` hace fallar dos subpruebas, incluida la nueva; también falla su resultado padre. Restaurado el original: **19 resultados de integración correctos** sobre PostgreSQL aislado. Sin cambios permanentes en código de aplicación.
 - Lint/typecheck y build/arranque Compose correctos. E2E enfocado correcto; suite completa: **17 E2E correctos**. La imagen runtime no contiene directorios de test, dist-test ni fixtures; exclusión comprobada dentro del contenedor y en tsconfig/Dockerfile.
 - Límites: no se mata el proceso en el instante exacto del commit; se suprime la emisión de forma determinista. Una instancia y Chromium, sin garantía exactly-once, latencia, carga ni auditoría completa de accesibilidad. CP0-C y CP1-C pendientes. Siguiente tarea tras revisión y merge manual: **3.4a — Cerrar conexiones revocadas y caducadas**.
+### Evidencia 3.4a — Cierre de conexiones por sesión (2026-10-14)
+
+- PR #39 integrada; rama `feature/3.4a-session-socket-lifecycle` desde `e8a1b0e`. Commits separados de API, cliente, E2E y documentación; merge reservado al usuario.
+- Índice por sesión y un temporizador absoluto por sesión conectada. Logout cierra todos sus sockets; otra sesión del mismo usuario permanece válida. Última desconexión y destrucción del módulo limpian temporizadores y suscripción local de revocación.
+- Registro antes de una segunda autenticación evita perder una revocación entre handshake e indexación. Integración retiene por separado ambas lecturas y revoca durante la espera; un resultado antiguo no resucita la conexión. Fallos de BD cierran el transporte sin afirmar revocación.
+- `session:ended` sin payload limpia identidad, conversación y borrador en pestañas conectadas. Una pestaña offline pierde acceso al reconectar. El logout propio deja terminar HTTP para limpiar la cookie; si se pierden respuesta y notificación, conserva el flujo de error y reintento. Sin cambios de esquema, dependencias ni configuración.
+- Verificación: **39 pruebas API, 85 Angular, 20 resultados de integración PostgreSQL y 18 E2E Chromium correctos**. Lint y typecheck correctos; imágenes compiladas y arranque saludable. La suite completa incluye reinicio de API y recreación con persistencia. Entorno Compose aislado; sin modificar `.env` ni el volumen de trabajo.
+- Caducidad inactiva real: dos sockets de una sesión con vencimiento corto en BD se cierran sin tráfico. Pruebas de reloj controlado verifican el límite absoluto, un timer por sesión y limpieza. El filtro de destinatarios se prueba manteniendo intencionadamente abierto un socket revocado.
+- Control negativo: retirar la segunda autenticación hizo fallar dos pruebas (carrera de revocación y fallo de BD). Restaurada la protección, pasan las 39 pruebas API.
+- Límites: una instancia; temporizadores sujetos al event loop; no se retractan eventos enviados ni operaciones ya aceptadas. Chromium, sin prueba de carga ni auditoría completa de accesibilidad. CP0-C y CP1-C pendientes. Siguiente paso tras revisión y merge manual: **Checkpoint CP3-C**.

@@ -112,9 +112,9 @@ export async function verifySubscriptions(app: INestApplication, db: DatabaseSer
     const reconnected = await connect(cookie);
     assert.equal(hasRoom(reconnected), false);
     assert.equal((await subscribe(reconnected)).ok, true);
-    await sessions.revoke((await sessions.authenticate(cookie)).id);
-    rejected(await subscribe(second), 'UNAUTHENTICATED');
-    rejected(await ack(second, 'channel:unsubscribe', { channelId: channel.id }), 'UNAUTHENTICATED');
+    const ended = new Promise(resolve => second.once('disconnect', resolve));
+    await sessions.revoke((await sessions.authenticate(cookie)).id); await ended;
+    assert.equal(second.connected, false); assert.equal(hasRoom(second), false);
     const otherSession = await sessions.authenticate(otherCookie);
     await db.session.update({ where: { id: otherSession.id }, data: { expiresAt: new Date(0) } });
     rejected(await subscribe(outsider), 'UNAUTHENTICATED');

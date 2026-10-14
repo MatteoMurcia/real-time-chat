@@ -573,11 +573,13 @@ The workspace shows the signed-in identity, channel directory and live conversat
 Its Sign out button prevents duplicate submission and
 returns to login after confirmed logout (or 401 indicating no valid session).
 It clears the identity and expiry timer; an older in-flight `/me` response cannot
-restore the cleared identity. Network errors, 403 and timeouts retain local state
-and show a focused error with manual retry, never falsely claiming successful
-revocation. Other open tabs discover revocation on their next session check;
-immediate cross-tab logout notification is not implemented. Live message delivery
-checks recipient sessions; active disconnection remains task 3.4a.
+restore the cleared identity. Without confirmation of revocation, network errors,
+403 and timeouts retain local state and show a focused error with manual retry.
+The server closes every socket of a revoked or expired session and notifies its
+connected tabs to clear private state. Other sessions remain valid. Offline tabs
+discover revocation on reconnect. The tab performing logout lets its HTTP response
+finish before navigating so the cookie can be cleared. Live message delivery still
+checks recipient sessions if closure is delayed. See [session lifecycle](docs/local-development.md#session-lifecycle).
 
 The Playwright suite uses Chromium against a real Compose stack. It creates
 accounts, so use an isolated project and environment file. Copy `.env.example` to

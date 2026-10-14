@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { mock } from 'node:test';
 import type { INestApplication } from '@nestjs/common';
 import { io, type Socket } from 'socket.io-client';
 import { isApiError } from '@real-time-chat/contracts';
@@ -117,7 +118,10 @@ export async function verifyMessages(app: INestApplication, db: DatabaseService)
     rejected(await send(lost), 'FORBIDDEN');
     rejected(await send({ ...input, clientMessageId: randomUUID() }), 'FORBIDDEN');
     const current = await sessions.authenticate(cookies[1]);
-    await sessions.revoke(current.id);
+    // Keep this socket alive deliberately to verify the delivery filter even if active closure is delayed.
+    const serverReceiver = app.get(ChatGateway).server.of('/').sockets.get(receiver.id!)!;
+    const delayedClosure = mock.method(serverReceiver, 'disconnect', () => serverReceiver);
+    try { await sessions.revoke(current.id); } finally { delayedClosure.mock.restore(); }
     rejected(await send({ ...input, clientMessageId: randomUUID() }, receiver), 'UNAUTHENTICATED');
     const beforeRevokedDelivery = events.length;
     await channels.setMembership(users[2]!.id, channel.id, true);

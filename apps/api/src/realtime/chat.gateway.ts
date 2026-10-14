@@ -22,7 +22,7 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection {
     private readonly db: DatabaseService, private readonly access: ChannelAccessService, private readonly connections: ConnectionsService,
     private readonly messages: SendMessageService) {}
 
-  handleConnection(socket: Socket): void { this.connections.add(socket); }
+  handleConnection(socket: Socket): Promise<void> { return this.connections.add(socket); }
 
   @SubscribeMessage('message:send')
   async send(@ConnectedSocket() socket: Socket, @MessageBody() body: unknown): Promise<SendMessageAck> {
@@ -95,6 +95,7 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection {
         const session = await this.sessions.authenticate(socket.request.headers.cookie);
         socket.data.sessionId = session.id;
         socket.data.userId = session.user.id;
+        socket.data.expiresAt = session.expiresAt.getTime();
         next();
       } catch (error: unknown) {
         const unauthenticated = error instanceof UnauthorizedException;

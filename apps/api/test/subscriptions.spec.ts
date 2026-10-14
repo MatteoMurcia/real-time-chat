@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { ConnectionsService } from '../src/realtime/connections.service.js';
+import { EMPTY } from 'rxjs';
+import type { SessionService } from '../src/identity/session.service.js';
 
 test('channel coordination spans completion, allows other channels and releases after errors', async () => {
-  const connections = new ConnectionsService();
+  const connections = new ConnectionsService({ revoked: EMPTY } as unknown as SessionService);
   const order: string[] = [];
   let release!: () => void;
   const held = new Promise<void>(resolve => { release = resolve; });
