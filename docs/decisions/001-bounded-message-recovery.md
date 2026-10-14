@@ -58,8 +58,9 @@ tokens would require an explicit future contract. No schema or dependency change
 The application still targets one API instance. This endpoint does not itself
 schedule browser recovery or guarantee exactly-once delivery. Task 3.2b adds
 visible-channel orchestration; task 3.3a verifies initial snapshot/event ordering
-and obsolete selection cancellation. The deliberate commit-without-event
-demonstration remains in 3.3b.
+and obsolete selection cancellation. Task 3.3b verifies a committed row with
+server emission suppressed in integration and browser convergence with events
+dropped by a test transport proxy. Both keep the receiver connected.
 
 ## Evidence
 
