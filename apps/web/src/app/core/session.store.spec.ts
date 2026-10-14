@@ -86,6 +86,33 @@ it('times out a stalled restoration without retrying or treating it as a 401', (
 
 const csrfToken = `${'a'.repeat(64)}.1800000000.${'b'.repeat(64)}`;
 
+it('ends a remotely revoked session, cancels expiry and ignores an older restore response', () => {
+  vi.useFakeTimers(); const store = TestBed.inject(SessionStore), http = TestBed.inject(HttpTestingController);
+  store.restore().subscribe(); http.expectOne('/api/auth/me').flush(session());
+  store.restore().subscribe(); const stale = http.expectOne('/api/auth/me');
+  store.end(); stale.flush(session());
+  expect(store.session()).toBeNull(); expect(store.status()).toBe('anonymous'); expect(vi.getTimerCount()).toBe(0);
+});
+
+it.each([204, 503])('waits for its own logout response (%s) after the server confirms session end', status => {
+  vi.useFakeTimers(); const store = TestBed.inject(SessionStore), http = TestBed.inject(HttpTestingController);
+  store.restore().subscribe(); http.expectOne('/api/auth/me').flush(session());
+  const error = vi.fn(); store.logout().subscribe({ error });
+  http.expectOne('/api/auth/session/csrf').flush({ csrfToken }); const response = http.expectOne('/api/auth/logout');
+  store.end(); expect(store.session()).not.toBeNull(); expect(response.cancelled).toBe(false);
+  response.flush(null, { status, statusText: 'Result' });
+  expect(error).not.toHaveBeenCalled(); expect(store.status()).toBe('signed-out'); expect(store.session()).toBeNull();
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it('does not retain a confirmed ended session when a pending logout is cancelled', () => {
+  const store = TestBed.inject(SessionStore), http = TestBed.inject(HttpTestingController);
+  store.restore().subscribe(); http.expectOne('/api/auth/me').flush(session());
+  const subscription = store.logout().subscribe(); http.expectOne('/api/auth/session/csrf').flush({ csrfToken });
+  const response = http.expectOne('/api/auth/logout'); store.end(); subscription.unsubscribe();
+  expect(response.cancelled).toBe(true); expect(store.status()).toBe('signed-out'); expect(store.session()).toBeNull();
+});
+
 it('clears identity on confirmed logout and ignores an older restoration response', () => {
   vi.useFakeTimers();
   const store = TestBed.inject(SessionStore);

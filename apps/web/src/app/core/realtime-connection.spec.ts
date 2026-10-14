@@ -11,13 +11,14 @@ const fake = vi.hoisted(() => ({
 }));
 vi.mock('socket.io-client', () => ({ io: () => fake }));
 const session = signal<object | null>(null);
+const end = vi.fn(() => session.set(null));
 
 beforeEach(() => {
   vi.clearAllMocks(); fake.listeners.clear(); fake.active = false; session.set(null);
   fake.connected = false; fake.id = 'socket-1'; fake.timeout.mockReturnValue(fake);
   fake.on.mockImplementation((name: string, listener: (error?: unknown) => void) => fake.listeners.set(name, listener));
   fake.disconnect.mockImplementation(() => { fake.active = false; fake.connected = false; fake.listeners.get('disconnect')?.(); });
-  TestBed.configureTestingModule({ providers: [RealtimeConnection, { provide: SessionStore, useValue: { session } }] });
+  TestBed.configureTestingModule({ providers: [RealtimeConnection, { provide: SessionStore, useValue: { session, end } }] });
 });
 
 it('serializes room changes across channels and removes exactly the registered listener', async () => {
@@ -72,6 +73,21 @@ it('does not disconnect a replacement socket or replay room changes queued on th
   expect(fake.disconnect).not.toHaveBeenCalled(); expect(fake.emitWithAck).toHaveBeenCalledTimes(1);
 });
 afterEach(() => TestBed.resetTestingModule());
+
+it('clears identity on session end and keeps the terminal state through disconnect', () => {
+  session.set({}); const connection = TestBed.inject(RealtimeConnection); TestBed.tick();
+  fake.listeners.get('session:ended')?.(); fake.listeners.get('disconnect')?.(); TestBed.tick();
+  expect(end).toHaveBeenCalledOnce(); expect(session()).toBeNull(); expect(connection.status()).toBe('unauthenticated');
+  const attempts = fake.connect.mock.calls.length; connection.connect(); expect(fake.connect).toHaveBeenCalledTimes(attempts);
+});
+
+it('clears identity after a rejected reconnect but preserves it on transient transport failure', () => {
+  session.set({}); const connection = TestBed.inject(RealtimeConnection);
+  fake.active = true; fake.listeners.get('connect_error')?.(new Error('temporary'));
+  expect(end).not.toHaveBeenCalled(); expect(session()).not.toBeNull(); expect(connection.status()).toBe('reconnecting');
+  fake.listeners.get('connect_error')?.({ data: { code: 'UNAUTHENTICATED', message: 'Ended', requestId: '12345678-1234-4234-8234-123456789abc' } });
+  expect(end).toHaveBeenCalledOnce(); expect(session()).toBeNull(); expect(connection.status()).toBe('unauthenticated');
+});
 
 it('connects only with a session and cleans up when the session or workspace ends', () => {
   const connection = TestBed.inject(RealtimeConnection);

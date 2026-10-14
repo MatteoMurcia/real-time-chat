@@ -11,6 +11,7 @@ export class SessionStore {
   private readonly phase = signal<'unknown' | 'checking' | 'authenticated' | 'anonymous' | 'signed-out' | 'error'>('unknown');
   private revision = 0;
   private expiryTimer: ReturnType<typeof setTimeout> | undefined;
+  private logoutState: 'idle' | 'pending' | 'ended' = 'idle';
   readonly session = this.current.asReadonly();
   readonly status = this.phase.asReadonly();
 
@@ -21,11 +22,24 @@ export class SessionStore {
   }
 
   logout() {
-    return this.client.logout().pipe(
-      catchError((error: unknown) => error instanceof HttpErrorResponse && error.status === 401
-        ? of(undefined) : throwError(() => error)),
-      tap(() => { this.clear(); this.phase.set('signed-out'); }),
-    );
+    return defer(() => {
+      this.logoutState = 'pending';
+      return this.client.logout().pipe(
+        catchError((error: unknown) => this.logoutState === 'ended' || (error instanceof HttpErrorResponse && error.status === 401)
+          ? of(undefined) : throwError(() => error)),
+        tap(() => { this.clear(); this.phase.set('signed-out'); }),
+        finalize(() => {
+          if (this.logoutState === 'ended' && this.current()) { this.clear(); this.phase.set('signed-out'); }
+          this.logoutState = 'idle';
+        }),
+      );
+    });
+  }
+
+  end(): void {
+    // Let our logout response clear the HTTP-only cookie before navigation cancels its request.
+    if (this.logoutState !== 'idle') this.logoutState = 'ended';
+    else this.clear();
   }
 
   restore() {
