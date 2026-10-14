@@ -67,6 +67,18 @@ including across API restarts.
 
 ### Recovery lifecycle
 
+Opening a channel waits for its successful subscription acknowledgement before
+requesting the initial snapshot H. The message listener is already attached, so
+events received before that acknowledgement or while HTTP is in flight merge
+with the snapshot by canonical ID and sequence; loading never replaces live rows.
+The first recovery starts at H even if a newer event is already visible.
+
+Each selection invalidates earlier subscription callbacks and cancels history
+and recovery requests. Returning A-to-B-to-A starts a fresh A view: channel ID
+alone cannot identify the current selection. Old success/error callbacks must
+not replace its rows, cursors or authorization state. The connection serializes
+room changes so a delayed unsubscribe cannot overtake the new subscribe.
+
 The first history response seeds a separate `syncCursor` C; older-page cursors and
 the history snapshot remain unchanged by recovery. The store merges each validated
 sync page before advancing C, including a final empty page. Events and send acks
@@ -221,6 +233,19 @@ misreported as a successful retry. Recovery performs no second insert or retry
 loop. Rate limiting remains 4.1a.
 
 ## Migration and verification
+
+`chat.store.races.spec.ts` controls subscription acknowledgements and HTTP streams
+to verify events on both sides of H, A-to-B-to-A snapshots and errors, obsolete
+subscription results, and cancellation of a partially recovered interval. Removing
+the subscription revision guard makes the stale-selection regression fail.
+`e2e/channel-races.spec.ts` uses real authenticated sends and held HTTP responses:
+events render before snapshot capture and delivery, merge once, and continue after
+loading. It then releases old A/B snapshots after a fresh A snapshot and checks
+canonical IDs, the next recovery cursor and continued room delivery. No production
+fault flags, new runtime state or protocol changes were needed for task 3.3a.
+Cursor assertions read the real API response before forwarding it, avoiding
+Chromium response-body retention races. The channel test keeps one interceptor
+installed throughout the held requests; it does not suppress routing errors.
 
 `sync.service.spec.ts` checks fixed-H pagination, cancellation, timeout, invalid
 pages, sequence order and non-progressing responses. Store tests use controlled

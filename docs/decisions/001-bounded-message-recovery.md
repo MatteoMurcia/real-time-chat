@@ -57,8 +57,9 @@ tokens would require an explicit future contract. No schema or dependency change
 
 The application still targets one API instance. This endpoint does not itself
 schedule browser recovery or guarantee exactly-once delivery. Task 3.2b adds
-visible-channel orchestration; further initial-load races and commit-without-event
-demonstrations remain in 3.3a–3.3b.
+visible-channel orchestration; task 3.3a verifies initial snapshot/event ordering
+and obsolete selection cancellation. The deliberate commit-without-event
+demonstration remains in 3.3b.
 
 ## Evidence
 

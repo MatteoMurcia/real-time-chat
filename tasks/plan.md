@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-13 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b integrada mediante PR #30; CP2-C integrado mediante PR #31; 3.1a integrada mediante PR #32; 3.1b integrada mediante PR #33; CP3-A integrado mediante PR #34; 3.2a integrada mediante PR #35; 3.2b integrada mediante PR #36; CP3-B verificado, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
+Revisión: 3 · Actualización: 2026-10-14 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b integrada mediante PR #30; CP2-C integrado mediante PR #31; 3.1a integrada mediante PR #32; 3.1b integrada mediante PR #33; CP3-A integrado mediante PR #34; 3.2a integrada mediante PR #35; 3.2b integrada mediante PR #36; CP3-B integrado mediante PR #37; 3.3a verificada, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
 
 ## 1. Cómo usar este plan
 
@@ -540,13 +540,13 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
   - Verificar: unitarias de disparadores/cancelación con reloj controlado y E2E de reconexión.
   - Archivos: `apps/web/src/app/features/chat/sync.service.ts`, `sync.service.spec.ts`, store/plantilla/estilos chat, `e2e/reconnect.spec.ts`. Reutiliza el estado y la resuscripción del socket-client sin modificarlo.
 
-**Checkpoint CP3-B:** verificado sobre `fbe0623`; desconexión, 105 mensajes en tres páginas, reinicio de API y recuperación ordenada sin duplicados. [Informe](../docs/checkpoints/cp3-b.md). Pendiente de revisión y merge manual.
+**Checkpoint CP3-B:** verificado sobre `fbe0623`; desconexión, 105 mensajes en tres páginas, reinicio de API y recuperación ordenada sin duplicados. [Informe](../docs/checkpoints/cp3-b.md). Integrado mediante PR #37.
 
-- [ ] **3.3a — Resolver carreras de carga inicial y eventos** · M · Depende de: 3.2b, 2.4b.
+- [x] **3.3a — Resolver carreras de carga inicial y eventos** · M · Depende de: 3.2b, 2.4b. Verificada sobre la implementación existente; pendiente de revisión y merge manual.
   - Trabajo: implementar orden subscribe → snapshot H → merge y descarte de respuestas anteriores.
   - Aceptación: evento simultáneo con snapshot no desaparece; selección A→B→A no mezcla canales ni mueve cursores indebidamente.
   - Verificar: respuestas HTTP retardadas y eventos intercalados antes/durante/después de snapshot.
-  - Archivos: sync service, reducer, store chat, pruebas unitarias sync, `e2e/channel-races.spec.ts`.
+  - Archivos: `chat.store.races.spec.ts`, `e2e/channel-races.spec.ts`, documentación. Reutiliza store, reducer, clientes HTTP y serialización de suscripciones existentes sin cambios de ejecución.
 - [ ] **3.3b — Probar hueco entre commit y emisión** · M · Depende de: 3.3a.
   - Trabajo: pruebas de integración/E2E con supresión de emisión exclusiva de test; revisar orden y cursor al final.
   - Aceptación: un receptor conectado recupera el mensaje persistido sin evento; recuperación repetida no duplica.
@@ -1127,3 +1127,13 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Chromium contra Compose compilado: **15 E2E correctos en 1,5 minutos**. Navegador desconectado, 105 mensajes enviados desde otro cliente Socket.IO, reinicio de API y tres páginas recuperadas con IDs canónicos exactos; borrador conservado y error 503 recuperable mediante reintento.
 - [Informe CP3-B](../docs/checkpoints/cp3-b.md): garantías, evidencia y límites. Sin garantía de latencia, persistencia de estado del cliente, despliegue, carga o certificación multiinstancia/otros motores. CP0-C y CP1-C siguen pendientes.
 - Siguiente tarea tras revisión y merge manual: **3.3a — Resolver carreras de carga inicial y eventos**. La demostración específica de commit sin emisión queda en **3.3b**.
+### Evidencia 3.3a — Carreras de carga inicial y eventos (2026-10-14)
+
+- PR #37 integrada; rama `feature/3.3a-channel-load-races` desde `main` en `122a481`. Commits separados de pruebas unitarias, E2E y documentación. Merge reservado al usuario.
+- Revisados consumidores, orden de suscripción, snapshot bloqueado con H, merge del reducer, cancelaciones y revisiones de vista. La implementación previa ya cumple el alcance; no se añade estado, dependencia, contrato ni cambio de ejecución.
+- Cinco pruebas nuevas controlan ack de suscripción, eventos antes/durante/después del snapshot, respuestas y errores antiguos A→B→A y cancelación de una recuperación parcial. Verifican filas, olderCursor, snapshotCursor y C por separado.
+- Mutación de revisión: retirar temporalmente la comprobación de revisión del ack hace fallar **2 pruebas**, incluida la nueva de selección obsoleta. Restaurado el original: **79 pruebas Angular correctas** en 11 archivos.
+- E2E nuevo contra API real: eventos visibles antes de capturar H y mientras se retiene la respuesta; merge sin duplicados; vuelta A→B→A con respuestas antiguas retenidas, comparación de IDs, siguiente cursor de recuperación y recepción posterior. Fallos/demoras se inyectan solo en test.
+- Verificación local: lint y typecheck correctos; build/arranque Compose correctos; E2E enfocado correcto y suite completa de **16 E2E correctos**. CI de la PR vuelve a comprobar Quality y Containers.
+- Primera CI: Quality correcto; Containers detectó un error de lectura del cuerpo HTTP desde Chromium en el E2E previo de reconexión, con los otros 15 escenarios correctos. Se captura ahora el cursor desde la respuesta real antes de entregarla al navegador y se espera la recuperación inicial. El E2E de carreras usa un interceptor permanente para evitar conflictos con respuestas retenidas. Ambos escenarios pasan tres repeticiones locales por separado; ajuste en commit adicional, sin reintentos automáticos ni supresión de errores.
+- Límites: una instancia, Chromium y estado cliente en memoria. Sin certificación de carga, otros motores ni accesibilidad completa; CP0-C y CP1-C pendientes. El caso específico commit sin emisión corresponde a **3.3b**, siguiente tarea tras revisión y merge manual.
