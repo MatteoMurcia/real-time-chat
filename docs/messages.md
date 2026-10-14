@@ -234,6 +234,28 @@ loop. Rate limiting remains 4.1a.
 
 ## Migration and verification
 
+Task 3.3b separates server emission failure from browser delivery loss.
+`test/fixtures/message-emitter.ts` intercepts the selected message key on the
+integration server's existing sockets, before transport emission, and restores
+the methods in cleanup. `test/integration/commit-emission.ts` sends through the
+real gateway, independently reads the committed PostgreSQL row, and verifies
+that a second user's connected socket receives later messages but never that
+event. Authorized HTTP recovery restores the missing ID; writes between pages
+stay outside the fixed H, repeated reads retain canonical IDs, and retrying the
+original key neither inserts nor emits again. Removing the query's upper bound
+makes this regression fail. The fixture is excluded from the runtime image.
+
+`e2e/sync-gap.spec.ts` instead drops 105 already-emitted events in the browser's
+WebSocket test proxy, keeping the connection open. An HTTP barrier and a focus
+trigger control recovery. A later live message must not advance C past the gap;
+three pages recover through H while another live message arrives after H. The
+next recovery includes that newer message without adding a duplicate UI row;
+another recovery is empty. Exact IDs, query cursors and one WebSocket connection
+are checked. This E2E proves browser convergence after delivery loss, not server
+emission suppression; the integration test proves the latter. The existing store
+fake-clock tests separately cover the 15-second recovery trigger. No production
+fault switches, schema changes, outbox or exactly-once guarantee are introduced.
+
 `chat.store.races.spec.ts` controls subscription acknowledgements and HTTP streams
 to verify events on both sides of H, A-to-B-to-A snapshots and errors, obsolete
 subscription results, and cancellation of a partially recovered interval. Removing

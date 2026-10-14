@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-14 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b integrada mediante PR #30; CP2-C integrado mediante PR #31; 3.1a integrada mediante PR #32; 3.1b integrada mediante PR #33; CP3-A integrado mediante PR #34; 3.2a integrada mediante PR #35; 3.2b integrada mediante PR #36; CP3-B integrado mediante PR #37; 3.3a verificada, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
+Revisión: 3 · Actualización: 2026-10-14 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b integrada mediante PR #30; CP2-C integrado mediante PR #31; 3.1a integrada mediante PR #32; 3.1b integrada mediante PR #33; CP3-A integrado mediante PR #34; 3.2a integrada mediante PR #35; 3.2b integrada mediante PR #36; CP3-B integrado mediante PR #37; 3.3a integrada mediante PR #38; 3.3b verificada, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes.
 
 ## 1. Cómo usar este plan
 
@@ -542,16 +542,16 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
 
 **Checkpoint CP3-B:** verificado sobre `fbe0623`; desconexión, 105 mensajes en tres páginas, reinicio de API y recuperación ordenada sin duplicados. [Informe](../docs/checkpoints/cp3-b.md). Integrado mediante PR #37.
 
-- [x] **3.3a — Resolver carreras de carga inicial y eventos** · M · Depende de: 3.2b, 2.4b. Verificada sobre la implementación existente; pendiente de revisión y merge manual.
+- [x] **3.3a — Resolver carreras de carga inicial y eventos** · M · Depende de: 3.2b, 2.4b. Integrada mediante PR #38.
   - Trabajo: implementar orden subscribe → snapshot H → merge y descarte de respuestas anteriores.
   - Aceptación: evento simultáneo con snapshot no desaparece; selección A→B→A no mezcla canales ni mueve cursores indebidamente.
   - Verificar: respuestas HTTP retardadas y eventos intercalados antes/durante/después de snapshot.
   - Archivos: `chat.store.races.spec.ts`, `e2e/channel-races.spec.ts`, documentación. Reutiliza store, reducer, clientes HTTP y serialización de suscripciones existentes sin cambios de ejecución.
-- [ ] **3.3b — Probar hueco entre commit y emisión** · M · Depende de: 3.3a.
+- [x] **3.3b — Probar hueco entre commit y emisión** · M · Depende de: 3.3a. Verificada; pendiente de revisión y merge manual.
   - Trabajo: pruebas de integración/E2E con supresión de emisión exclusiva de test; revisar orden y cursor al final.
   - Aceptación: un receptor conectado recupera el mensaje persistido sin evento; recuperación repetida no duplica.
   - Verificar: prueba con reloj o disparador controlado y otra con tráfico concurrente hasta H; fixture no incluida en producción.
-  - Archivos: `apps/api/test/fixtures/message-emitter.ts`, `apps/api/test/commit-emission.spec.ts`, `e2e/sync-gap.spec.ts`, `playwright.config.ts`.
+  - Archivos: `apps/api/test/fixtures/message-emitter.ts`, `apps/api/test/integration/commit-emission.ts`, runner de integración existente, `e2e/sync-gap.spec.ts`, documentación. Sin cambios de configuración Playwright ni de ejecución de la aplicación.
 - [ ] **3.4a — Cerrar conexiones revocadas y caducadas** · M · Depende de: 1.2c, 2.2b, 3.2b.
   - Trabajo: índice sockets/sesión, temporizador de expiración y limpieza de estado cliente; comprobar permisos al reconectar y excluir sesiones revocadas/caducadas al distribuir eventos, aunque el temporizador se retrase. El filtro de sesión antes de emitir mensajes se adelantó en 2.3a; completar aquí desconexión activa y sus carreras.
   - Aceptación: logout desconecta todas las conexiones de esa sesión; una sesión idle caduca; otra sesión permanece válida.
@@ -1137,3 +1137,13 @@ Las decisiones y umbrales de este plan son propios del proyecto. Verificar APIs 
 - Verificación local: lint y typecheck correctos; build/arranque Compose correctos; E2E enfocado correcto y suite completa de **16 E2E correctos**. CI de la PR vuelve a comprobar Quality y Containers.
 - Primera CI: Quality correcto; Containers detectó un error de lectura del cuerpo HTTP desde Chromium en el E2E previo de reconexión, con los otros 15 escenarios correctos. Se captura ahora el cursor desde la respuesta real antes de entregarla al navegador y se espera la recuperación inicial. El E2E de carreras usa un interceptor permanente para evitar conflictos con respuestas retenidas. Ambos escenarios pasan tres repeticiones locales por separado; ajuste en commit adicional, sin reintentos automáticos ni supresión de errores.
 - Límites: una instancia, Chromium y estado cliente en memoria. Sin certificación de carga, otros motores ni accesibilidad completa; CP0-C y CP1-C pendientes. El caso específico commit sin emisión corresponde a **3.3b**, siguiente tarea tras revisión y merge manual.
+
+### Evidencia 3.3b — Hueco entre commit y emisión (2026-10-14)
+
+- PR #38 integrada; rama `test/3.3b-commit-emission-gap` desde `main` en `2c8eb40`. Commits separados de integración/fixture, E2E y documentación. Merge reservado al usuario.
+- Fixture exclusivamente de test: suprime antes del transporte las emisiones de una clave en los sockets del servidor de integración y restaura sus métodos en cleanup. Gateway, transacción, autorización y HTTP reales; PostgreSQL confirma independientemente la fila guardada.
+- Dos usuarios: el receptor permanece conectado y recibe eventos posteriores, pero no el suprimido. Recupera el hueco por HTTP; escrituras entre páginas no cambian H, la siguiente recuperación recoge lo posterior y la siguiente queda vacía. Reintentar la clave original conserva ID, seis filas y el contador de emisiones suprimidas.
+- E2E: un proxy WebSocket de test descarta 105 eventos ya emitidos, mientras el cliente conserva la conexión y recibe mensajes posteriores. Barrera HTTP/disparador focus controlan tres páginas hasta H; tráfico después de H aparece una sola vez y se confirma también por la siguiente recuperación. IDs y cursores comprobados, sin duplicados. Esta prueba cubre pérdida de entrega; la integración anterior cubre supresión de emisión en servidor. El temporizador de 15 segundos tiene cobertura previa con reloj controlado en el store.
+- Mutación: retirar temporalmente `lte: high` hace fallar dos subpruebas, incluida la nueva; también falla su resultado padre. Restaurado el original: **19 resultados de integración correctos** sobre PostgreSQL aislado. Sin cambios permanentes en código de aplicación.
+- Lint/typecheck y build/arranque Compose correctos. E2E enfocado correcto; suite completa: **17 E2E correctos**. La imagen runtime no contiene directorios de test, dist-test ni fixtures; exclusión comprobada dentro del contenedor y en tsconfig/Dockerfile.
+- Límites: no se mata el proceso en el instante exacto del commit; se suprime la emisión de forma determinista. Una instancia y Chromium, sin garantía exactly-once, latencia, carga ni auditoría completa de accesibilidad. CP0-C y CP1-C pendientes. Siguiente tarea tras revisión y merge manual: **3.4a — Cerrar conexiones revocadas y caducadas**.
