@@ -211,9 +211,9 @@ requires membership but not subscription; only subscribed sockets receive events
 The queue spans commit and emission, sharing the ordering of join/leave/subscribe.
 Success and events occur only after commit. Recipients are checked against live
 session records in one query before emission. Revoked/expired sessions are excluded
-and sockets must still occupy the room. This advances the delivery filter from
-3.4a because messages now carry content; active disconnection and timers remain
-in that task. Already transmitted events cannot be recalled.
+and sockets must still occupy the room. This filter remains necessary when active
+session closure is delayed; see [session lifecycle](local-development.md#session-lifecycle).
+Already transmitted events cannot be recalled.
 
 Delivery is best-effort. A crash or delivery-check failure after commit can leave
 a stored message without an event or successful ack. Timeout does not prove

@@ -131,11 +131,36 @@ environment/config output containing database credentials.
 - **Namespace rejection after a transient database error:** retry the connection
   using the workspace button. No internal exception details are shown.
 
-No chat events, channels or message replay are implemented here. Authentication
-at connection time does not authorize future operations. Server-side closure of
-already-open sockets on expiry/revocation remains in 3.4a; local logout or leaving
-the workspace closes this browser's socket now. Connection-state recovery is not
-enabled, and cross-instance coordination is not part of this single-instance task.
+Authentication at connection time does not authorize future operations. Channels,
+messages and bounded HTTP recovery have their own permission checks. Socket.IO
+connection-state recovery is not enabled; coordination supports one API instance.
+
+## Session lifecycle
+
+The server indexes sockets by session and uses one absolute-expiry timer per
+connected session. Logout emits revocation only after the database deletion,
+then closes every socket of that session. Other sessions of the same user remain
+connected. Idle sockets also expire without sending another command. The last
+disconnect clears its timer; module shutdown clears all timers and the local
+revocation subscription.
+
+Registration indexes the socket before a second database authentication: logout
+before indexing is caught by the read, and logout afterwards by the notification.
+A stale authentication result cannot reopen a disconnected socket. A database
+failure closes the transport without claiming that the session was revoked.
+
+Before closing an ended session, the server emits `session:ended` without a
+payload. The browser clears identity, conversation and drafts and returns to
+login. An authenticated handshake rejection after reconnect does the same.
+The tab performing logout waits for its HTTP response to clear the HttpOnly
+cookie before navigation; a received ended notification confirms revocation even
+if that response fails. If both signals are lost, the existing error/retry path
+remains available. Transient connection failures retain identity for retry.
+
+Session timers and revocation notifications are process-local; distribute both
+before adding API instances. A blocked event loop can delay closure, so commands
+and message delivery still validate sessions independently. Already transmitted
+events and accepted in-flight operations cannot be retracted by closing a socket.
 
 Implementation references: [Nest gateways](https://docs.nestjs.com/websockets/gateways),
 [Socket.IO middleware](https://socket.io/docs/v4/middlewares/),

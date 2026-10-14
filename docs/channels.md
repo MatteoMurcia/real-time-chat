@@ -111,7 +111,8 @@ must also be distributed before scaling. Do not add an asynchronous adapter with
 revisiting the room-change boundary. Future channel broadcasts must participate
 in this ordering; a room is never a substitute for permission checks.
 
-Immediate logout disconnection and idle-session expiry remain task 3.4a.
+Logout closes all sockets of that session, and a session timer closes idle sockets
+at expiry; see [session lifecycle](local-development.md#session-lifecycle).
 Operations reject invalid sessions, and message delivery filters revoked/expired
 recipients before emission. See the official
 [Socket.IO room lifecycle](https://socket.io/docs/v4/rooms/).
