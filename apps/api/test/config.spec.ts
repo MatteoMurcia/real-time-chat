@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { loadConfig } from '../src/config.js';
+import { loadConfig, defaultTrafficLimits, normalizeIp } from '../src/config.js';
 
 const databaseUrl = 'postgresql://test:example@127.0.0.1:5432/chat_test';
 
@@ -12,7 +12,20 @@ test('loads a valid configuration with a loopback host by default', () => {
     databaseUrl,
     appOrigin: 'http://127.0.0.1:8080',
     sessionTtlSeconds: 86400,
+    trafficLimits: defaultTrafficLimits,
+    trustedProxyIps: [],
   });
+});
+
+test('validates traffic thresholds and trusts only explicitly named proxy IP addresses', () => {
+  const env = { NODE_ENV: 'test', PORT: '3000', DATABASE_URL: databaseUrl };
+  for (const name of ['SEND_LIMIT', 'LOGIN_LIMIT', 'REGISTER_LIMIT', 'CHANNEL_CREATE_LIMIT', 'SESSION_CONNECTION_LIMIT']) {
+    for (const value of ['', '0', '-1', '1.1', '1e3', '1001']) assert.throws(() => loadConfig({ ...env, [name]: value }), new RegExp(name));
+  }
+  assert.equal(loadConfig({ ...env, SEND_LIMIT: '1000' }).trafficLimits.send, 1000);
+  assert.deepEqual(loadConfig({ ...env, TRUSTED_PROXY_IPS: '::ffff:127.0.0.1, ::1' }).trustedProxyIps, ['127.0.0.1', '::1']);
+  for (const value of ['true', '1', '*', 'uniquelocal', '172.29.0.0/24', '127.0.0.1,']) assert.throws(() => loadConfig({ ...env, TRUSTED_PROXY_IPS: value }), /TRUSTED_PROXY_IPS/);
+  assert.equal(normalizeIp('::ffff:192.0.2.1'), '192.0.2.1');
 });
 
 test('bounds the configurable absolute session lifetime', () => {
