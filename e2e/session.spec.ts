@@ -150,9 +150,18 @@ test('logs out once, handles failure, rejects the old cookie and preserves anoth
   } finally { await other.close(); }
 });
 
-test('recovers when logout commits but its response never reaches the browser', async ({ page, context }) => {
+test('recovers when logout commits but its response and session-ended notification are lost', async ({ page, context }) => {
   const email = `lost-logout-${randomUUID()}@example.test`;
   const password = 'a unique lost response passphrase';
+  let upgraded = false, dropped = 0;
+  await page.routeWebSocket('**/socket.io/**', socket => {
+    const server = socket.connectToServer();
+    socket.onMessage(frame => { if (frame === '5') upgraded = true; server.send(frame); });
+    server.onMessage(frame => {
+      if (frame === '42["session:ended"]') { dropped++; return; }
+      socket.send(frame);
+    });
+  });
   await page.goto('/register');
   await page.getByLabel('Display name', { exact: true }).fill('Lost Response');
   await page.getByLabel('Email address', { exact: true }).fill(email);
@@ -165,6 +174,7 @@ test('recovers when logout commits but its response never reaches the browser', 
   await expect(page).toHaveURL(/\/workspace$/);
   const oldCookie = (await context.cookies()).find(cookie => cookie.name === 'chat_session')!;
   let attempts = 0;
+  await expect.poll(() => upgraded).toBe(true);
   await page.route('**/api/auth/logout', async route => {
     attempts++;
     const response = await route.fetch({ maxRedirects: 0, maxRetries: 0 });
@@ -181,6 +191,7 @@ test('recovers when logout commits but its response never reaches the browser', 
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(page).toHaveURL(/\/login\?reason=signed-out$/);
   expect(attempts).toBe(1);
+  expect(dropped).toBe(1);
   await expect(page.getByRole('heading', { name: 'Welcome, Lost Response' })).toHaveCount(0);
   await page.reload();
   await page.getByRole('link', { name: 'Try opening your workspace' }).click();
