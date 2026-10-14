@@ -46,7 +46,8 @@ instruction. Fixtures and `dist-test` are absent from the runtime API image.
 Host toolchain: Node **24.21.0**, npm **12.1.0** on Windows/PowerShell.
 Fresh PostgreSQL **18.6**, database `cp3c_test`, Compose project `chat-e2e`,
 compiled application at `http://localhost:18083`. Initial port/project collision
-checks passed. Temporary credentials live only in ignored `.git/cp3c.env`.
+checks passed. Temporary credentials were kept in ignored `.git/cp3c.env`
+and removed after final review.
 Integration finished before E2E; neither suite ran concurrently against the
 database. All following results were run for this checkpoint, not inherited
 from 3.4a or counted from Docker's cached stages.
@@ -69,12 +70,17 @@ from 3.4a or counted from Docker's cached stages.
 The full E2E suite recreates all four containers while retaining the isolated
 volume, verifies accounts/session and message ID after recreation, then restarts
 the API again for recovery. Its final stack uses `compose.yaml` without the host
-database override, so PostgreSQL is no longer exposed on port 15491. The healthy
-isolated stack is retained temporarily for final reviewer inspection; cleanup
-will be recorded before PR creation. The primary
+database override. After independent review, the isolated stack, its volume and
+temporary environment file were removed (`cleanup.log`). The primary
 `real-time-chat_postgres_data` volume and root `.env` were not modified.
 Local logs are ignored, not shipped with the checkpoint. GitHub Quality and
 Containers checks for the checkpoint PR remain to be run after PR creation.
+
+The parent agent independently reviewed the message, recovery and session paths,
+the test fixtures, final documentation diff and execution logs before creating
+the PR. No blocking defect was identified. The review clarified which
+authentication read is the post-registration recheck and confirmed cleanup of
+the isolated environment. No runtime change was needed.
 
 ## Remaining scope and limits
 
