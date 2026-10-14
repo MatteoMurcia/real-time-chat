@@ -30,10 +30,18 @@ test('recovers three missed pages after disconnect and API restart, then retries
   try {
     await new Promise<void>((resolve, reject) => { sender.once('connect', resolve); sender.once('connect_error', reject); sender.connect(); });
     await page.getByRole('button', { name: 'Refresh channels', exact: true }).click();
+    let initialCursor = '';
+    // Buffer the real response before forwarding it; Chromium may discard its protocol body.
+    await page.route(`**/api/channels/${channel.id}/messages/sync?*`, async route => {
+      const response = await route.fetch(); initialCursor = (await response.json()).nextCursor;
+      await route.fulfill({ response });
+    }, { times: 1 });
     const initialResponse = page.waitForResponse(response => response.url().includes('/messages/sync?') && response.status() === 200);
     await page.getByRole('button', { name: `Open chat ${name}`, exact: true }).click();
-    const initial = await (await initialResponse).json();
+    await initialResponse;
     await expect(page.getByText('No messages yet. Say hello.', { exact: true })).toBeVisible();
+    await expect(page.getByText('Recovering missed messages…', { exact: true })).toHaveCount(0);
+    expect(initialCursor).not.toBe('');
     await expect.poll(() => !!connection).toBe(true);
     await context.setOffline(true); await connection!.close({ code: 1001, reason: 'Test network interruption' });
     await expect(page.getByText('Connection interrupted. Reconnecting…', { exact: true })).toBeVisible();
@@ -54,7 +62,7 @@ test('recovers three missed pages after disconnect and API restart, then retries
     await expect(rows).toHaveCount(105, { timeout: 20000 });
     expect(await rows.evaluateAll(elements => elements.map(element => element.getAttribute('data-message-id')))).toEqual(ids);
     await expect(page.getByLabel('Message', { exact: true })).toHaveValue('Draft survives recovery');
-    expect(requests[0]?.searchParams.get('after')).toBe(initial.nextCursor);
+    expect(requests[0]?.searchParams.get('after')).toBe(initialCursor);
     const bounded = requests.filter(request => request.searchParams.has('until'));
     expect(bounded).toHaveLength(2);
     expect(bounded[0]!.searchParams.get('until')).toBe(bounded[1]!.searchParams.get('until'));

@@ -243,6 +243,9 @@ events render before snapshot capture and delivery, merge once, and continue aft
 loading. It then releases old A/B snapshots after a fresh A snapshot and checks
 canonical IDs, the next recovery cursor and continued room delivery. No production
 fault flags, new runtime state or protocol changes were needed for task 3.3a.
+Cursor assertions read the real API response before forwarding it, avoiding
+Chromium response-body retention races. The channel test keeps one interceptor
+installed throughout the held requests; it does not suppress routing errors.
 
 `sync.service.spec.ts` checks fixed-H pagination, cancellation, timeout, invalid
 pages, sequence order and non-progressing responses. Store tests use controlled

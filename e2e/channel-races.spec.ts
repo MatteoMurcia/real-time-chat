@@ -37,15 +37,12 @@ test('merges events around the initial snapshot and ignores retained A/B respons
     await expect.poll(() => rows.evaluateAll(elements => elements.map(element => element.getAttribute('data-message-id')))).toEqual(ids);
   };
   const gates: (() => void)[] = [];
-  const holdSnapshot = async (channelId: string) => {
+  const held = new Map<string, { capture: (cursor: string) => void; released: Promise<void>; finish: () => void }>();
+  const snapshots = new Map<string, string>();
+  const holdSnapshot = (channelId: string) => {
     const captured = Promise.withResolvers<string>(), released = Promise.withResolvers<void>(), finished = Promise.withResolvers<void>();
     gates.push(() => released.resolve());
-    await page.route(`**/api/channels/${channelId}/messages`, async route => {
-      const response = await route.fetch();
-      captured.resolve((await response.json()).snapshotCursor);
-      await released.promise;
-      try { await route.fulfill({ response }); } finally { finished.resolve(); }
-    }, { times: 1 });
+    held.set(channelId, { capture: captured.resolve, released: released.promise, finish: finished.resolve });
     return { captured: captured.promise, release: async () => { released.resolve(); await finished.promise; } };
   };
   try {
@@ -53,36 +50,45 @@ test('merges events around the initial snapshot and ignores retained A/B respons
     const ids = [await send(a.id, 'Before opening A')];
     await send(b.id, 'Only in B');
     await page.getByRole('button', { name: 'Refresh channels', exact: true }).click();
-    let initialH = '';
-    await page.route(`**/api/channels/${a.id}/messages`, async route => {
-      ids.push(await send(a.id, 'Event before snapshot capture'));
-      await expectIds([ids[1]!]);
-      const response = await route.fetch(); initialH = (await response.json()).snapshotCursor;
-      ids.push(await send(a.id, 'Event while snapshot response is held'));
-      await expectIds(ids.slice(1));
-      await route.fulfill({ response });
-    }, { times: 1 });
+    let initial = true;
+    // Keep one interceptor installed while cancelled requests are still held.
+    await page.route(/\/api\/channels\/[^/]+\/messages$/, async route => {
+      const channelId = new URL(route.request().url()).pathname.split('/')[3]!;
+      const gate = held.get(channelId); held.delete(channelId);
+      const first = initial; initial = false;
+      if (first) {
+        ids.push(await send(a.id, 'Event before snapshot capture'));
+        await expectIds([ids[1]!]);
+      }
+      const response = await route.fetch(), cursor = (await response.json()).snapshotCursor;
+      snapshots.set(channelId, cursor);
+      if (first) {
+        ids.push(await send(a.id, 'Event while snapshot response is held'));
+        await expectIds(ids.slice(1));
+      }
+      if (gate) { gate.capture(cursor); await gate.released; }
+      try { await route.fulfill({ response }); } finally { gate?.finish(); }
+    });
     const firstSync = page.waitForResponse(response => response.url().includes(`/channels/${a.id}/messages/sync?`) && response.status() === 200);
     await page.getByRole('button', { name: `Open chat ${a.name}`, exact: true }).click();
     await firstSync; await expectIds(ids);
-    expect(syncRequests[0]!.searchParams.get('after')).toBe(initialH);
+    expect(syncRequests[0]!.searchParams.get('after')).toBe(snapshots.get(a.id));
     ids.push(await send(a.id, 'Event after snapshot merge')); await expectIds(ids);
     await page.getByRole('button', { name: 'Close conversation', exact: true }).click();
     await expect(page.getByRole('log', { name: 'Conversation messages' })).toHaveCount(0);
 
-    const oldA = await holdSnapshot(a.id);
+    const oldA = holdSnapshot(a.id);
     await page.getByRole('button', { name: `Open chat ${a.name}`, exact: true }).click();
     const obsoleteH = await oldA.captured;
-    const oldB = await holdSnapshot(b.id);
+    const oldB = holdSnapshot(b.id);
     await page.getByRole('button', { name: `Open chat ${b.name}`, exact: true }).click();
     await oldB.captured;
     ids.push(await send(a.id, 'Committed between the two A snapshots'));
-    const freshSnapshot = page.waitForResponse(response => new URL(response.url()).pathname === `/api/channels/${a.id}/messages` && response.status() === 200);
     const freshSync = page.waitForResponse(response => response.url().includes(`/channels/${a.id}/messages/sync?`) && response.status() === 200);
     await page.getByRole('button', { name: `Open chat ${a.name}`, exact: true }).click();
-    const freshH = (await (await freshSnapshot).json()).snapshotCursor;
-    expect(freshH).not.toBe(obsoleteH);
     await freshSync; await expectIds(ids);
+    const freshH = snapshots.get(a.id);
+    expect(freshH).toBeTruthy(); expect(freshH).not.toBe(obsoleteH);
     await oldB.release(); await oldA.release();
     await expect(page.getByText('Recovering missed messages…', { exact: true })).toHaveCount(0);
     const afterStale = page.waitForRequest(request => new URL(request.url()).pathname === `/api/channels/${a.id}/messages/sync`);
