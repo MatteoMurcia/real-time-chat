@@ -9,7 +9,7 @@ import { SessionStore } from './session.store';
 export class RealtimeConnection {
   private readonly sessions = inject(SessionStore);
   private readonly socket = io({ path: '/socket.io', autoConnect: false, transports: ['polling', 'websocket'], timeout: 5000 });
-  private readonly phase = signal<'connecting' | 'connected' | 'reconnecting' | 'unavailable' | 'unauthenticated' | 'disconnected'>('disconnected');
+  private readonly phase = signal<'connecting' | 'connected' | 'reconnecting' | 'unavailable' | 'unauthenticated' | 'disconnected' | 'rate-limited'>('disconnected');
   readonly status = this.phase.asReadonly();
   private subscriptions: Promise<unknown> = Promise.resolve();
 
@@ -51,6 +51,7 @@ export class RealtimeConnection {
       if (isApiError(error.data) && error.data.code === 'UNAUTHENTICATED') {
         this.phase.set('unauthenticated'); this.sessions.end();
       }
+      else if (isApiError(error.data) && error.data.code === 'RATE_LIMITED') this.phase.set('rate-limited');
       else this.phase.set(this.socket.active ? 'reconnecting' : 'unavailable');
     });
     effect(onCleanup => {

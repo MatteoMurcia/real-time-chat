@@ -74,6 +74,14 @@ it('does not disconnect a replacement socket or replay room changes queued on th
 });
 afterEach(() => TestBed.resetTestingModule());
 
+it('keeps a session after the socket quota rejects connection and permits manual retry', () => {
+  session.set({}); const connection = TestBed.inject(RealtimeConnection); TestBed.tick();
+  fake.listeners.get('connect_error')?.({ data: { code: 'RATE_LIMITED', message: 'private', requestId: '12345678-1234-4234-8234-123456789abc' } });
+  expect(connection.status()).toBe('rate-limited'); expect(end).not.toHaveBeenCalled();
+  const previous = fake.connect.mock.calls.length; connection.connect();
+  expect(fake.connect).toHaveBeenCalledTimes(previous + 1); expect(connection.status()).toBe('connecting');
+});
+
 it('clears identity on session end and keeps the terminal state through disconnect', () => {
   session.set({}); const connection = TestBed.inject(RealtimeConnection); TestBed.tick();
   fake.listeners.get('session:ended')?.(); fake.listeners.get('disconnect')?.(); TestBed.tick();

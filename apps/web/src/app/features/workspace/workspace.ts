@@ -18,7 +18,7 @@ import type { PublicChannel } from '@real-time-chat/contracts/channels';
       <h1 tabindex="-1">Welcome, {{ current.user.displayName }}</h1>
       <p>Signed in as {{ current.user.email }}.</p>
       <p role="status" aria-live="polite">{{ connectionLabels[connection.status()] }}</p>
-      @if (connection.status() === 'unavailable' || connection.status() === 'disconnected') {
+      @if (connection.status() === 'unavailable' || connection.status() === 'disconnected' || connection.status() === 'rate-limited') {
         <button type="button" (click)="connection.connect()">Retry connection</button>
       }
       @if (connection.status() === 'unauthenticated') { <p><a routerLink="/login">Sign in again</a></p> }
@@ -38,6 +38,7 @@ export class Workspace {
     connecting: 'Connecting to live updates…', connected: 'Live connection established.',
     reconnecting: 'Connection interrupted. Reconnecting…', unavailable: 'Live connection unavailable. Try again.',
     unauthenticated: 'Your session is no longer valid. Sign in again.', disconnected: 'Live connection closed.',
+    'rate-limited': 'Too many live connections for this session. Close another tab, then retry.',
   };
   protected readonly sessions = inject(SessionStore);
   private readonly router = inject(Router);
