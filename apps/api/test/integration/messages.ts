@@ -25,7 +25,9 @@ export async function verifyMessages(app: INestApplication, db: DatabaseService)
     for (const user of users) {
       const cookie = (await sessions.login({ email: user.email, password })).cookie.split(';')[0]!;
       cookies.push(cookie);
-      const socket = io(endpoint, { autoConnect: false, reconnection: false, timeout: 3000, transports: ['websocket'], extraHeaders: { origin: 'http://127.0.0.1:8080', cookie } });
+      const socket = io(endpoint, { autoConnect: false, reconnection: false, timeout: 3000, transports: ['websocket'],
+        auth: { userId: users[1]!.id, authorId: users[1]!.id }, query: { userId: users[1]!.id },
+        extraHeaders: { origin: 'http://127.0.0.1:8080', cookie } });
       sockets.push(socket);
       await new Promise<void>((resolve, reject) => { socket.once('connect', resolve); socket.once('connect_error', reject); socket.connect(); });
     }
@@ -41,12 +43,13 @@ export async function verifyMessages(app: INestApplication, db: DatabaseService)
     const flush = async () => { await receiver.timeout(3000).emitWithAck('channel:subscribe', { channelId: channel.id }); };
     rejected(await send(input, outsider), 'FORBIDDEN');
     rejected(await send({ ...input, authorId: users[1]!.id }), 'VALIDATION_ERROR');
+    assert.equal(await db.message.count({ where: { channelId: channel.id } }), 0);
     const replies = (await Promise.all(Array.from({ length: 10 }, () => send()))).map(accepted);
     assert.ok(replies.every(message => message.id === replies[0]!.id));
     assert.equal(replies[0]!.sequence, '1'); assert.equal(replies[0]!.body, input.body);
     assert.deepEqual(replies[0]!.author, { id: users[0]!.id, displayName: users[0]!.displayName });
     assert.deepEqual(Object.keys(replies[0]!).sort(), ['author', 'body', 'channelId', 'clientMessageId', 'createdAt', 'id', 'sequence']);
-    assert.ok(await db.message.findUnique({ where: { id: replies[0]!.id } }));
+    assert.equal((await db.message.findUniqueOrThrow({ where: { id: replies[0]!.id } })).authorId, users[0]!.id);
     await flush(); assert.deepEqual(events, [replies[0]]); assert.deepEqual(outsideEvents, []);
     rejected(await send({ ...input, body: 'changed content' }), 'CONFLICT');
     const ordered = (await Promise.all(Array.from({ length: 5 }, (_, i) => send({ ...input, clientMessageId: randomUUID(), body: `Ordered ${i}` })))).map(accepted);

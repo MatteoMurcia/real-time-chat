@@ -40,6 +40,11 @@ export async function verifyMessageSync(app: INestApplication, db: DatabaseServi
       await tx.channel.update({ where: { id: channel.id }, data: { lastSequence: 105n } });
     });
     const first = await page(zero); assert.equal(first.items.length, 50); assert.equal(first.until, cursor(105n));
+    for (const after of [first.nextCursor, cursor(104n)]) {
+      const denied = await get(`after=${after}&until=${first.until}`, channel.id, otherCookie);
+      assert.equal(denied.status, 403);
+      assert.ok(!(await denied.text()).includes('Sync 105'));
+    }
     assert.equal(first.nextCursor, cursor(50n)); assert.equal(first.hasMore, true);
     const all = [...first.items]; let current = first, pages = 1;
     while (current.hasMore) {
