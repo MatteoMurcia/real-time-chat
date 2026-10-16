@@ -36,11 +36,19 @@ up --build --watch`. Both Angular proxy configurations forward `/socket.io/` wit
 WebSocket support. Host Angular uses `proxy.conf.json` and needs
 `APP_ORIGIN=http://127.0.0.1:4200` on the API; container Angular uses
 `proxy.docker.json` and the same configured public origin as Nginx.
+The development override disables API proxy trust because Angular can forward
+client-supplied headers. Development login/registration quotas group by peer;
+base Nginx instead overwrites forwarded headers and uses an explicitly trusted
+static IP. See [traffic limits and proxy configuration](traffic-limits.md).
 
 ## Verify restart in an isolated stack
 
 Copy `.env.example` to `.env.e2e`, use a new private database password and set
-`WEB_PORT=18083`, `APP_ORIGIN=http://localhost:18083`. Run:
+`WEB_PORT=18083`, `APP_ORIGIN=http://localhost:18083`,
+`BACKEND_SUBNET=172.29.41.0/24` and `PROXY_IP=172.29.41.254`. For the full E2E
+suite set `SEND_LIMIT`, `LOGIN_LIMIT`, `REGISTER_LIMIT` and `CHANNEL_CREATE_LIMIT`
+to 1000 in this disposable environment only. Recovery fixtures send over 100
+messages; default quotas are tested separately by API integration. Run:
 
 ```text
 docker compose -p chat-e2e --env-file .env.e2e up --build --wait
@@ -94,7 +102,8 @@ starting existing images does not need Node/npm on the host.
 
 To check a second empty database without deleting existing data, copy the test
 environment to `.env.fresh`, choose another unused web port (for example 18084)
-and matching `APP_ORIGIN=http://localhost:18084`, then use a new project name:
+and matching `APP_ORIGIN=http://localhost:18084`. Also choose a different
+`BACKEND_SUBNET=172.29.42.0/24` and `PROXY_IP=172.29.42.254`, then use a new project name:
 
 ```text
 docker compose -p chat-fresh --env-file .env.fresh -f compose.yaml up --build --wait

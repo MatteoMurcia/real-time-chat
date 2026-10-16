@@ -26,6 +26,8 @@ unconfirmed response. Socket subscriptions require current membership; leaving
 removes all of the user's subscriptions to that channel before the HTTP response.
 The API persists messages with per-channel ordering and retry deduplication,
 then acknowledges and emits them after commit. See [message contracts and limits](docs/messages.md).
+HTTP and socket operations enforce [traffic and input limits](docs/traffic-limits.md),
+including shared user send budgets and explicit proxy trust.
 Members can open a live conversation, exchange plain text with author/time and
 confirmation, and retry unconfirmed sends without changing their keys. The UI
 retries once automatically after five seconds without confirmation, then offers
@@ -486,8 +488,9 @@ Secure and the `__Host-` prefix. The signing key lives in one API process, so
 restart requires a fresh bootstrap. Multiple API replicas require shared key
 management; authenticated session binding belongs to the session task, following
 the [OWASP CSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html).
-Host/forwarded headers do not determine the trusted origin. Rate limiting remains
-in task 4.1a. Database uniqueness resolves concurrent duplicate registrations.
+Host/forwarded headers do not determine the trusted origin. Registration uses a
+per-IP attempt budget; see [traffic limits](docs/traffic-limits.md).
+Database uniqueness resolves concurrent duplicate registrations.
 
 Integration tests exercise these endpoints against real PostgreSQL, including
 concurrent duplicates, invalid fields, malformed/oversized JSON, CSRF failures,
@@ -543,7 +546,8 @@ After deletion, `SessionService.revoked` emits `{ sessionId }` locally, once per
 deleted row. This is the hook for later socket disconnection, not a durable or
 cross-process event bus. CSRF signing keys are process-local: restart requires a
 fresh token, and multiple API instances need shared signing configuration before
-deployment. Other sessions are not revoked on login. Rate limiting remains in task 4.1a.
+deployment. Other sessions are not revoked on login. Login attempts share a
+per-IP budget; see [traffic limits](docs/traffic-limits.md).
 The design follows [OWASP session management guidance](https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html)
 for random session identifiers, cookie controls and server-side expiry; it does
 not claim to implement every recommended control at this stage.
@@ -584,7 +588,12 @@ checks recipient sessions if closure is delayed. See [session lifecycle](docs/lo
 The Playwright suite uses Chromium against a real Compose stack. It creates
 accounts, so use an isolated project and environment file. Copy `.env.example` to
 `.env.e2e`, set a private password, `WEB_PORT=18083` and
-`APP_ORIGIN=http://127.0.0.1:18083`, then run:
+`APP_ORIGIN=http://127.0.0.1:18083`. Use `BACKEND_SUBNET=172.29.41.0/24` and
+`PROXY_IP=172.29.41.254` to avoid the ordinary stack's subnet. Set `SEND_LIMIT`,
+`LOGIN_LIMIT`, `REGISTER_LIMIT` and `CHANNEL_CREATE_LIMIT` to 1000 only in this
+isolated fixture environment: recovery tests deliberately send over 100 messages
+and the suite creates many accounts on one IP. The API integration suite separately
+checks the real default quotas. Then run:
 
 ```text
 docker compose -p chat-e2e --env-file .env.e2e up --build --wait
