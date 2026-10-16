@@ -8,6 +8,7 @@ import { setTimeout } from 'node:timers/promises';
 test('real Nginx logs retain diagnostics without request credentials, including upstream failures', { timeout: 60000 }, async () => {
   const name = `chat-nginx-logs-${randomUUID()}`;
   const canary = randomUUID();
+  const methodCanary = `PROBE${canary.replaceAll('-', '').replace(/[0-9]/g, digit => String.fromCharCode(71 + Number(digit))).toUpperCase()}`;
   const docker = (...args) => {
     const result = spawnSync('docker', args, { encoding: 'utf8', timeout: 30000 });
     assert.equal(result.status, 0, `Docker ${args[0]} must succeed`);
@@ -38,12 +39,16 @@ test('real Nginx logs retain diagnostics without request credentials, including 
     });
     assert.equal(failure.status, 502);
     await failure.arrayBuffer();
+    const unknownMethod = await fetch(`${base}/index.html`, { method: methodCanary });
+    assert.equal(unknownMethod.status, 405);
+    await unknownMethod.arrayBuffer();
     docker('stop', '--time', '1', name);
     const logs = spawnSync('docker', ['logs', name], { encoding: 'utf8', timeout: 10000 });
     assert.equal(logs.status, 0);
-    assert.equal(`${logs.stdout}${logs.stderr}`.includes(canary), false, 'Request credentials must be absent from stdout and stderr');
+    assert.equal([canary, methodCanary].some(value => `${logs.stdout}${logs.stderr}`.includes(value)), false, 'Request credentials must be absent from stdout and stderr');
     const rows = logs.stdout.trim().split('\n').map(line => JSON.parse(line));
-    assert.deepEqual(rows.map(row => row.status), ['200', '502']);
+    assert.deepEqual(rows.map(row => row.status), ['200', '502', '405']);
+    assert.equal(rows[2].method, 'OTHER');
     for (const row of rows) {
       assert.deepEqual(Object.keys(row).sort(), ['method', 'requestId', 'requestTime', 'status', 'upstreamStatus', 'upstreamTime']);
       assert.match(row.requestId, /^[a-f0-9]{32}$/);
