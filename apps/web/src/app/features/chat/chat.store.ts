@@ -201,7 +201,7 @@ export class ChatStore {
       else if (!current()) return;
       else if (ack?.ok === false && isApiError(ack.error)) {
         if (['FORBIDDEN', 'UNAUTHENTICATED', 'NOT_FOUND'].includes(ack.error.code)) this.revoke();
-        else this.updateMessages({ type: ['VALIDATION_ERROR', 'CONFLICT', 'RATE_LIMITED'].includes(ack.error.code) ? 'rejected' : 'unconfirmed', request, attempt });
+        else this.updateMessages({ type: ['VALIDATION_ERROR', 'CONFLICT'].includes(ack.error.code) ? 'rejected' : 'unconfirmed', request, attempt });
       } else this.updateMessages({ type: 'unconfirmed', request, attempt });
     } catch { if (current()) this.updateMessages({ type: 'unconfirmed', request, attempt }); }
     finally { clearTimeout(deadline); this.deadlines.delete(deadline); }

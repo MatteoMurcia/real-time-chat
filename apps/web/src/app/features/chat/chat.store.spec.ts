@@ -156,6 +156,24 @@ it('accepts a late ack from the first attempt and ignores the retry failure afte
   expect(connection.send).toHaveBeenCalledTimes(2);
 });
 
+it('retains the original key after a lost ack and rate-limited retry, then confirms once by manual retry', async () => {
+  vi.useFakeTimers();
+  let originalAck!: (ack: SendMessageAck) => void;
+  connection.send.mockImplementationOnce(() => new Promise(done => { originalAck = done; }))
+    .mockResolvedValueOnce({ ok: false, error: { code: 'RATE_LIMITED', message: 'private', requestId: '12345678-1234-4234-8234-123456789abc' } });
+  store.send('Hello'); const request = store.outgoing()[0]!.request;
+  const saved = canonical({ clientMessageId: request.clientMessageId });
+  await vi.advanceTimersByTimeAsync(5000);
+  expect(store.outgoing()[0]?.state).toBe('unconfirmed');
+  expect(store.outgoing()[0]?.request).toBe(request);
+  await vi.advanceTimersByTimeAsync(60000); expect(connection.send).toHaveBeenCalledTimes(2);
+  connection.send.mockResolvedValueOnce({ ok: true, data: saved });
+  store.retry(store.outgoing()[0]!); await flush();
+  expect(connection.send.mock.calls.map(call => call[0])).toEqual([request, request, request]);
+  originalAck({ ok: true, data: saved }); await flush(); event(saved);
+  expect(store.messages()).toEqual([saved]); expect(store.outgoing()).toEqual([]);
+});
+
 it.each(['VALIDATION_ERROR', 'CONFLICT', 'RATE_LIMITED', 'FORBIDDEN', 'UNAUTHENTICATED'] as const)('never retries %s automatically', async code => {
   vi.useFakeTimers();
   connection.send.mockResolvedValueOnce({ ok: false, error: { code, message: 'private', requestId: '12345678-1234-4234-8234-123456789abc' } });
@@ -163,6 +181,8 @@ it.each(['VALIDATION_ERROR', 'CONFLICT', 'RATE_LIMITED', 'FORBIDDEN', 'UNAUTHENT
   expect(connection.send).toHaveBeenCalledOnce();
   if (code === 'FORBIDDEN' || code === 'UNAUTHENTICATED') {
     expect(store.ready()).toBe(false); expect(store.outgoing()).toEqual([]);
+  } else if (code === 'RATE_LIMITED') {
+    expect(store.outgoing()[0]?.state).toBe('unconfirmed');
   } else {
     const item = store.outgoing()[0]!; expect(item.state).toBe('rejected'); store.retry(item);
     expect(connection.send).toHaveBeenCalledOnce();
