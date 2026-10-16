@@ -8,8 +8,15 @@ test('two independent users converse once, remount, reconnect and lose access on
   const name = `Conversation ${suffix}`;
   const slug = `chat-${suffix}`;
   const errors: string[] = [];
+  const violations: string[] = [];
   const signIn = async (target: Page, user: string) => {
     target.on('pageerror', error => errors.push(error.message));
+    await target.exposeFunction('recordCspViolation', (directive: string) => violations.push(directive));
+    await target.addInitScript(() => {
+      document.addEventListener('securitypolicyviolation', event => {
+        void (window as unknown as { recordCspViolation: (directive: string) => Promise<void> }).recordCspViolation(event.violatedDirective);
+      });
+    });
     await target.goto('/register');
     await target.getByLabel('Display name', { exact: true }).fill(user);
     await target.getByLabel('Email address', { exact: true }).fill(`${user}-${suffix}@example.test`);
@@ -45,17 +52,28 @@ test('two independent users converse once, remount, reconnect and lose access on
     await open(page); await open(second);
     await expect(page.locator('#conversation-title')).toBeFocused();
 
-    const literal = '<img src=x onerror=alert(1)> Hello 👋';
+    const literal = '<img src=/xss-probe onerror="document.documentElement.dataset.xss=1"><svg onload="document.documentElement.dataset.xss=1"></svg><script>document.documentElement.dataset.xss=1</script> Hello 👋';
     await send(page, literal);
     for (const target of [page, second]) {
       await expect(messages(target)).toHaveCount(1);
+      await expect(messages(target).locator('img, svg, script')).toHaveCount(0);
       await expect(messages(target).first()).toContainText(literal);
       await expect(messages(target).first()).toContainText('Alice');
       await expect(messages(target).first()).toContainText('Confirmed');
-      await expect(messages(target).locator('img')).toHaveCount(0);
+      expect(await target.locator('html').getAttribute('data-xss')).toBeNull();
       await expect(messages(target).locator('time')).toHaveAttribute('datetime', /^\d{4}-/);
     }
     expect(await messages(page).first().getAttribute('data-message-id')).toBe(await messages(second).first().getAttribute('data-message-id'));
+    const savedId = await messages(page).first().getAttribute('data-message-id');
+    for (const target of [page, second]) {
+      await target.reload();
+      await open(target);
+      await expect(messages(target)).toHaveCount(1);
+      await expect(messages(target).first()).toHaveAttribute('data-message-id', savedId!);
+      await expect(messages(target).first().locator('.body')).toHaveText(literal);
+      await expect(messages(target).locator('img, svg, script')).toHaveCount(0);
+      expect(await target.locator('html').getAttribute('data-xss')).toBeNull();
+    }
 
     const composer = second.getByLabel('Message', { exact: true });
     await composer.fill('First line'); await composer.press('Shift+Enter'); await composer.press('End');
@@ -108,4 +126,5 @@ test('two independent users converse once, remount, reconnect and lose access on
     await expect(second.getByText('Only Alice can receive this now', { exact: true })).toHaveCount(0);
   } finally { await other.close(); }
   expect(errors).toEqual([]);
+  expect(violations).toEqual([]);
 });
