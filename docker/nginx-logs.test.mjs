@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import { setTimeout } from 'node:timers/promises';
 
 test('real Nginx logs retain diagnostics without request credentials, including upstream failures', { timeout: 60000 }, async () => {
   const name = `chat-nginx-logs-${randomUUID()}`;
@@ -22,7 +23,12 @@ test('real Nginx logs retain diagnostics without request credentials, including 
     const base = `http://127.0.0.1:${port}`;
     const headers = { authorization: `Bearer ${canary}`, cookie: `chat_session=${canary}`,
       referer: `${base}/?csrf=${canary}`, 'x-csrf-token': canary, 'x-request-id': canary };
-    const page = await fetch(`${base}/index.html?token=${canary}`, { headers });
+    let page;
+    for (let attempt = 0; attempt < 50 && !page; attempt++) {
+      try { page = await fetch(`${base}/index.html?token=${canary}`, { headers }); }
+      catch { await setTimeout(100); }
+    }
+    assert.ok(page, 'Nginx must start listening within five seconds');
     assert.equal(page.status, 200);
     await page.arrayBuffer();
     // The alias resolves to this Nginx container, where port 3000 is closed.
