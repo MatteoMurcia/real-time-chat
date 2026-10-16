@@ -21,6 +21,7 @@ import { verifyMessageSync } from './message-sync.js';
 import { verifySyncCommitBoundary } from './message-sync-races.js';
 import { verifyCommitEmissionGap } from './commit-emission.js';
 import { verifySocketSessions } from './socket-session.js';
+import { verifyTrafficLimits } from './traffic-limits.js';
 
 test('migrations, user/session constraints and application connection lifecycle', async (t) => {
   const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -40,7 +41,9 @@ test('migrations, user/session constraints and application connection lifecycle'
   assert.equal(migration.error, undefined);
   assert.equal(migration.status, 0, 'Migration deployment must succeed');
 
-  const { app } = await createApp({ NODE_ENV: 'test', PORT: '3000', DATABASE_URL: databaseUrl });
+  await t.test('enforces default HTTP/socket quotas, input bounds and proxy trust with real clients', { timeout: 30000 }, () => verifyTrafficLimits(databaseUrl));
+  // Existing recovery fixtures intentionally create >100 messages and many accounts on one peer.
+  const { app } = await createApp({ NODE_ENV: 'test', PORT: '3000', DATABASE_URL: databaseUrl, SEND_LIMIT: '1000', LOGIN_LIMIT: '1000', REGISTER_LIMIT: '1000', CHANNEL_CREATE_LIMIT: '1000' });
   t.after(() => app.close());
   await app.listen(0, '127.0.0.1');
   const db = app.get(DatabaseService);

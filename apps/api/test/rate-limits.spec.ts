@@ -32,6 +32,18 @@ test('bounds active buckets without evicting limits, and cleans idle identities'
   t.mock.timers.tick(60000); limits.consume('send', 'overflow');
 });
 
+test('enforces the default login, registration and channel windows and clears cleanup on destruction', t => {
+  t.mock.timers.enable({ apis: ['Date', 'setInterval'], now: 1000 });
+  const clear = t.mock.method(globalThis, 'clearInterval');
+  for (const [action, count, duration] of [['login', 10, 60000], ['register', 5, 3600000], ['createChannel', 10, 3600000]] as const) {
+    const limits = new RateLimitService(defaultTrafficLimits);
+    for (let i = 0; i < count; i++) limits.consume(action, 'identity');
+    t.mock.timers.tick(duration - 1); assert.throws(() => limits.consume(action, 'identity'), { status: 429 });
+    t.mock.timers.tick(1); limits.consume(action, 'identity'); limits.onModuleDestroy();
+  }
+  assert.equal(clear.mock.callCount(), 3);
+});
+
 function socket(sessionId: string) {
   return Object.assign(new EventEmitter(), { data: { sessionId }, conn: Object.assign(new EventEmitter(), { readyState: 'open' }) }) as unknown as Socket;
 }

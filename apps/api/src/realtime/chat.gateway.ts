@@ -1,9 +1,7 @@
 import { BadRequestException, Inject, UnauthorizedException } from '@nestjs/common';
 import { ConnectedSocket, MessageBody, SubscribeMessage, WebSocketGateway, WebSocketServer, type OnGatewayConnection, type OnGatewayInit } from '@nestjs/websockets';
-import { randomUUID } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Server, Socket } from 'socket.io';
-import type { ApiError } from '@real-time-chat/contracts';
 import type { ChannelSubscriptionAck } from '@real-time-chat/contracts/channels';
 import { SessionService } from '../identity/session.service.js';
 import { verifyOrigin } from '../identity/request-origin.js';
@@ -14,19 +12,22 @@ import { SendMessageService } from '../messaging/send-message.service.js';
 import { validateMessage } from '../messaging/validate-message.js';
 import type { PublicMessage, SendMessageAck } from '@real-time-chat/contracts/messages';
 import { socketError } from './socket-error.js';
+import { RateLimitService } from '../security/rate-limit.service.js';
 
 @WebSocketGateway({ path: '/socket.io', serveClient: false, maxHttpBufferSize: 16384, transports: ['polling', 'websocket'] })
 export class ChatGateway implements OnGatewayInit, OnGatewayConnection {
   @WebSocketServer() server!: Server;
   constructor(private readonly sessions: SessionService, @Inject('APP_ORIGIN') private readonly origin: string,
     private readonly db: DatabaseService, private readonly access: ChannelAccessService, private readonly connections: ConnectionsService,
-    private readonly messages: SendMessageService) {}
+    private readonly messages: SendMessageService, private readonly limits: RateLimitService) {}
 
   handleConnection(socket: Socket): Promise<void> { return this.connections.add(socket); }
 
   @SubscribeMessage('message:send')
   async send(@ConnectedSocket() socket: Socket, @MessageBody() body: unknown): Promise<SendMessageAck> {
     try {
+      if (!socket.connected || typeof socket.data.userId !== 'string') throw new UnauthorizedException();
+      this.limits.consume('send', socket.data.userId);
       const input = validateMessage(body);
       return await this.connections.withChannel(input.channelId, async () => {
         const session = await this.sessions.authenticate(socket.request.headers.cookie);
@@ -96,14 +97,10 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection {
         socket.data.sessionId = session.id;
         socket.data.userId = session.user.id;
         socket.data.expiresAt = session.expiresAt.getTime();
+        this.limits.reserveConnection(socket);
         next();
       } catch (error: unknown) {
-        const unauthenticated = error instanceof UnauthorizedException;
-        const data: ApiError = {
-          code: unauthenticated ? 'UNAUTHENTICATED' : 'INTERNAL_ERROR',
-          message: unauthenticated ? 'Authentication is required.' : 'Connection could not be established.',
-          requestId: randomUUID(),
-        };
+        const data = socketError(error);
         next(Object.assign(new Error(data.message), { data }));
       }
     });

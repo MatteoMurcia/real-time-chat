@@ -78,7 +78,7 @@ jobs:
         run: |
           password=$(openssl rand -hex 24)
           echo "::add-mask::$password"
-          printf 'POSTGRES_DB=ci_chat\nPOSTGRES_USER=ci_user\nPOSTGRES_PASSWORD=%s\nAPP_ORIGIN=http://localhost:8080\n' "$password" > .env
+          printf 'POSTGRES_DB=ci_chat\nPOSTGRES_USER=ci_user\nPOSTGRES_PASSWORD=%s\nAPP_ORIGIN=http://localhost:8080\nSEND_LIMIT=1000\nLOGIN_LIMIT=1000\nREGISTER_LIMIT=1000\nCHANNEL_CREATE_LIMIT=1000\n' "$password" > .env
       - name: Build images and start the application
         run: docker compose up --build --wait --wait-timeout 120
       - name: Verify the public health endpoint

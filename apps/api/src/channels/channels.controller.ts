@@ -3,10 +3,11 @@ import type { IncomingHttpHeaders } from 'node:http';
 import { SessionService } from '../identity/session.service.js';
 import { CsrfService } from '../identity/csrf.service.js';
 import { ChannelsService } from './channels.service.js';
+import { RateLimitService } from '../security/rate-limit.service.js';
 
 @Controller('channels')
 export class ChannelsController {
-  constructor(private readonly sessions: SessionService, private readonly csrf: CsrfService, private readonly channels: ChannelsService) {}
+  constructor(private readonly sessions: SessionService, private readonly csrf: CsrfService, private readonly channels: ChannelsService, private readonly limits: RateLimitService) {}
 
   @Get()
   @Header('Cache-Control', 'no-store')
@@ -19,6 +20,7 @@ export class ChannelsController {
   @Header('Cache-Control', 'no-store')
   async create(@Headers() headers: IncomingHttpHeaders, @Body() body: unknown) {
     const session = await this.sessions.authenticate(headers.cookie);
+    this.limits.consume('createChannel', session.user.id);
     this.csrf.verifySession(headers, session.id);
     if (!/^application\/json(?:\s*;|$)/i.test(headers['content-type'] ?? '')) throw new BadRequestException();
     return this.channels.create(session.user.id, body);

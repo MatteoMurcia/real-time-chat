@@ -37,6 +37,12 @@ services:
       <<: *database-environment
       APP_ORIGIN: ${APP_ORIGIN:-http://127.0.0.1:8080}
       SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-86400}
+      SEND_LIMIT: ${SEND_LIMIT:-30}
+      LOGIN_LIMIT: ${LOGIN_LIMIT:-10}
+      REGISTER_LIMIT: ${REGISTER_LIMIT:-5}
+      CHANNEL_CREATE_LIMIT: ${CHANNEL_CREATE_LIMIT:-10}
+      SESSION_CONNECTION_LIMIT: ${SESSION_CONNECTION_LIMIT:-5}
+      TRUSTED_PROXY_IPS: ${PROXY_IP:-172.29.0.254}
     networks: [backend]
     init: true
     depends_on:
@@ -57,7 +63,10 @@ services:
       dockerfile: apps/web/Dockerfile
     ports:
       - "127.0.0.1:${WEB_PORT:-8080}:8080"
-    networks: [frontend, backend]
+    networks:
+      frontend:
+      backend:
+        ipv4_address: ${PROXY_IP:-172.29.0.254}
     depends_on:
       api:
         condition: service_healthy
@@ -72,6 +81,9 @@ networks:
   frontend:
   backend:
     internal: true
+    ipam:
+      config:
+        - subnet: ${BACKEND_SUBNET:-172.29.0.0/24}
 
 volumes:
   postgres_data:

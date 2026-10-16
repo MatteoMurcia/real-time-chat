@@ -17,17 +17,20 @@ import { SendMessageService } from './messaging/send-message.service.js';
 import { HistoryService } from './messaging/history.service.js';
 import { HistoryController } from './messaging/history.controller.js';
 import { SyncService } from './messaging/sync.service.js';
+import { RateLimitService } from './security/rate-limit.service.js';
+import type { TrafficLimits } from './config.js';
 
 @Module({
   controllers: [LiveController, RegistrationController, SessionController, ChannelsController, HistoryController],
   providers: [{ provide: APP_FILTER, useClass: ErrorFilter }],
 })
 export class AppModule {
-  static register(databaseUrl: string, appOrigin: string, sessionTtlSeconds: number): DynamicModule {
+  static register(databaseUrl: string, appOrigin: string, sessionTtlSeconds: number, trafficLimits: TrafficLimits): DynamicModule {
     return {
       module: AppModule,
       providers: [
         { provide: 'APP_ORIGIN', useValue: appOrigin },
+        { provide: RateLimitService, useFactory: () => new RateLimitService(trafficLimits) },
         ChatGateway,
         ConnectionsService,
         SendMessageService,

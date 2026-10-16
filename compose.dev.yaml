@@ -2,6 +2,9 @@ services:
   api:
     build:
       target: development
+    # Angular forwards incoming headers; group dev traffic by peer instead of trusting XFF.
+    environment:
+      TRUSTED_PROXY_IPS: ''
     healthcheck:
       start_period: 30s
     develop:
