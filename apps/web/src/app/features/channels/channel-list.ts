@@ -91,6 +91,7 @@ export class ChannelList {
         this.createError.set(api?.code === 'CONFLICT' ? 'A channel already uses this name or slug.'
           : api?.code === 'VALIDATION_ERROR' ? 'Check the channel name and slug.'
           : api?.code === 'FORBIDDEN' ? 'Your security check expired. Please try again.'
+          : api?.code === 'RATE_LIMITED' ? 'Too many channel creation attempts. Try again later.'
           : 'We could not confirm creation. Refresh the list before trying again; the channel may already exist.');
         this.changeDetector.detectChanges();
         this.element.nativeElement.querySelector<HTMLElement>('#channel-error')?.focus();

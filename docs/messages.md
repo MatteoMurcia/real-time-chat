@@ -28,9 +28,10 @@ key and body. After another five seconds it stays **Unconfirmed** and offers
 manual retry. A timeout is not evidence that the message was lost.
 
 Automatic retry is limited to that first deadline. Offline sends, explicit server
-errors and malformed replies do not start a retry loop. Validation, conflict and
-rate-limit failures are rejected; access errors end the conversation. Unexpected
-failures remain unconfirmed. Manual retry requires a current unconfirmed row;
+errors and malformed replies do not start a retry loop. Validation and conflict
+failures are rejected; access errors end the conversation. Rate-limit and unexpected
+failures remain unconfirmed and retain the original request key for manual retry:
+an earlier attempt may already have committed. Manual retry requires a current unconfirmed row;
 stale clicks cannot resend a pending, rejected or already confirmed message.
 
 Socket acknowledgements are retained for at most 30 seconds per attempt, separately

@@ -1,5 +1,12 @@
 import { isIP } from 'node:net';
 
+export const defaultTrafficLimits = { send: 30, login: 10, register: 5, createChannel: 10, connections: 5 };
+export type TrafficLimits = typeof defaultTrafficLimits;
+
+export function normalizeIp(ip: string): string {
+  return ip.startsWith('::ffff:') && isIP(ip.slice(7)) === 4 ? ip.slice(7) : ip;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv) {
   const nodeEnv = env.NODE_ENV;
   if (!nodeEnv) throw new Error('NODE_ENV is required');
@@ -43,5 +50,14 @@ export function loadConfig(env: NodeJS.ProcessEnv) {
     throw new Error('SESSION_TTL_SECONDS must be an integer between 1 and 604800');
   }
 
-  return { nodeEnv, port, host, databaseUrl, appOrigin, sessionTtlSeconds };
+  const trafficLimits = { ...defaultTrafficLimits };
+  const names = { send: 'SEND_LIMIT', login: 'LOGIN_LIMIT', register: 'REGISTER_LIMIT', createChannel: 'CHANNEL_CREATE_LIMIT', connections: 'SESSION_CONNECTION_LIMIT' } as const;
+  for (const key of Object.keys(names) as (keyof TrafficLimits)[]) {
+    const raw = env[names[key]] ?? String(trafficLimits[key]);
+    if (!/^\d+$/.test(raw) || Number(raw) < 1 || Number(raw) > 1000) throw new Error(`${names[key]} must be an integer between 1 and 1000`);
+    trafficLimits[key] = Number(raw);
+  }
+  const trustedProxyIps = env.TRUSTED_PROXY_IPS ? env.TRUSTED_PROXY_IPS.split(',').map(ip => normalizeIp(ip.trim())) : [];
+  if (trustedProxyIps.some(ip => !isIP(ip))) throw new Error('TRUSTED_PROXY_IPS must be a comma-separated list of IP addresses');
+  return { nodeEnv, port, host, databaseUrl, appOrigin, sessionTtlSeconds, trafficLimits, trustedProxyIps };
 }

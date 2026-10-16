@@ -1,4 +1,7 @@
-import { BadRequestException, Body, Controller, Get, Header, Headers, HttpCode, Post, Res } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Header, Headers, HttpCode, Post, Req, Res } from '@nestjs/common';
+import type { Request } from 'express';
+import { RateLimitService } from '../security/rate-limit.service.js';
+import { normalizeIp } from '../config.js';
 import type { IncomingHttpHeaders, ServerResponse } from 'node:http';
 import type { SessionResponse } from '@real-time-chat/contracts/auth';
 import { CsrfService } from './csrf.service.js';
@@ -6,13 +9,14 @@ import { SessionService } from './session.service.js';
 
 @Controller('auth')
 export class SessionController {
-  constructor(private readonly sessions: SessionService, private readonly csrf: CsrfService) {}
+  constructor(private readonly sessions: SessionService, private readonly csrf: CsrfService, private readonly limits: RateLimitService) {}
 
   @Post('login')
   @HttpCode(200)
   @Header('Cache-Control', 'no-store')
   async login(@Headers() headers: IncomingHttpHeaders, @Body() body: unknown,
-    @Res({ passthrough: true }) response: ServerResponse): Promise<SessionResponse> {
+    @Res({ passthrough: true }) response: ServerResponse, @Req() request: Request): Promise<SessionResponse> {
+    this.limits.consume('login', normalizeIp(request.ip ?? request.socket.remoteAddress ?? 'unknown'));
     this.csrf.verify(headers);
     if (!/^application\/json(?:\s*;|$)/i.test(headers['content-type'] ?? '')) throw new BadRequestException();
     const session = await this.sessions.login(body);

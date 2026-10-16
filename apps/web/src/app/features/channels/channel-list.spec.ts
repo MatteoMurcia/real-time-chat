@@ -24,6 +24,18 @@ function setup() {
   return { fixture, element, http, fill, submit, click };
 }
 
+it('shows a safe quota rejection and preserves creation input without retrying', () => {
+  const { fixture, element, http, fill, submit } = setup();
+  http.expectOne('/api/channels').flush({ channels: [], nextCursor: null });
+  fill('channel-name', 'Design'); fill('channel-slug', 'design-team'); submit();
+  http.expectOne('/api/auth/session/csrf').flush({ csrfToken: token });
+  http.expectOne('/api/channels').flush({ code: 'RATE_LIMITED', message: 'private', requestId: '12345678-1234-4234-8234-123456789abc' }, { status: 429, statusText: 'Too Many Requests' });
+  fixture.detectChanges();
+  expect(element.textContent).toContain('Too many channel creation attempts. Try again later.');
+  expect(element.querySelector<HTMLInputElement>('#channel-name')!.value).toBe('Design');
+  expect(element.textContent).not.toContain('private'); http.expectNone('/api/auth/session/csrf');
+});
+
 it('validates locally, posts once with session CSRF and refreshes after confirmed creation', () => {
   const { fixture, element, http, fill, submit } = setup();
   http.expectOne('/api/channels').flush({ channels: [], nextCursor: null });
