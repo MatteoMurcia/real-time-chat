@@ -16,6 +16,7 @@
             "tsConfig": "tsconfig.json",
             "styles": ["src/styles.css"],
             "outputPath": "dist",
+            "optimization": { "styles": { "inlineCritical": false } },
             "budgets": [{ "type": "initial", "maximumWarning": "500kB", "maximumError": "1MB" }]
           },
           "configurations": {
