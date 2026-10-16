@@ -38,6 +38,12 @@ export async function verifyHistory(app: INestApplication, db: DatabaseService):
       await tx.channel.update({ where: { id: channel.id }, data: { lastSequence: 105n } });
     });
     const first = await page(); assert.equal(first.items.length, 50);
+    // A cursor is a position, never a capability: borrowing or constructing one grants no access.
+    for (const before of [first.olderCursor, historyCursor(channel.id, 105n, 105n)]) {
+      const denied = await get(`?before=${before}`, channel.id, otherCookie);
+      assert.equal(denied.status, 403);
+      assert.ok(!(await denied.text()).includes('History 105'));
+    }
     assert.deepEqual(first.items.map(item => item.sequence), Array.from({ length: 50 }, (_, i) => String(i + 56)));
     assert.ok(first.items.every(item => item.createdAt === createdAt.toISOString()));
     assert.deepEqual(first.items[0]!.author, { id: owner.id, displayName: owner.displayName });

@@ -115,6 +115,9 @@ test('migrations, user/session constraints and application connection lifecycle'
         assert.equal(response.status, 403);
         assert.ok(isApiError(await response.json()));
       }
+      for (const from of ['', 'null', `${origin}.evil.test`, 'http://localhost:8080']) {
+        assert.equal((await post(input, { ...headers, origin: from })).status, 403);
+      }
       const invalid = await post({ ...input, email: 'invalid', password: 'secret' });
       assert.equal(invalid.status, 400);
       const error = await invalid.json();
@@ -169,6 +172,9 @@ test('migrations, user/session constraints and application connection lifecycle'
       const me = (cookie = '') => fetch(`${endpoint}/me`, { headers: { cookie } });
       for (const invalid of [{ ...headers, cookie: '' }, { ...headers, 'x-csrf-token': 'forged' }, { ...headers, origin: 'https://evil.test' }]) {
         assert.equal((await login(input, invalid)).status, 403);
+      }
+      for (const from of ['', 'null', `${origin}.evil.test`, 'http://localhost:8080']) {
+        assert.equal((await login(input, { ...headers, origin: from })).status, 403);
       }
       assert.equal((await login(input, { ...headers, 'content-type': 'text/plain' })).status, 400);
       const wrong = await login({ ...input, password: password.trim() });
@@ -276,6 +282,9 @@ test('migrations, user/session constraints and application connection lifecycle'
         assert.equal(failure.status, 403);
         assert.equal(failure.headers.get('set-cookie'), null);
         assert.ok(isApiError(await failure.json()));
+      }
+      for (const from of ['', 'null', `${origin}.evil.test`, 'http://localhost:8080']) {
+        assert.equal((await logout({ ...headers, origin: from })).status, 403);
       }
       for (const cookie of ['', 'chat_session=malformed', `chat_session=${'b'.repeat(64)}`, `${first}; ${first}`]) {
         assert.equal((await logout({ ...headers, cookie })).status, 401);

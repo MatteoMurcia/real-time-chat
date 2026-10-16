@@ -27,8 +27,12 @@ export async function verifyChannels(app: INestApplication, db: DatabaseService)
     for (const invalid of [{ ...headers, origin: 'https://evil.test' }, { ...headers, 'x-csrf-token': '' }, { ...headers, cookie: cookies[1]! }]) {
       assert.equal((await post(input, invalid)).status, 403);
     }
+    for (const from of ['', 'null', `${origin}.evil.test`, 'http://localhost:8080']) {
+      assert.equal((await post(input, { ...headers, origin: from })).status, 403);
+    }
     assert.equal((await post({ ...input, createdBy: users[1]!.id })).status, 400);
     assert.equal((await post({ ...input, slug: 'INVALID' })).status, 400);
+    assert.equal(await db.channel.count({ where: { slug: input.slug } }), 0);
     const results = await Promise.all([post(input), post(input)]);
     assert.deepEqual(results.map(result => result.status).sort(), [201, 409]);
     const created = await results.find(result => result.status === 201)!.json() as CreateChannelResponse;

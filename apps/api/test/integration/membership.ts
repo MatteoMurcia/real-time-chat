@@ -39,11 +39,16 @@ export async function verifyMembership(app: INestApplication, db: DatabaseServic
       for (const invalid of [{ ...headers[1]!, origin: 'https://evil.test' }, { ...headers[1]!, 'x-csrf-token': '' }, { ...headers[1]!, 'x-csrf-token': headers[0]!['x-csrf-token'] }]) {
         assert.equal((await mutate(method, invalid)).status, 403);
       }
+      for (const from of ['', 'null', `${origin}.evil.test`, 'http://localhost:8080']) {
+        assert.equal((await mutate(method, { ...headers[1]!, origin: from })).status, 403);
+      }
       assert.equal((await mutate(method, headers[1]!, 'invalid')).status, 400);
       assert.equal((await mutate(method, headers[1]!, randomUUID())).status, 404);
       assert.equal((await fetch(`${base}/channels/${channel.id}/membership?userId=${users[0]!.id}`, { method, headers: headers[1]! })).status, 400);
       assert.equal((await fetch(`${base}/channels/${channel.id}/membership`, { method, headers: { ...headers[1]!, 'content-type': 'application/json' }, body: JSON.stringify({ userId: users[0]!.id }) })).status, 400);
     }
+    assert.equal(await member(), null);
+    await access.requireMember(users[0]!.id, channel.id);
     for (const response of await Promise.all([mutate('PUT'), mutate('PUT'), mutate('PUT')])) {
       assert.equal(response.status, 200);
       assert.equal(response.headers.get('cache-control'), 'no-store');

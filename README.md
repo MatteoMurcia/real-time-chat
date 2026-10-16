@@ -498,6 +498,9 @@ public response fields, and absence of an automatically created session.
 
 ## Login and sessions API
 
+See [local security boundaries](docs/security-boundaries.md) for the authorization
+test matrix, literal HTML rendering and Nginx browser security headers.
+
 Bootstrap CSRF with `GET /api/auth/csrf`, as for registration. Send
 `POST /api/auth/login` with JSON `{ "email": "person@example.test", "password":
 "a long unique passphrase" }`, the pre-auth cookie, matching origin and
