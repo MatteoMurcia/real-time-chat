@@ -71,6 +71,9 @@ Security headers, reconnect and CSP remain covered by the full browser suite.
    `none`, duration threshold `-1`, error parameter logging `0`, verified at runtime.
    These settings and their diagnostic tradeoff follow the
    [PostgreSQL 18 reference](https://www.postgresql.org/docs/18/runtime-config-logging.html).
+   The standalone Quality-job PostgreSQL container receives the same flags, so
+   its failure-diagnostics step does not restore default DETAIL/statement logging.
+   This workflow edit is reviewed locally; its runner execution awaits PR CI.
 
 `security-logs.spec.ts` uses fresh password, pre-auth/session-CSRF and actual
 session-token canaries, derived stored token hash and the isolated database
