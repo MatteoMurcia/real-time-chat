@@ -7,8 +7,8 @@ input bounds, public projections, and credentials in responses/service logs of
 the compiled local application. Evidence was collected on 16–17 October.
 
 **Verdict: verified for this scope.** Two logging defects were reproduced and
-corrected. This checkpoint still requires independent parent review and the
-owner's manual PR review/merge. CP0-C and CP1-C remain pending; next task is 4.2a.
+corrected. Independent parent review is complete; the owner's manual PR
+review/merge remains pending. CP0-C and CP1-C remain pending; next task is 4.2a.
 
 ## Complete entry-point inventory
 
@@ -122,13 +122,17 @@ stack was restored with the existing `up --wait`, then the entire E2E suite was
 run again; no test timeout, skip or automatic retry was added.
 
 The isolated project is `chat-e2e`, database `cp4a_test`, web 18083, initial host
-database port 15491, subnet `172.29.41.0/24`, proxy `.254`; credentials stay in
+database port 15491, subnet `172.29.41.0/24`, proxy `.254`; credentials were held in
 ignored `.git/cp4a.env`. Persistence E2E recreates from base Compose and removes
 the opt-in host DB port while preserving the isolated volume. Root `.env` is
 unchanged and `real-time-chat_postgres_data` is preserved. Temporary proxy-test
-containers/networks are removed by their fixture. Stack cleanup/review status
-must be confirmed separately by the parent; this report does not assign ownership
-of a leftover stack. PR CI remains to run after the parent creates a PR.
+containers/networks are removed by their fixture. After independent review, the
+parent removed the isolated stack, volume and environment file (`cleanup.log`),
+and confirmed the root environment digest and primary volume were unchanged.
+The parent reviewed runtime paths, configuration, fixtures, negative controls,
+execution logs and the final diff. Review corrections cover listener readiness,
+method normalization, login-response scan order and matching CI database settings.
+No blocking findings remain. PR CI will run after PR creation.
 
 ## Limits and next step
 
