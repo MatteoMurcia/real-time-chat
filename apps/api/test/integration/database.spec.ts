@@ -41,8 +41,6 @@ const suites: { name: string; timeout: number; run: (fixture: Fixture) => Promis
     await assert.rejects(db.user.create({ data: { email, displayName: 'Duplicate', passwordHash: 'test-only-hash' } }), { code: 'P2002' });
     await db.session.create({ data: session });
     await assert.rejects(db.session.create({ data: session }), { code: 'P2002' });
-    // Temporary CI exit-status probe; removed after the failing job is verified.
-    assert.fail('4.3a controlled integration failure probe');
   } },
   { name: "enforces user foreign keys and restricts deleting a user with sessions", timeout: 20000, run: async ({ db }) => {
     const { user, session } = await createUserFixture(db);
