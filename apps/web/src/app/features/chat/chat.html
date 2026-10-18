@@ -5,6 +5,7 @@
   </div>
   <p role="status">{{ store.notice() }}</p>
   <p class="visually-hidden" role="status">{{ store.liveNotice() }}</p>
+  <p class="visually-hidden" role="status" aria-atomic="true">{{ store.outgoingNotice() }}</p>
   @if (!store.ready()) { <p>Sending is paused until the live subscription is ready.</p> }
   <p class="field-help">The latest 50 saved messages load when you open a channel. Load earlier pages to read more. Drafts and unconfirmed sends stay only in this view.</p>
   <div class="history-controls">
@@ -21,17 +22,17 @@
         <small>Confirmed</small>
       </article>
     }
-    @for (item of store.outgoing(); track item.request.clientMessageId) {
+    @for (item of store.outgoing(); track item.request.clientMessageId; let index = $index) {
       <article class="message outgoing">
         <strong>You</strong><p class="body">{{ item.request.body }}</p>
-        <small role="status">{{ item.state === 'pending' ? (item.attempt === 1 ? 'Sending…' : 'Retrying confirmation…') : item.state === 'rejected' ? 'Rejected — copy the text to send a corrected message.' : 'Unconfirmed — it may already be saved.' }}</small>
-        @if (item.state === 'unconfirmed') { <button type="button" [disabled]="!store.ready()" (click)="retry(item)">Retry confirmation</button> }
+        <small>{{ item.state === 'pending' ? (item.attempt === 1 ? 'Sending…' : 'Retrying confirmation…') : item.state === 'rejected' ? 'Rejected — copy the text to send a corrected message.' : 'Unconfirmed — it may already be saved.' }}</small>
+        @if (item.state === 'unconfirmed') { <button type="button" [disabled]="!store.ready()" [attr.aria-label]="'Retry confirmation for message ' + (index + 1)" (click)="retry(item)">Retry confirmation</button> }
       </article>
     }
   </div>
   @if (store.historyLoading()) { <p role="status">Loading history…</p> }
   @if (store.historyError()) { <p role="alert" class="error-summary">{{ store.historyError() }}</p> }
-  @if (store.syncLoading()) { <p role="status">Recovering missed messages…</p> }
+  @if (store.syncLoading()) { <p>Recovering missed messages…</p> }
   @if (store.syncError()) {
     <p role="alert" class="error-summary">{{ store.syncError() }}</p>
     <button type="button" (click)="recover()" [disabled]="!store.ready() || store.syncLoading()">Retry recovery</button>

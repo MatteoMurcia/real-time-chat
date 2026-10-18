@@ -81,13 +81,14 @@ test('reconciles late and lost confirmations with one automatic retry and the or
   await expect(log).toContainText('Unconfirmed — it may already be saved.', { timeout: 15000 });
   const lost = requests.filter(item => item.body === 'Lost confirmation');
   expect(lost).toHaveLength(2); expect(lost[1]).toEqual(lost[0]);
-  await page.getByRole('button', { name: 'Retry confirmation', exact: true }).click();
+  await page.getByRole('button', { name: 'Retry confirmation for message 1', exact: true }).click();
+  await expect(page.getByLabel('Message', { exact: true })).toBeFocused();
   await expect(log.locator('.outgoing')).toHaveCount(0);
   await expect(log.locator('article')).toHaveCount(2);
   expect(requests.filter(item => item.body === 'Lost confirmation')).toEqual([lost[0], lost[0], lost[0]]);
   await send('Rejected confirmation');
   await expect(log).toContainText('Rejected — copy the text to send a corrected message.');
-  await expect(page.getByRole('button', { name: 'Retry confirmation', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Retry confirmation for message/ })).toHaveCount(0);
   // Let another real 5s deadline pass to prove there is no third automatic send or retry of rejection.
   await page.waitForTimeout(5500);
   expect(requests).toHaveLength(6);

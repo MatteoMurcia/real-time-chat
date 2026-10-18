@@ -75,6 +75,8 @@ test('two independent users converse once, remount, reconnect and lose access on
       expect(await target.locator('html').getAttribute('data-xss')).toBeNull();
     }
 
+    const focusedDraft = page.getByLabel('Message', { exact: true });
+    await focusedDraft.fill('Draft stays while Bob replies');
     const composer = second.getByLabel('Message', { exact: true });
     await composer.fill('First line'); await composer.press('Shift+Enter'); await composer.press('End');
     await composer.press('x');
@@ -82,6 +84,8 @@ test('two independent users converse once, remount, reconnect and lose access on
     await expect(messages(second)).toHaveCount(1);
     await composer.press('Enter');
     await expect(messages(page)).toHaveCount(2); await expect(messages(second)).toHaveCount(2);
+    await expect(focusedDraft).toBeFocused();
+    await expect(focusedDraft).toHaveValue('Draft stays while Bob replies');
     await expect(messages(page).last()).toContainText('Bob');
     await expect(messages(page).last().locator('.body')).toHaveText('First line\nx');
 

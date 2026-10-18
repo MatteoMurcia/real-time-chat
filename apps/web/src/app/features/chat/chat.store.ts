@@ -27,6 +27,12 @@ export class ChatStore {
   private readonly deadlines = new Set<ReturnType<typeof setTimeout>>();
   readonly messages = computed(() => this.messageState().messages);
   readonly outgoing = computed(() => this.messageState().outgoing);
+  readonly outgoingNotice = computed(() => {
+    const items = this.outgoing();
+    if (!items.length) return 'No messages awaiting confirmation.';
+    const count = (state: Outgoing['state']) => items.filter(item => item.state === state).length;
+    return `${count('pending')} sending, ${count('unconfirmed')} unconfirmed, ${count('rejected')} rejected.`;
+  });
   readonly notice = signal('');
   readonly liveNotice = signal('');
   readonly historyLoading = signal(false);
@@ -46,7 +52,9 @@ export class ChatStore {
     const interval = setInterval(recover, inject(SYNC_INTERVAL_MS));
     const stopMessages = this.connection.listen('message:created', value => {
       if (isMessage(value) && value.channelId === this.channelId()) {
-        this.confirm(value); this.liveNotice.set(`Message ${value.sequence} received from ${value.author.displayName}.`);
+        const known = this.messages().some(message => message.id === value.id);
+        this.confirm(value);
+        if (!known) this.liveNotice.set(`Message ${value.sequence} received from ${value.author.displayName}.`);
       }
     });
     const stopRevocations = this.connection.listen('channel:access-revoked', value => {
@@ -138,6 +146,8 @@ export class ChatStore {
     const channelId = this.channelId(), after = this.syncCursor(), revision = this.viewRevision;
     if (!channelId || !this.ready() || this.document.visibilityState !== 'visible' || this.syncLoading()) return;
     if (after === null) { this.loadHistory(); return; }
+    let recovered = 0;
+    const announce = () => { if (recovered) this.liveNotice.set(`Conversation updated. ${recovered} new messages loaded.`); };
     this.syncLoading.set(true); this.syncError.set('');
     this.syncRequest = this.sync.recover(channelId, after).subscribe({
       next: page => {
@@ -145,7 +155,7 @@ export class ChatStore {
         const count = this.messages().length;
         for (const message of page.items) this.confirm(message);
         this.syncCursor.set(page.nextCursor);
-        if (this.messages().length > count) this.liveNotice.set(`Conversation updated. ${this.messages().length} messages loaded.`);
+        recovered += this.messages().length - count;
       },
       error: (error: unknown) => {
         if (revision !== this.viewRevision) return;
@@ -153,9 +163,11 @@ export class ChatStore {
         if (error instanceof HttpErrorResponse && [401, 403, 404].includes(error.status)) this.revoke();
         else if (error instanceof HttpErrorResponse && error.status === 400) {
           this.resetContent(); this.loadHistory(false);
-        } else this.syncError.set('Could not recover missed messages. Your loaded messages are kept. Try again.');
+        } else {
+          announce(); this.syncError.set('Could not recover missed messages. Your loaded messages are kept. Try again.');
+        }
       },
-      complete: () => { if (revision === this.viewRevision) this.syncLoading.set(false); },
+      complete: () => { if (revision === this.viewRevision) { this.syncLoading.set(false); announce(); } },
     });
   }
 

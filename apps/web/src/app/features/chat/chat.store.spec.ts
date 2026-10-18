@@ -49,6 +49,29 @@ beforeEach(async () => {
 });
 afterEach(() => { TestBed.resetTestingModule(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
+it('announces recovered messages once after all pages and stays silent on empty polling', () => {
+  const pages = new Subject<MessageSyncPage>(); sync.recover.mockReturnValue(pages); store.recover();
+  pages.next({ items: [canonical()], nextCursor: 'page-1', until: 'H', hasMore: true });
+  expect(store.liveNotice()).toBe('');
+  pages.next({ items: [canonical({ id: 'second', sequence: '2' })], nextCursor: 'H', until: 'H', hasMore: false });
+  expect(store.liveNotice()).toBe(''); pages.complete();
+  expect(store.liveNotice()).toBe('Conversation updated. 2 new messages loaded.');
+  sync.recover.mockReturnValue(EMPTY); store.recover();
+  expect(store.liveNotice()).toBe('Conversation updated. 2 new messages loaded.');
+});
+
+it('summarizes outgoing states without message bodies and announces zero after an ack alone', async () => {
+  expect(store.outgoingNotice()).toBe('No messages awaiting confirmation.');
+  store.send('Private draft');
+  expect(store.outgoingNotice()).toBe('1 sending, 0 unconfirmed, 0 rejected.');
+  const request = store.outgoing()[0]!.request;
+  connection.send.mockResolvedValueOnce({ ok: true, data: canonical({ clientMessageId: request.clientMessageId, body: 'Private draft' }) });
+  await vi.advanceTimersByTimeAsync(5000); await flush();
+  expect(store.outgoingNotice()).toBe('No messages awaiting confirmation.');
+  store.send('Another draft');
+  expect(store.outgoingNotice()).toBe('1 sending, 0 unconfirmed, 0 rejected.');
+});
+
 it('seeds C from the snapshot, advances only after recovery pages and preserves it on errors and older history', async () => {
   expect(sync.recover).toHaveBeenCalledWith('channel-1', 'snapshot');
   const pending = new Subject<MessageSyncPage>(); sync.recover.mockReturnValue(pending);

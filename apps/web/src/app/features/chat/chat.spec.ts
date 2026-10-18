@@ -6,7 +6,7 @@ import { ChatStore } from './chat.store';
 
 const store = {
   open: vi.fn(), send: vi.fn(() => true), retry: vi.fn(), recover: vi.fn(), loadHistory: vi.fn(),
-  messages: signal<unknown[]>([]), outgoing: signal<unknown[]>([]), liveNotice: signal(''), notice: signal(''),
+  messages: signal<unknown[]>([]), outgoing: signal<unknown[]>([]), outgoingNotice: signal('No messages awaiting confirmation.'), liveNotice: signal(''), notice: signal(''),
   ready: signal(true), historyLoading: signal(false), historyError: signal(''), olderCursor: signal<string | null>(null),
   snapshotCursor: signal('snapshot'), syncLoading: signal(false), syncError: signal(''),
 };
