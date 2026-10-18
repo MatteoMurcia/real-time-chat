@@ -125,8 +125,15 @@ Existing lifecycle code already met the requirement and required no production c
 Local browser checks ran against the real Angular UI with a disposable HTTP/socket
 fixture solely for layout/navigation feedback. Mobile, desktop and reduced-height
 screenshots were visually reviewed. Docker's Linux engine remains unavailable;
-actual database/API/socket verification is delegated to the existing full-stack CI
-before marking this task verified. The fixture is ignored and never shipped.
+actual database/API/socket verification ran in the existing full-stack CI instead.
+[Run 39170035297](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39170035297)
+passed Quality and Containers on `893e9ef`: **44 API, 103 Angular, 3 contracts,
+3 Docker, 21 PostgreSQL integration results and 22 Chromium E2E tests**. All E2E
+passed in 1.5 minutes without skips or retries; audit reported zero vulnerabilities.
+Independent review found no blockers; its suggestion to send after Workspace
+re-entry was added and verified. The parent reviewed the final diff and screenshots.
+Task 4.2b is verified on 2026-10-19 in PR #46, pending owner review/manual merge.
+The local fixture is ignored and never shipped.
 
 No physical phone keyboard, iOS/Safari, other browser engine, screen-reader speech
 or full accessibility audit was checked. Native keyboard behavior still requires
