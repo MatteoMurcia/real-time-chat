@@ -58,8 +58,16 @@ Final host verification: **102 Angular tests** across 13 files; lint, typecheck,
 build and audit passed (zero vulnerabilities). Integration from the earlier
 keyboard slice passed 21 results; this is not a fresh run of the final image.
 Docker Desktop's Linux engine became unavailable during the final continuation.
-The final compiled-image keyboard and full browser regression therefore require
-the PR's Quality and Containers checks; their status is recorded in the PR.
+The final compiled image was verified by GitHub CI instead:
+[run 39168334708](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39168334708)
+passed Quality and Containers, including **21 PostgreSQL integration results,
+44 API tests, 102 Angular tests, 3 contracts, 3 Docker tests and 21 Chromium E2E
+tests**. The browser suite completed in 1.5 minutes, with no skips or retries.
+
+A controlled mutation made successive recovery summaries identical; two of the
+32 store tests failed. Original source bytes were restored, and all 32 passed
+again. This verifies that both batch summaries and their distinguishing sequence
+are covered, including the New messages indicator's input.
 
 The subagent's work and the final changes were independently reviewed. The review
 caught missing real-message focus evidence and repeated equal-count summaries;
