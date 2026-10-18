@@ -410,8 +410,15 @@ hashes, and sessions with unique token hashes, expiry/user indexes and a foreign
 key that restricts user deletion. The identity API normalizes email, hashes
 passwords/tokens, and validates sessions before returning the current user.
 
-Integration tests use a **separate database whose name ends in `_test`**. Create
-it once in the local SQL session and set `TEST_DATABASE_URL` to its full URL:
+Integration is reproducible with Docker Compose, without host Node, npm or
+PostgreSQL. The standalone `compose.test.yaml` runs pinned tools and PostgreSQL
+on an internal network, without published ports or application volumes. See
+[container integration](docs/local-development.md#reproducible-integration-in-containers)
+for password generation, execution, reverse-order verification and cleanup.
+
+The optional host runner uses a **dedicated database ending in `_test`**, with
+a test role allowed to create databases. Create that base once and set
+`TEST_DATABASE_URL` to its full URL:
 
 ```sql
 CREATE DATABASE real_time_chat_test;
@@ -421,10 +428,12 @@ CREATE DATABASE real_time_chat_test;
 npm run test:integration --workspace @real-time-chat/api
 ```
 
-The suite refuses a missing URL or the development database name, applies the
-committed migrations, checks constraints/rollback against real PostgreSQL, and
-removes only its own test records. It also checks that closing Nest releases its
-connection. The test database and migration history remain for subsequent runs.
+The runner refuses a missing URL or the development database name. Each suite
+creates a unique database from `template0`, applies committed migrations, checks
+all five data tables are empty and starts its own app. Minimal fixtures belong
+to that suite; its generated database is dropped in `finally`, including on
+failure. The base database remains empty. Constraints, rollback, real HTTP/socket
+clients and Nest connection cleanup retain their original assertions.
 Ordinary `npm test` stays database-independent; integration tests are explicit
 and fail rather than skip when PostgreSQL/configuration is unavailable.
 
@@ -636,9 +645,12 @@ emails. The ordinary development volume is separate. CI uses a disposable stack.
 runs on every pull request targeting `main` and every push to `main`.
 
 - **Quality:** pinned Node/npm, lockfile installation, lint (zero warnings),
-  typecheck, unit/contract tests, Docker configuration tests, builds, dependency
-  audit (high/critical vulnerabilities fail), and integration tests with an
-  isolated PostgreSQL 18.6 database.
+  typecheck, unit/contract tests, Docker configuration tests, builds and dependency
+  audit (high/critical vulnerabilities fail).
+- **Integration:** build the dedicated test image, run all integration suites
+  against freshly migrated PostgreSQL 18.6 databases, repeat in reverse order,
+  then verify no suite databases or base tables remain. Tools run inside the
+  image; this job does not install Node/npm on the host.
 - **Containers:** build the Compose images, apply migrations to an empty volume,
   wait for healthy services, verify the public health response through Nginx,
   and run the Chromium registration/session E2Es against that stack.
@@ -662,8 +674,9 @@ npm run build
 npm audit --audit-level=high
 ```
 
-For integration, follow the separate test database setup above and run
-`npm run test:integration --workspace @real-time-chat/api`. For the container
+For integration, use the standalone container flow linked above (`npm run
+test:integration` is an optional shortcut with host Node), or the explicit
+`npm run test:integration --workspace @real-time-chat/api` host runner. For the container
 check, use the documented `docker compose up --build --wait` flow. CI runs these
 checks on disposable Ubuntu runners; do not copy its volume-deletion cleanup
 commands to your persistent local database.

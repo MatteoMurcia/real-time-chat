@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-19 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b integrada mediante PR #30; CP2-C integrado mediante PR #31; 3.1a integrada mediante PR #32; 3.1b integrada mediante PR #33; CP3-A integrado mediante PR #34; 3.2a integrada mediante PR #35; 3.2b integrada mediante PR #36; CP3-B integrado mediante PR #37; 3.3a integrada mediante PR #38; 3.3b integrada mediante PR #39; 3.4a integrada mediante PR #40; CP3-C integrado mediante PR #41; 4.1a integrada mediante PR #42; 4.1b integrada mediante PR #43; CP4-A integrado mediante PR #44; 4.2a integrada mediante PR #45; 4.2b verificada, pendiente de revisión y merge manual mediante PR #46. CP0-C y revisión de salida CP1-C pendientes. Siguiente tarea tras merge: 4.3a.
+Revisión: 3 · Actualización: 2026-10-19 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b integrada mediante PR #30; CP2-C integrado mediante PR #31; 3.1a integrada mediante PR #32; 3.1b integrada mediante PR #33; CP3-A integrado mediante PR #34; 3.2a integrada mediante PR #35; 3.2b integrada mediante PR #36; CP3-B integrado mediante PR #37; 3.3a integrada mediante PR #38; 3.3b integrada mediante PR #39; 3.4a integrada mediante PR #40; CP3-C integrado mediante PR #41; 4.1a integrada mediante PR #42; 4.1b integrada mediante PR #43; CP4-A integrado mediante PR #44; 4.2a integrada mediante PR #45; 4.2b integrada mediante PR #46; 4.3a en verificación. CP0-C y revisión de salida CP1-C pendientes. Siguiente tras merge de 4.3a: Checkpoint CP4-B.
 
 ## 1. Cómo usar este plan
 
@@ -584,7 +584,7 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
   - Aceptación: registro → canal → mensaje funciona por teclado; nuevo mensaje no roba foco ni causa anuncios masivos.
   - Verificar: recorrido manual de teclado y E2E de composición; herramientas automáticas como complemento.
   - Archivos: shell web, plantilla chat, estilos compartidos, `e2e/keyboard.spec.ts`, `docs/qa.md`.
-- [x] **4.2b — Ajustar móvil y navegación repetida** · M · Depende de: 4.2a. Verificada (2026-10-19); revisiones del subagente y agente principal completadas, CI verde; pendiente de revisión y merge manual mediante PR #46.
+- [x] **4.2b — Ajustar móvil y navegación repetida** · M · Depende de: 4.2a. Integrada mediante PR #46 en `50631a97f19a2540f45ff8a55c0d7ab2269e61ff` (2026-10-19).
   - Trabajo: lista de canales/panel de conversación responsive, alturas con teclado y limpieza de listeners.
   - Aceptación: sin scroll horizontal a 375 y 1280 px; veinte cambios de canal no duplican mensajes ni suscripciones.
   - Verificar: navegador en ambas anchuras y E2E de navegación repetida, incluyendo mensajes largos.
@@ -595,6 +595,7 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
   - Aceptación: las suites funcionan desde BD vacía y no dependen de orden ni del seed de demo.
   - Verificar: job real de integración con PostgreSQL efímero y un fallo intencional temporal retirado después de verificar el job.
   - Archivos: compose.test.yaml, workflow CI, `apps/api/test/setup.ts`, `apps/api/test/fixtures/users.ts`, configuración runner.
+  - Estado (2026-10-19): runner en contenedor, aislamiento de las 19 suites y verificación en orden inverso implementados; 45 pruebas API y cuatro de preload correctas en host, lint/typecheck correctos. Revisiones independiente y principal completadas. Pendiente de CI real, demostración de fallo propagado y retirada del fallo temporal. Docker local no disponible. [Procedimiento y límites](../docs/local-development.md#reproducible-integration-in-containers).
 
 **Checkpoint CP4-B:** usabilidad móvil/escritorio comprobada e integración reproducible; corregir flakiness antes de cerrar la entrega local.
 
