@@ -1,16 +1,20 @@
 import 'reflect-metadata';
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import { test } from 'node:test';
-import { Controller, Get, HttpException, Module, Param, Post } from '@nestjs/common';
+import { Controller, Get, HttpException, Logger, Module, Param, Post } from '@nestjs/common';
 import { APP_FILTER, NestFactory } from '@nestjs/core';
 import { isApiError } from '@real-time-chat/contracts';
 import { ErrorFilter } from '../src/http/error.filter.js';
+import { socketError } from '../src/realtime/socket-error.js';
+
+const privateDetail = randomUUID();
 
 @Controller('errors')
 class ErrorsController {
   @Get(':status')
   fail(@Param('status') status: string) {
-    if (status === 'unexpected') throw new Error('private database password');
+    if (status === 'unexpected') throw new Error(privateDetail);
     throw new HttpException({ message: 'private detail', stack: 'private stack' }, Number(status));
   }
 
@@ -22,6 +26,8 @@ class ErrorsController {
 class ErrorsTestModule {}
 
 test('HTTP errors use safe codes, fresh server IDs and no internal details', async t => {
+  const logs: unknown[] = [];
+  t.mock.method(Logger.prototype, 'error', (message: unknown) => logs.push(message));
   const app = await NestFactory.create(ErrorsTestModule, { logger: false });
   t.after(() => app.close());
   await app.listen(0, '127.0.0.1');
@@ -37,6 +43,7 @@ test('HTTP errors use safe codes, fresh server IDs and no internal details', asy
     assert.equal(body.code, code);
     assert.deepEqual(Object.keys(body).sort(), ['code', 'message', 'requestId']);
     assert.doesNotMatch(JSON.stringify(body), /private|stack|password|spoofed/);
+    assert.equal(JSON.stringify(body).includes(privateDetail), false);
     assert.equal(response.headers.get('x-request-id'), body.requestId);
     assert.equal(response.headers.get('cache-control'), 'no-store');
     assert.equal(ids.has(body.requestId), false);
@@ -55,4 +62,15 @@ test('HTTP errors use safe codes, fresh server IDs and no internal details', asy
   assert.ok(isApiError(malformedBody));
   assert.equal(malformedBody.code, 'VALIDATION_ERROR');
   assert.doesNotMatch(JSON.stringify(malformedBody), /private/);
+  const socketFailure = socketError(new Error(privateDetail));
+  assert.equal(socketFailure.code, 'INTERNAL_ERROR');
+  assert.equal(JSON.stringify(socketFailure).includes(privateDetail), false);
+  assert.ok(logs.length > 0);
+  assert.equal(JSON.stringify(logs).includes(privateDetail), false);
+  for (const log of logs) {
+    assert.ok(log && typeof log === 'object');
+    assert.deepEqual(Object.keys(log).sort(), ['code', 'requestId']);
+    assert.ok('code' in log && log.code === 'INTERNAL_ERROR');
+    assert.ok('requestId' in log && typeof log.requestId === 'string' && /^[a-f0-9-]{36}$/.test(log.requestId));
+  }
 });

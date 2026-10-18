@@ -68,8 +68,44 @@ claim a nonce-based strict policy.
 
 ## Limits
 
-This is task 4.1b evidence, not certification of checkpoint CP4-A. CP4-A still
-requires its entry-point and response/log secret review; CP0-C and CP1-C also
-remain pending. The tests cover one API instance and Chromium, without a load,
+The entry-point and response/log review is recorded in [CP4-A](checkpoints/cp4-a.md).
+CP0-C and CP1-C remain pending. The tests cover one API instance and Chromium, without a load,
 multi-browser or comprehensive accessibility/security audit. Traffic quotas and
 their process-local limitations are documented in [traffic limits](traffic-limits.md).
+
+## Credentials, responses and logs
+
+Passwords, password hashes, raw session tokens and stored token hashes are not
+public fields. Registration/login/me expose the actor's intended user projection
+(including their email); messages expose author ID/display name only. The
+pre-auth and session-CSRF bootstrap JSON deliberately contains a CSRF token.
+Pre-auth/login `Set-Cookie` deliberately carries the HttpOnly cookie, and logout
+expires the session cookie. These explicit credential channels use `no-store`;
+they are excluded from secret-echo checks. Query/auth payload credentials never
+replace the session cookie, even when the token is valid.
+
+Nginx access logs contain only its generated request ID, an allowlisted HTTP
+method (`OTHER` for unknown methods), status/upstream status and request/upstream
+duration. They omit paths, query parameters, headers (including Referer,
+Authorization and cookies) and bodies. Nginx's free-form error log is disabled
+because upstream failures include unredacted request context; access statuses
+and timings remain available. This intentionally sacrifices textual proxy
+diagnostics. The proxy's generated request ID is independent of the API's ID.
+
+Compose starts PostgreSQL with `log_error_verbosity=terse` and
+`log_min_error_statement=panic`: ordinary constraint failures retain their main
+diagnostic but omit row DETAIL, context and failing SQL. Parameter logging stays
+at its default zero on error, with ordinary statement/duration logging disabled.
+This reduces database debugging detail; it is not a general-purpose scrubber for
+arbitrary SQL or database PANIC failures. See the [PostgreSQL logging reference](https://www.postgresql.org/docs/18/runtime-config-logging.html).
+HTTP/socket error adapters log only a server-generated request ID and error code,
+and expose generic errors. Prisma query/error logging is not enabled.
+
+`docker/nginx-logs.test.mjs` runs the pinned real proxy with successful, unknown
+method and failed upstream requests. `e2e/security-logs.spec.ts` scans stdout and
+stderr for all four services using fresh password/session/CSRF canaries and a
+temporary database constraint error; boolean assertions never print values.
+`apps/api/test/errors.spec.ts` captures HTTP/socket unexpected-error logging and
+requires the exact code/request-ID projection. These checks cover exercised
+paths in the compiled local demo; they do not audit external log collectors,
+host diagnostics, operator SQL or all possible database failures.
