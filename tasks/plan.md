@@ -1,6 +1,6 @@
 # Real-time Chat — Plan detallado de implementación
 
-Revisión: 3 · Actualización: 2026-10-18 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b integrada mediante PR #30; CP2-C integrado mediante PR #31; 3.1a integrada mediante PR #32; 3.1b integrada mediante PR #33; CP3-A integrado mediante PR #34; 3.2a integrada mediante PR #35; 3.2b integrada mediante PR #36; CP3-B integrado mediante PR #37; 3.3a integrada mediante PR #38; 3.3b integrada mediante PR #39; 3.4a integrada mediante PR #40; CP3-C integrado mediante PR #41; 4.1a integrada mediante PR #42; 4.1b integrada mediante PR #43; CP4-A integrado mediante PR #44; 4.2a verificada, pendiente de revisión y merge manual. CP0-C y revisión de salida CP1-C pendientes. Siguiente tarea tras merge: 4.2b.
+Revisión: 3 · Actualización: 2026-10-18 · Estado: tareas 0.0a–0.0c, 0.1a–0.1c, CP0-A, 0.2a–0.2d, CP0-D, 0.3a y CP0-B integrados; 0.3b, 1.1a, 1.1b y CP1-A integrados; 1.2a–1.2c y CP1-B integrados; 1.3a integrada mediante PR #20; 1.3b integrada mediante PR #21; 2.1a integrada mediante PR #22; 2.2a integrada mediante PR #23; 2.2b integrada mediante PR #24; CP2-A integrado mediante PR #25; 2.3a integrada mediante PR #26; 2.3b integrada mediante PR #27; CP2-B integrado mediante PR #28; 2.4a integrada mediante PR #29; 2.4b integrada mediante PR #30; CP2-C integrado mediante PR #31; 3.1a integrada mediante PR #32; 3.1b integrada mediante PR #33; CP3-A integrado mediante PR #34; 3.2a integrada mediante PR #35; 3.2b integrada mediante PR #36; CP3-B integrado mediante PR #37; 3.3a integrada mediante PR #38; 3.3b integrada mediante PR #39; 3.4a integrada mediante PR #40; CP3-C integrado mediante PR #41; 4.1a integrada mediante PR #42; 4.1b integrada mediante PR #43; CP4-A integrado mediante PR #44; 4.2a integrada mediante PR #45; 4.2b en verificación. CP0-C y revisión de salida CP1-C pendientes. Siguiente tarea tras merge: 4.3a.
 
 ## 1. Cómo usar este plan
 
@@ -579,7 +579,7 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
 
 **Checkpoint CP4-A — VERIFICADO (2026-10-17):** 13 rutas HTTP, tres eventos Socket.IO y Engine.IO revisados con pruebas directas de permisos, origen/CSRF, identidad/sesión/membresía, payloads/cuotas/cursores y proyecciones. Corregidas fugas en logs Nginx/PostgreSQL con regresión roja/verde; **44 API, 88 Angular, 3 contratos, 3 Docker, 21 resultados de integración y 20 E2E correctos**, auditoría cero vulnerabilidades. [Informe y límites](../docs/checkpoints/cp4-a.md). Integrado mediante PR #44 en `702143306a1d1e779633a2e3d1e287f982aaab85`. Siguiente tarea 4.2a. CP0-C y CP1-C siguen pendientes.
 
-- [x] **4.2a — Pulir interacción de escritorio y accesibilidad** · M · Depende de: 2.4b, 3.4a. Verificada (2026-10-18); revisión independiente completada y CI verde; pendiente de revisión del usuario y merge manual. [QA y límites](../docs/qa.md).
+- [x] **4.2a — Pulir interacción de escritorio y accesibilidad** · M · Depende de: 2.4b, 3.4a. Integrada mediante PR #45 en `fb155d36d83e608f077939cbe3d0bef174b6dcfd` (2026-10-18). [QA y límites](../docs/qa.md).
   - Trabajo: foco, nombres accesibles, teclado/IME, estados vacíos y avisos de conexión/envío.
   - Aceptación: registro → canal → mensaje funciona por teclado; nuevo mensaje no roba foco ni causa anuncios masivos.
   - Verificar: recorrido manual de teclado y E2E de composición; herramientas automáticas como complemento.
@@ -589,6 +589,7 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
   - Aceptación: sin scroll horizontal a 375 y 1280 px; veinte cambios de canal no duplican mensajes ni suscripciones.
   - Verificar: navegador en ambas anchuras y E2E de navegación repetida, incluyendo mensajes largos.
   - Archivos: shell/estilos web, componente chat, `e2e/responsive.spec.ts`, `docs/qa.md`.
+  - Estado (2026-10-18): implementación y comprobación visual local completadas; **103 Angular correctas**, lint/typecheck/build correctos. E2E responsive con fixture local correcta; pendiente de CI con API/BD reales y revisión final. [QA y límites](../docs/qa.md#mobile-layout-and-repeated-navigation--42b).
 - [ ] **4.3a — Consolidar integración reproducible en CI** · M · Depende de: 4.1b, 0.3b.
   - Trabajo: compose.test.yaml con herramientas de prueba en contenedor, aislamiento por suite, migraciones y fixtures mínimas; diagnósticos seguros al fallar.
   - Aceptación: las suites funcionan desde BD vacía y no dependen de orden ni del seed de demo.
