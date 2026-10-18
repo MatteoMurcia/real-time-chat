@@ -7,15 +7,24 @@ test('wraps long content, adapts to a reduced viewport and cleans up twenty chan
   const origin = process.env.E2E_BASE_URL!, suffix = randomUUID();
   const email = `${'reader'.repeat(9)}@${suffix}.example.test`, password = 'a unique responsive passphrase';
   const errors: string[] = [], subscriptions: { event: string; channelId: string }[] = [];
+  const received: string[] = [], expectedLive: string[] = [];
   let upgraded = false;
   page.on('pageerror', error => errors.push(error.message));
-  page.on('websocket', socket => socket.on('framesent', frame => {
-    const payload = String(frame.payload);
-    if (payload === '5') upgraded = true;
-    if (!/^42\d*\[/.test(payload)) return;
-    const [event, input] = JSON.parse(payload.slice(payload.indexOf('[')));
-    if (event === 'channel:subscribe' || event === 'channel:unsubscribe') subscriptions.push({ event, channelId: input.channelId });
-  }));
+  page.on('websocket', socket => {
+    socket.on('framereceived', frame => {
+      const payload = String(frame.payload);
+      if (!/^42\d*\[/.test(payload)) return;
+      const [event, message] = JSON.parse(payload.slice(payload.indexOf('[')));
+      if (event === 'message:created') received.push(message.id);
+    });
+    socket.on('framesent', frame => {
+      const payload = String(frame.payload);
+      if (payload === '5') upgraded = true;
+      if (!/^42\d*\[/.test(payload)) return;
+      const [event, input] = JSON.parse(payload.slice(payload.indexOf('[')));
+      if (event === 'channel:subscribe' || event === 'channel:unsubscribe') subscriptions.push({ event, channelId: input.channelId });
+    });
+  });
   const preauth = async () => ({ origin, 'x-csrf-token': (await (await context.request.get('/api/auth/csrf', { headers: { origin } })).json()).csrfToken });
   expect((await context.request.post('/api/auth/register', { headers: await preauth(), data: { email, password, displayName: 'MobileReader'.repeat(6) } })).status()).toBe(201);
   expect((await context.request.post('/api/auth/login', { headers: await preauth(), data: { email, password } })).status()).toBe(200);
@@ -43,7 +52,7 @@ test('wraps long content, adapts to a reduced viewport and cleans up twenty chan
     const saved: string[][] = [[], []];
     const send = async (index: number, body: string) => {
       const ack = await sender.timeout(5000).emitWithAck('message:send', { channelId: channels[index]!.id, clientMessageId: randomUUID(), body });
-      expect(ack.ok).toBe(true); saved[index]!.push(ack.data.id);
+      expect(ack.ok).toBe(true); saved[index]!.push(ack.data.id); return ack.data.id as string;
     };
     const longBody = 'x'.repeat(2000);
     for (let index = 0; index < 12; index++) await send(0, index ? `Earlier message ${index}` : longBody);
@@ -81,6 +90,7 @@ test('wraps long content, adapts to a reduced viewport and cleans up twenty chan
     await expect(composer).toBeFocused(); await expect(composer).toHaveValue('Draft survives viewport changes');
     expect(await page.getByRole('log').evaluate(element => element.clientHeight)).toBeLessThanOrEqual(180);
     await composer.scrollIntoViewIfNeeded(); await expect(composer).toBeInViewport({ ratio: 1 });
+    await page.screenshot({ path: testInfo.outputPath('responsive-reduced-height.png') });
     const submit = page.getByRole('button', { name: 'Send message', exact: true });
     await submit.scrollIntoViewIfNeeded(); await expect(submit).toBeInViewport({ ratio: 1 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -96,7 +106,9 @@ test('wraps long content, adapts to a reduced viewport and cleans up twenty chan
       }
       await open(index);
       expect(await listenerCounts()).toEqual(activeListeners);
-      await send(index, `Live after change ${change}`); await expectRows(index);
+      await send(1 - index, `Inactive channel after change ${change}`);
+      expectedLive.push(await send(index, `Live after change ${change}`)); await expectRows(index);
+      await expect.poll(() => received).toEqual(expectedLive);
       await expect.poll(() => subscriptions.length).toBe(1 + change * 2);
     }
     expect(closes).toBe(5);
