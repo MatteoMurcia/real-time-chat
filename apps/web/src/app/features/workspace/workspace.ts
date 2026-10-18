@@ -58,6 +58,7 @@ export class Workspace {
 
   protected closeChat(): void {
     this.activeChannel.set(null);
+    this.changeDetector.detectChanges();
     this.element.nativeElement.querySelector<HTMLElement>('#channels-title')?.focus();
   }
 

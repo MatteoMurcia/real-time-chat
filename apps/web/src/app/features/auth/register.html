@@ -1,6 +1,6 @@
 <div class="auth-page">
   <p class="eyebrow">YOUR ACCOUNT</p>
-  <h1>Create your account</h1>
+  <h1 tabindex="-1">Create your account</h1>
   <p>Start with a name your teammates will recognize.</p>
   <form [formGroup]="form" (ngSubmit)="submit()" novalidate [attr.aria-busy]="pending()">
     @if (message()) {

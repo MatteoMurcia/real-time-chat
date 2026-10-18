@@ -1,8 +1,9 @@
-import { afterNextRender, afterRenderEffect, ChangeDetectionStrategy, Component, effect, ElementRef, inject, input, output, signal, untracked } from '@angular/core';
+import { afterRenderEffect, ChangeDetectionStrategy, Component, effect, ElementRef, inject, input, output, signal, untracked } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import type { PublicChannel } from '@real-time-chat/contracts/channels';
 import { ChatStore } from './chat.store';
+import type { Outgoing } from './message.reducer';
 
 @Component({
   selector: 'app-chat',
@@ -19,6 +20,7 @@ export class Chat {
   protected readonly draft = new FormControl('', { nonNullable: true });
   protected readonly following = signal(true);
   protected readonly hasNewMessages = signal(false);
+  protected composing = false;
   private readonly element = inject<ElementRef<HTMLElement>>(ElementRef);
   private anchor: { element: HTMLElement; offset: number } | undefined;
   private lastLiveNotice = '';
@@ -27,11 +29,14 @@ export class Chat {
     effect(() => {
       const channelId = this.channel().id;
       untracked(() => {
-        this.anchor = undefined; this.lastLiveNotice = '';
+        this.anchor = undefined; this.lastLiveNotice = ''; this.composing = false;
         this.store.open(channelId); this.draft.reset(); this.following.set(true); this.hasNewMessages.set(false);
       });
     });
-    afterNextRender(() => this.element.nativeElement.querySelector<HTMLElement>('#conversation-title')?.focus());
+    afterRenderEffect(() => {
+      this.channel();
+      untracked(() => this.element.nativeElement.querySelector<HTMLElement>('#conversation-title')?.focus());
+    });
     afterRenderEffect(() => {
       const messages = this.store.messages(), liveNotice = this.store.liveNotice();
       this.store.outgoing();
@@ -52,11 +57,27 @@ export class Chat {
   }
 
   protected send(): void {
-    if (this.store.send(this.draft.value)) this.draft.reset();
+    if (!this.composing && this.store.send(this.draft.value)) {
+      this.draft.reset(); this.focusComposer();
+    }
   }
 
   protected onKey(event: KeyboardEvent): void {
-    if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) { event.preventDefault(); this.send(); }
+    // Some IMEs end composition before the confirming keydown, retaining keyCode 229.
+    if (event.key === 'Enter' && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey
+      && !this.composing && !event.isComposing && event.keyCode !== 229) { event.preventDefault(); this.send(); }
+  }
+
+  protected retry(item: Outgoing): void {
+    this.focusComposer(); this.store.retry(item);
+  }
+
+  protected recover(): void {
+    this.log()?.focus({ preventScroll: true }); this.store.recover();
+  }
+
+  private focusComposer(): void {
+    this.element.nativeElement.querySelector<HTMLTextAreaElement>('#message-body')?.focus({ preventScroll: true });
   }
 
   protected scrollToLatest(): void {

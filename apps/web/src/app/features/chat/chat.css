@@ -9,4 +9,4 @@ time, small { color: var(--muted); font-size: .875rem; }
 .outgoing { border: 1px dashed var(--line); }
 .outgoing button { display: block; margin-top: .5rem; }
 .latest { display: block; margin-top: .75rem; }
-textarea { box-sizing: border-box; display: block; width: 100%; min-height: 7rem; resize: vertical; margin-top: .5rem; padding: .75rem; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: .25rem; }
+textarea { box-sizing: border-box; display: block; width: 100%; min-height: 7rem; resize: vertical; margin-top: .5rem; padding: .75rem; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--muted); border-radius: .25rem; }
