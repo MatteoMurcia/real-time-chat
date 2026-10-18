@@ -146,8 +146,10 @@ export class ChatStore {
     const channelId = this.channelId(), after = this.syncCursor(), revision = this.viewRevision;
     if (!channelId || !this.ready() || this.document.visibilityState !== 'visible' || this.syncLoading()) return;
     if (after === null) { this.loadHistory(); return; }
-    let recovered = 0;
-    const announce = () => { if (recovered) this.liveNotice.set(`Conversation updated. ${recovered} new messages loaded.`); };
+    let recovered = 0, lastRecoveredSequence = '';
+    const announce = () => {
+      if (recovered) this.liveNotice.set(`Conversation updated. ${recovered} new messages loaded through message ${lastRecoveredSequence}.`);
+    };
     this.syncLoading.set(true); this.syncError.set('');
     this.syncRequest = this.sync.recover(channelId, after).subscribe({
       next: page => {
@@ -155,7 +157,8 @@ export class ChatStore {
         const count = this.messages().length;
         for (const message of page.items) this.confirm(message);
         this.syncCursor.set(page.nextCursor);
-        recovered += this.messages().length - count;
+        const added = this.messages().length - count;
+        if (added) { recovered += added; lastRecoveredSequence = page.items.at(-1)!.sequence; }
       },
       error: (error: unknown) => {
         if (revision !== this.viewRevision) return;

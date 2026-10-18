@@ -55,9 +55,18 @@ it('announces recovered messages once after all pages and stays silent on empty 
   expect(store.liveNotice()).toBe('');
   pages.next({ items: [canonical({ id: 'second', sequence: '2' })], nextCursor: 'H', until: 'H', hasMore: false });
   expect(store.liveNotice()).toBe(''); pages.complete();
-  expect(store.liveNotice()).toBe('Conversation updated. 2 new messages loaded.');
+  expect(store.liveNotice()).toBe('Conversation updated. 2 new messages loaded through message 2.');
   sync.recover.mockReturnValue(EMPTY); store.recover();
-  expect(store.liveNotice()).toBe('Conversation updated. 2 new messages loaded.');
+  expect(store.liveNotice()).toBe('Conversation updated. 2 new messages loaded through message 2.');
+});
+
+it('distinguishes consecutive recovery summaries with the same number of new messages', () => {
+  const notices: string[] = [];
+  for (const sequence of ['1', '2']) {
+    sync.recover.mockReturnValue(of({ items: [canonical({ id: `row-${sequence}`, sequence })], nextCursor: `cursor-${sequence}`, until: `cursor-${sequence}`, hasMore: false }));
+    store.recover(); notices.push(store.liveNotice());
+  }
+  expect(notices).toEqual(['Conversation updated. 1 new messages loaded through message 1.', 'Conversation updated. 1 new messages loaded through message 2.']);
 });
 
 it('summarizes outgoing states without message bodies and announces zero after an ack alone', async () => {
