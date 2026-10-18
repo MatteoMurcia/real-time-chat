@@ -55,10 +55,19 @@ jobs:
       - name: Build integration tools in the test image
         run: docker compose -f compose.test.yaml build integration
       - name: Run integration against fresh PostgreSQL databases
-        run: docker compose -f compose.test.yaml up --abort-on-container-exit --exit-code-from integration
+        id: integration
+        run: docker compose -f compose.test.yaml run --rm integration
+      - name: Verify cleanup after forward integration
+        if: always() && (steps.integration.outcome == 'success' || steps.integration.outcome == 'failure')
+        shell: bash
+        run: |
+          test "$(docker compose -f compose.test.yaml exec -T db psql -U integration -d chat_integration_test -tAc "SELECT count(*) FROM pg_database WHERE datname LIKE 'suite_%_test'")" = 0
+          test "$(docker compose -f compose.test.yaml exec -T db psql -U integration -d chat_integration_test -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'")" = 0
       - name: Repeat integration in reverse order
+        id: reverse
         run: docker compose -f compose.test.yaml run --rm -e INTEGRATION_ORDER=reverse integration
-      - name: Verify suite databases were removed and the base remains empty
+      - name: Verify cleanup after reverse integration
+        if: always() && (steps.reverse.outcome == 'success' || steps.reverse.outcome == 'failure')
         shell: bash
         run: |
           test "$(docker compose -f compose.test.yaml exec -T db psql -U integration -d chat_integration_test -tAc "SELECT count(*) FROM pg_database WHERE datname LIKE 'suite_%_test'")" = 0

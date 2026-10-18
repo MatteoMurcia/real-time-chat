@@ -20,7 +20,7 @@
     "typecheck": "npm run typecheck --workspaces",
     "test": "npm test --workspaces",
     "test:docker": "node --test docker/*.test.mjs",
-    "test:integration": "docker compose -p real-time-chat-integration -f compose.test.yaml up --build --abort-on-container-exit --exit-code-from integration",
+    "test:integration": "docker compose -p real-time-chat-integration -f compose.test.yaml run --build --rm integration",
     "test:e2e": "playwright test",
     "lint": "eslint . --max-warnings=0"
   },
