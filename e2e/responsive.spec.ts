@@ -128,6 +128,8 @@ test('wraps long content, adapts to a reduced viewport and cleans up twenty chan
     await expect(page.getByText('Live connection established.', { exact: true })).toBeVisible();
     expect(await listenerCounts()).toEqual(baseline);
     await open(0); expect(await listenerCounts()).toEqual(activeListeners);
+    expectedLive.push(await send(0, 'Live after returning to Workspace'));
+    await expectRows(0); await expect.poll(() => received).toEqual(expectedLive);
     expect(errors).toEqual([]);
   } finally { sender.disconnect(); await cdp.detach(); }
 });
