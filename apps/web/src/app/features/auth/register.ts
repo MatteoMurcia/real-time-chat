@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, DestroyRef, ElementRef, inject, signal } from '@angular/core';
+import { afterNextRender, ChangeDetectionStrategy, ChangeDetectorRef, Component, DestroyRef, ElementRef, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, type ValidatorFn } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -38,6 +38,8 @@ export class Register {
   protected readonly pending = signal(false);
   protected readonly message = signal('');
   private readonly serverFields = signal<FieldErrors>({});
+
+  constructor() { afterNextRender(() => this.element.nativeElement.querySelector('h1')?.focus()); }
 
   protected error(field: RegistrationField): string {
     const control = this.form.controls[field];

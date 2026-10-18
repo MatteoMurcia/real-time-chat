@@ -27,6 +27,12 @@ function setup() {
   return { fixture, element, http, fill, submit, valid };
 }
 
+it('focuses the page title when registration opens', () => {
+  const { element } = setup();
+  expect(document.activeElement).toBe(element.querySelector('h1'));
+  expect(element.querySelector('h1')!.tabIndex).toBe(-1);
+});
+
 it('validates before sending and sends only once after a fresh CSRF bootstrap', async () => {
   const { fixture, element, http, submit, valid } = setup();
   const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);

@@ -25,7 +25,7 @@
       <article class="message outgoing">
         <strong>You</strong><p class="body">{{ item.request.body }}</p>
         <small role="status">{{ item.state === 'pending' ? (item.attempt === 1 ? 'Sending…' : 'Retrying confirmation…') : item.state === 'rejected' ? 'Rejected — copy the text to send a corrected message.' : 'Unconfirmed — it may already be saved.' }}</small>
-        @if (item.state === 'unconfirmed') { <button type="button" [disabled]="!store.ready()" (click)="store.retry(item)">Retry confirmation</button> }
+        @if (item.state === 'unconfirmed') { <button type="button" [disabled]="!store.ready()" (click)="retry(item)">Retry confirmation</button> }
       </article>
     }
   </div>
@@ -34,12 +34,12 @@
   @if (store.syncLoading()) { <p role="status">Recovering missed messages…</p> }
   @if (store.syncError()) {
     <p role="alert" class="error-summary">{{ store.syncError() }}</p>
-    <button type="button" (click)="store.recover()" [disabled]="!store.ready() || store.syncLoading()">Retry recovery</button>
+    <button type="button" (click)="recover()" [disabled]="!store.ready() || store.syncLoading()">Retry recovery</button>
   }
   <button class="latest" type="button" (click)="scrollToLatest()">{{ hasNewMessages() ? 'New messages — show latest' : following() ? 'Scroll to latest message' : 'Show latest messages' }}</button>
   <form (submit)="$event.preventDefault(); send()">
     <label for="message-body">Message</label>
-    <textarea id="message-body" rows="3" [formControl]="draft" aria-describedby="message-help" (keydown)="onKey($event)"></textarea>
+    <textarea id="message-body" rows="3" [formControl]="draft" aria-describedby="message-help" (keydown)="onKey($event)" (compositionstart)="composing = true" (compositionend)="composing = false"></textarea>
     <p id="message-help" class="field-help">1–2,000 characters. Enter to send; Shift+Enter for a new line. Confirmation retries once automatically after 5 seconds. Drafts stay here while reconnecting.</p>
     <button type="submit" [disabled]="!store.ready() || !draft.value.trim()">Send message</button>
   </form>
