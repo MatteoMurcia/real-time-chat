@@ -175,3 +175,95 @@ Implementation references: [Nest gateways](https://docs.nestjs.com/websockets/ga
 [Socket.IO middleware](https://socket.io/docs/v4/middlewares/),
 [reverse proxy](https://socket.io/docs/v4/reverse-proxy/) and
 [client lifecycle](https://socket.io/docs/v4/client-socket-instance/).
+
+## Reproducible integration in containers
+
+Use the standalone test file, rather than combining it with `compose.yaml`.
+Only Git and Docker Compose are needed. Choose a unique private test password;
+in PowerShell 7+ it can be generated without installing Node or OpenSSL:
+
+```powershell
+$env:TEST_POSTGRES_PASSWORD = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(24))
+```
+
+On a shell with OpenSSL, use `export TEST_POSTGRES_PASSWORD="$(openssl rand -hex 24)"`.
+Do not echo, commit or reuse the password. The test settings do not consume the
+development `POSTGRES_PASSWORD` or `DATABASE_URL`.
+
+```text
+docker compose -p real-time-chat-integration -f compose.test.yaml run --build --rm integration
+docker compose -p real-time-chat-integration -f compose.test.yaml run --rm -e INTEGRATION_ORDER=reverse integration
+docker compose -p real-time-chat-integration -f compose.test.yaml down --volumes --remove-orphans
+```
+
+Run cleanup even when either test command fails. PowerShell users can place test
+commands inside `try { ... } finally { <cleanup command> }`; shell users can use
+an EXIT trap. Preserve/check each test command's exit code; cleanup success does
+not mean tests passed. `npm run test:integration` is an optional shortcut for the
+first command when host Node/npm is available; it does not perform cleanup.
+
+The explicit project name prevents a development `COMPOSE_PROJECT_NAME` from
+selecting the primary stack. For simultaneous independent runs, use a distinct
+test project name consistently for all commands. Never use the primary project's
+name for test cleanup. This stack has no published ports, host bind mounts or
+named volumes: PostgreSQL uses tmpfs, and tools are compiled into the test image.
+The runner is non-root; migration engines are downloaded during build before
+joining the internal network. No demo seed is executed.
+
+Each of the 19 scenarios creates a private `suite_<uuid>_test` database, applies
+all committed migrations, verifies the five data tables start empty and starts
+an independent app. Constraint fixtures create their own user/session instead
+of relying on an earlier scenario. Generated databases are dropped after the
+scenario, even on assertion failure. The test role needs CREATEDB only in this
+disposable server. No supplied database name is used as a deletion target.
+
+The quota fixture temporarily mocks the process clock, so scenarios run serially
+within each Node process. CI repeats the same image in reverse order without
+restarting PostgreSQL and checks after each pass, including failures, that no
+generated databases remain and the base has no public tables. Neither
+suite order nor demo data is a prerequisite. Existing per-scenario deadlines and
+all behavior assertions remain in place.
+
+The new **Integration** job uses a unique project and masked random password for
+every run. It propagates the runner's exit status, reports service status and
+bounded database logs on failure, and always removes its own stack. PostgreSQL
+logging omits failing SQL/constraint detail; migration setup errors expose a safe
+phase rather than captured connection output. Do not publish environment files,
+expanded Compose configuration or full container inspection output as diagnostics.
+
+References: [Compose one-off test containers](https://docs.docker.com/reference/cli/docker/compose/run/)
+and [health-dependent startup](https://docs.docker.com/compose/how-tos/startup-order/).
+
+### Verification evidence — 4.3a (2026-10-19)
+
+[CI 39171553695](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39171553695)
+on `178ccde` included a temporary assertion failure after the duplicate-key
+scenario's real checks. **Integration failed with exit code 1 and the exact
+controlled-probe assertion**. The subsequent cleanup query still passed: no
+generated suite database or base public table remained. Safe diagnostics and
+stack teardown passed. Quality and Containers passed, including all 22 E2Es.
+The two failed Node results were the intended scenario and its parent; the
+remaining 19 passed. Reverse-order steps correctly did not run after that failure.
+
+Commit `1ab8a0c` removed the probe, restoring the full scenario assertions.
+[CI 39171836883](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39171836883)
+then passed **21/21 integration results in each order**, approximately 28 seconds
+per pass, with zero failures, cancellations or skipped tests. Both cleanup queries
+and stack removal passed while the same PostgreSQL instance served both passes.
+These are two executions of the same scenarios, not 42 distinct tests.
+The same run passed all three jobs: **45 API, 103 Angular, 3 contracts, 5 Docker
+checks and 22 Chromium E2Es**, with zero audit vulnerabilities.
+
+Host verification passed **45 API tests**, four URL-preload tests, lint/typecheck
+and Compose configuration validation. Docker Desktop's Linux engine is unavailable
+locally: the existing real-Nginx Docker test fails on missing Docker, so neither
+container execution nor that check is claimed as a local success. CI supplies the
+real Docker/PostgreSQL/browser evidence. No test was suppressed to accommodate
+the local limitation.
+
+The independent reviewer and parent checked isolation, retained assertions,
+cleanup and final probe removal. Review suggestions added cleanup checks after
+both passes on the same server and clarified the PowerShell version. Primary
+environment/data are preserved; no production role, API, schema, dependency or
+deployment changes are included. CP4-B is a separate checkpoint; CP0-C and CP1-C
+remain pending.

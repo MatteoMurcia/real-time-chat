@@ -1,0 +1,33 @@
+name: real-time-chat-integration
+
+services:
+  db:
+    image: postgres:18.6-bookworm
+    command: ["postgres", "-c", "log_error_verbosity=terse", "-c", "log_min_error_statement=panic"]
+    environment: &test-database
+      POSTGRES_DB: chat_integration_test
+      POSTGRES_USER: integration
+      POSTGRES_PASSWORD: ${TEST_POSTGRES_PASSWORD:?Set a private TEST_POSTGRES_PASSWORD}
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U integration -d chat_integration_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  integration:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: integration
+    environment: *test-database
+    init: true
+    depends_on:
+      db:
+        condition: service_healthy
+
+networks:
+  default:
+    internal: true

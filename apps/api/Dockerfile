@@ -27,6 +27,17 @@ USER node
 EXPOSE 3000
 CMD ["sh", "-c", "npm run build --workspace @real-time-chat/api && exec node --import ./docker/database-env.mjs apps/api/dist/main.js"]
 
+FROM dependencies AS integration
+RUN node node_modules/@prisma/engines/scripts/postinstall.js
+COPY tsconfig.base.json ./
+COPY --chown=node:node apps/api ./apps/api
+RUN npm run pretest:integration --workspace @real-time-chat/api \
+    && node node_modules/typescript/bin/tsc -p apps/api/tsconfig.test.json
+COPY docker/database-env.mjs docker/test-env.mjs ./docker/
+ENV NODE_ENV=test
+USER node
+CMD ["sh", "-c", "exec node --import ./docker/test-env.mjs --test apps/api/dist-test/test/integration/*.spec.js"]
+
 FROM dependencies AS migrate
 # Download the migration engine at build time, before entering the internal network.
 RUN node node_modules/@prisma/engines/scripts/postinstall.js
