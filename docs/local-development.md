@@ -180,7 +180,7 @@ Implementation references: [Nest gateways](https://docs.nestjs.com/websockets/ga
 
 Use the standalone test file, rather than combining it with `compose.yaml`.
 Only Git and Docker Compose are needed. Choose a unique private test password;
-in PowerShell it can be generated without installing Node or OpenSSL:
+in PowerShell 7+ it can be generated without installing Node or OpenSSL:
 
 ```powershell
 $env:TEST_POSTGRES_PASSWORD = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(24))
@@ -233,3 +233,37 @@ expanded Compose configuration or full container inspection output as diagnostic
 
 References: [Compose one-off test containers](https://docs.docker.com/reference/cli/docker/compose/run/)
 and [health-dependent startup](https://docs.docker.com/compose/how-tos/startup-order/).
+
+### Verification evidence — 4.3a (2026-10-19)
+
+[CI 39171553695](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39171553695)
+on `178ccde` included a temporary assertion failure after the duplicate-key
+scenario's real checks. **Integration failed with exit code 1 and the exact
+controlled-probe assertion**. The subsequent cleanup query still passed: no
+generated suite database or base public table remained. Safe diagnostics and
+stack teardown passed. Quality and Containers passed, including all 22 E2Es.
+The two failed Node results were the intended scenario and its parent; the
+remaining 19 passed. Reverse-order steps correctly did not run after that failure.
+
+Commit `1ab8a0c` removed the probe, restoring the full scenario assertions.
+[CI 39171836883](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39171836883)
+then passed **21/21 integration results in each order**, approximately 28 seconds
+per pass, with zero failures, cancellations or skipped tests. Both cleanup queries
+and stack removal passed while the same PostgreSQL instance served both passes.
+These are two executions of the same scenarios, not 42 distinct tests.
+The same run passed all three jobs: **45 API, 103 Angular, 3 contracts, 5 Docker
+checks and 22 Chromium E2Es**, with zero audit vulnerabilities.
+
+Host verification passed **45 API tests**, four URL-preload tests, lint/typecheck
+and Compose configuration validation. Docker Desktop's Linux engine is unavailable
+locally: the existing real-Nginx Docker test fails on missing Docker, so neither
+container execution nor that check is claimed as a local success. CI supplies the
+real Docker/PostgreSQL/browser evidence. No test was suppressed to accommodate
+the local limitation.
+
+The independent reviewer and parent checked isolation, retained assertions,
+cleanup and final probe removal. Review suggestions added cleanup checks after
+both passes on the same server and clarified the PowerShell version. Primary
+environment/data are preserved; no production role, API, schema, dependency or
+deployment changes are included. CP4-B is a separate checkpoint; CP0-C and CP1-C
+remain pending.
