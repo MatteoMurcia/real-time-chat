@@ -1,9 +1,6 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
-import { createRequire } from 'node:module';
 import { test } from 'node:test';
-import { fileURLToPath } from 'node:url';
 import { createApp } from '../../src/app.js';
 import { DatabaseService } from '../../src/database/database.service.js';
 import { isApiError } from '@real-time-chat/contracts';
@@ -22,76 +19,45 @@ import { verifySyncCommitBoundary } from './message-sync-races.js';
 import { verifyCommitEmissionGap } from './commit-emission.js';
 import { verifySocketSessions } from './socket-session.js';
 import { verifyTrafficLimits } from './traffic-limits.js';
+import type { INestApplication } from '@nestjs/common';
+import { withTestDatabase } from '../setup.js';
+import { createUserFixture } from '../fixtures/users.js';
 
-test('migrations, user/session constraints and application connection lifecycle', async (t) => {
-  const databaseUrl = process.env.TEST_DATABASE_URL;
-  assert.ok(databaseUrl, 'TEST_DATABASE_URL is required; use a separate database ending in _test');
-  const url = new URL(databaseUrl);
-  assert.match(url.pathname, /_test$/, 'Integration database name must end in _test');
-  if (process.env.DATABASE_URL) {
-    const development = new URL(process.env.DATABASE_URL);
-    assert.notEqual(url.pathname, development.pathname, 'Test database must differ from development');
-  }
-
-  const migration = spawnSync(process.execPath, [createRequire(import.meta.url).resolve('prisma/build/index.js'), 'migrate', 'deploy'], {
-    cwd: fileURLToPath(new URL('../../../', import.meta.url)),
-    env: { ...process.env, DATABASE_URL: databaseUrl },
-    encoding: 'utf8', timeout: 60000,
-  });
-  assert.equal(migration.error, undefined);
-  assert.equal(migration.status, 0, 'Migration deployment must succeed');
-
-  await t.test('enforces default HTTP/socket quotas, input bounds and proxy trust with real clients', { timeout: 30000 }, () => verifyTrafficLimits(databaseUrl));
-  // Existing recovery fixtures intentionally create >100 messages and many accounts on one peer.
-  const { app } = await createApp({ NODE_ENV: 'test', PORT: '3000', DATABASE_URL: databaseUrl, SEND_LIMIT: '1000', LOGIN_LIMIT: '1000', REGISTER_LIMIT: '1000', CHANNEL_CREATE_LIMIT: '1000' });
-  t.after(() => app.close());
-  await app.listen(0, '127.0.0.1');
-  const db = app.get(DatabaseService);
-  await t.test('creates channels atomically, rejects forged requests and paginates discovery', () => verifyChannels(app, db));
-  await t.test('joins and leaves channels idempotently with session-scoped access', () => verifyMembership(app, db));
-  await t.test('authorizes channel subscriptions and orders both subscribe/leave races', { timeout: 20000 }, () => verifySubscriptions(app, db));
-  await t.test('persists ordered messages, deduplicates retries and rejects failed commits', { timeout: 20000 }, () => verifyMessages(app, db));
-  await t.test('resolves concurrent message keys without leaking unauthorized results', { timeout: 20000 }, () => verifyMessageIdempotency(app, db));
-  await t.test('paginates an authorized message snapshot across equal timestamps and concurrent new messages', () => verifyHistory(app, db));
-  await t.test('recovers an authorized bounded message interval despite ongoing traffic', { timeout: 20000 }, () => verifyMessageSync(app, db));
-  await t.test('waits for commit or rollback before capturing the sync boundary', { timeout: 20000 }, () => verifySyncCommitBoundary(app, db));
-  await t.test('recovers a committed message without emission while the receiver stays connected', { timeout: 20000 }, () => verifyCommitEmissionGap(app, db));
-  await t.test('closes revoked and idle expired sockets without affecting another session or reopening races', { timeout: 20000 }, () => verifySocketSessions(app, db));
-  const email = `${randomUUID()}@example.test`;
-  const user = await db.user.create({ data: { email, displayName: 'Integration test', passwordHash: 'test-only-hash' } });
-  t.after(async () => {
-    // This separate client also makes cleanup safe after the lifecycle assertion closes the app.
-    const cleanup = new DatabaseService(databaseUrl);
-    try {
-      await cleanup.session.deleteMany({ where: { userId: user.id } });
-      await cleanup.user.delete({ where: { id: user.id } });
-    } finally {
-      await cleanup.$disconnect();
-    }
-  });
-  const session = { userId: user.id, tokenHash: randomUUID(), expiresAt: new Date(Date.now() + 86400000) };
-
-  await t.test('rejects duplicate email and token hashes', async () => {
+type Fixture = { app: INestApplication; db: DatabaseService; databaseUrl: string };
+const suites: { name: string; timeout: number; run: (fixture: Fixture) => Promise<void> }[] = [
+  { name: "enforces default HTTP/socket quotas, input bounds and proxy trust with real clients", timeout: 30000, run: ({ databaseUrl }) => verifyTrafficLimits(databaseUrl) },
+  { name: "creates channels atomically, rejects forged requests and paginates discovery", timeout: 20000, run: ({ app, db }) => verifyChannels(app, db) },
+  { name: "joins and leaves channels idempotently with session-scoped access", timeout: 20000, run: ({ app, db }) => verifyMembership(app, db) },
+  { name: "authorizes channel subscriptions and orders both subscribe/leave races", timeout: 20000, run: ({ app, db }) => verifySubscriptions(app, db) },
+  { name: "persists ordered messages, deduplicates retries and rejects failed commits", timeout: 20000, run: ({ app, db }) => verifyMessages(app, db) },
+  { name: "resolves concurrent message keys without leaking unauthorized results", timeout: 20000, run: ({ app, db }) => verifyMessageIdempotency(app, db) },
+  { name: "paginates an authorized message snapshot across equal timestamps and concurrent new messages", timeout: 20000, run: ({ app, db }) => verifyHistory(app, db) },
+  { name: "recovers an authorized bounded message interval despite ongoing traffic", timeout: 20000, run: ({ app, db }) => verifyMessageSync(app, db) },
+  { name: "waits for commit or rollback before capturing the sync boundary", timeout: 20000, run: ({ app, db }) => verifySyncCommitBoundary(app, db) },
+  { name: "recovers a committed message without emission while the receiver stays connected", timeout: 20000, run: ({ app, db }) => verifyCommitEmissionGap(app, db) },
+  { name: "closes revoked and idle expired sockets without affecting another session or reopening races", timeout: 20000, run: ({ app, db }) => verifySocketSessions(app, db) },
+  { name: "rejects duplicate email and token hashes", timeout: 20000, run: async ({ db }) => {
+    const { user, session } = await createUserFixture(db); const email = user.email;
     await assert.rejects(db.user.create({ data: { email, displayName: 'Duplicate', passwordHash: 'test-only-hash' } }), { code: 'P2002' });
     await db.session.create({ data: session });
     await assert.rejects(db.session.create({ data: session }), { code: 'P2002' });
-  });
-
-  await t.test('enforces user foreign keys and restricts deleting a user with sessions', async () => {
+  } },
+  { name: "enforces user foreign keys and restricts deleting a user with sessions", timeout: 20000, run: async ({ db }) => {
+    const { user, session } = await createUserFixture(db);
+    await db.session.create({ data: session });
     await assert.rejects(db.session.create({ data: { ...session, tokenHash: randomUUID(), userId: randomUUID() } }), { code: 'P2003' });
     await assert.rejects(db.user.delete({ where: { id: user.id } }), { code: 'P2003' });
-  });
-
-  await t.test('rolls back failed transactions', async () => {
+  } },
+  { name: "rolls back failed transactions", timeout: 20000, run: async ({ db }) => {
+    const { session } = await createUserFixture(db);
     const tokenHash = randomUUID();
     await assert.rejects(db.$transaction(async (tx) => {
       await tx.session.create({ data: { ...session, tokenHash } });
       throw new Error('intentional rollback');
     }), /intentional rollback/);
     assert.equal(await db.session.count({ where: { tokenHash } }), 0);
-  });
-
-  await t.test('registers through HTTP with CSRF, safe validation and concurrent uniqueness', async () => {
+  } },
+  { name: "registers through HTTP with CSRF, safe validation and concurrent uniqueness", timeout: 20000, run: async ({ app, db }) => {
     const endpoint = `${await app.getUrl()}/api/auth`;
     const origin = 'http://127.0.0.1:8080';
     const registrationEmail = `${randomUUID()}@example.test`;
@@ -156,9 +122,8 @@ test('migrations, user/session constraints and application connection lifecycle'
     } finally {
       await db.user.deleteMany({ where: { email: registrationEmail } });
     }
-  });
-
-  await t.test('login stores only token hashes and restores valid sessions with absolute expiry', async () => {
+  } },
+  { name: "login stores only token hashes and restores valid sessions with absolute expiry", timeout: 20000, run: async ({ app, db, databaseUrl }) => {
     const origin = 'http://127.0.0.1:8080';
     const endpoint = `${await app.getUrl()}/api/auth`;
     const password = ' session test passphrase 🔐 ';
@@ -250,9 +215,8 @@ test('migrations, user/session constraints and application connection lifecycle'
       await db.session.deleteMany({ where: { userId: member.id } });
       await db.user.delete({ where: { id: member.id } });
     }
-  });
-
-  await t.test('logout revokes only the current session and binds CSRF to that session', async () => {
+  } },
+  { name: "logout revokes only the current session and binds CSRF to that session", timeout: 20000, run: async ({ app, db }) => {
     const origin = 'http://127.0.0.1:8080';
     const endpoint = `${await app.getUrl()}/api/auth`;
     const sessions = app.get(SessionService);
@@ -314,9 +278,8 @@ test('migrations, user/session constraints and application connection lifecycle'
       await db.session.deleteMany({ where: { userId: member.id } });
       await db.user.delete({ where: { id: member.id } });
     }
-  });
-
-  await t.test('authenticates real Socket.IO clients and checks origins for polling and WebSocket', async () => {
+  } },
+  { name: "authenticates real Socket.IO clients and checks origins for polling and WebSocket", timeout: 20000, run: async ({ app, db }) => {
     const origin = 'http://127.0.0.1:8080';
     const endpoint = await app.getUrl();
     const sessions = app.get(SessionService);
@@ -368,9 +331,8 @@ test('migrations, user/session constraints and application connection lifecycle'
       await db.session.deleteMany({ where: { userId: member.id } });
       await db.user.delete({ where: { id: member.id } });
     }
-  });
-
-  await t.test('serves liveness with real application wiring and closes database connections', async () => {
+  } },
+  { name: "serves liveness with real application wiring and closes database connections", timeout: 20000, run: async ({ app, db, databaseUrl }) => {
     assert.equal((await fetch(`${await app.getUrl()}/api/health/live`)).status, 200);
     const connections = await db.$queryRaw<{ pid: number }[]>`SELECT pg_backend_pid() AS pid`;
     assert.ok(connections[0]);
@@ -382,7 +344,22 @@ test('migrations, user/session constraints and application connection lifecycle'
     } finally {
       await observer.$disconnect();
     }
-  });
+  } }
+];
+
+// The quota fixture temporarily mocks Date.now; keep suites serial within this process.
+test('isolated integration suites start empty and apply committed migrations', { concurrency: 1 }, async t => {
+  const ordered = process.env.INTEGRATION_ORDER === 'reverse' ? suites.toReversed() : suites;
+  await Promise.all(ordered.map(suite => t.test(suite.name, { timeout: suite.timeout }, () => withTestDatabase(async databaseUrl => {
+    // High-volume recovery fixtures have explicit quotas; the defaults have their own suite.
+    const { app } = await createApp({ NODE_ENV: 'test', PORT: '3000', DATABASE_URL: databaseUrl, SEND_LIMIT: '1000', LOGIN_LIMIT: '1000', REGISTER_LIMIT: '1000', CHANNEL_CREATE_LIMIT: '1000' });
+    try {
+      await app.listen(0, '127.0.0.1');
+      const db = app.get(DatabaseService);
+      assert.deepEqual(await Promise.all([db.user.count(), db.session.count(), db.channel.count(), db.membership.count(), db.message.count()]), [0, 0, 0, 0, 0]);
+      await suite.run({ app, db, databaseUrl });
+    } finally { await app.close(); }
+  }))));
 });
 
 test('failed connection does not expose the connection URL', async () => {
