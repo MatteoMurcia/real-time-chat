@@ -1,4 +1,5 @@
-import { spawn, spawnSync } from 'node:child_process';
+import { execFile, spawn, spawnSync } from 'node:child_process';
+import { promisify } from 'node:util';
 import type { PublicMessage, SendMessageRequest } from '@real-time-chat/contracts/messages';
 import { expect, test } from './fixtures.js';
 
@@ -88,7 +89,9 @@ test('drains a real commit and recovers a lost confirmation after the API contai
     expect(denied).toMatchObject({ ok: false, error: { code: 'INTERNAL_ERROR' } });
     expect(successfulAcks).toBe(0);
     gate.stdin.end('COMMIT;\n'); expect(await gateExit).toBe(0);
-    expect(docker('wait', api)).toBe('0');
+    // The sender and routed browser sockets need this event loop to finish the close handshake.
+    const exit = await promisify(execFile)('docker', ['wait', api], { timeout: 10000 });
+    expect(exit.stdout.trim()).toBe('0');
     const id = sql(`SELECT id FROM "Message" WHERE "clientMessageId"='${key}'::uuid`);
     expect(id).toMatch(/^[\da-f-]{36}$/);
     docker('start', api); restarted = true;
