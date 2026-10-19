@@ -116,7 +116,9 @@ characters in credentials) without starting Docker. The images exclude local
 environment files, generated output, dependencies and private key files from
 their build context.
 
-For an optional populated local demo, follow [the demonstration seed](docs/demo-seed.md).
+For an optional populated local demo in a separate database, follow
+[demo access and maintenance](docs/demo.md). The [seed reference](docs/demo-seed.md)
+explains repeat runs and collision handling.
 It adds two fictional accounts and paginated history through a one-shot container.
 
 ## Develop inside Docker

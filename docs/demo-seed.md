@@ -4,6 +4,9 @@ This optional tool creates fictional **Alice Rivera** and **Bob Chen**, two
 channels and 111 messages: **Demo Lounge** has 105 messages (three 50-item history
 pages), and **Demo Planning** has six. Both accounts belong to both channels.
 It creates no login sessions and does not run when the application starts.
+For the separate demo installation, two-session access and guarded manual reset,
+start with [demo access and maintenance](demo.md). The commands below describe
+adding seed data to the ordinary local stack; they do not enable reset there.
 
 ## Run with Docker only
 
