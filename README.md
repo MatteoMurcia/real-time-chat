@@ -452,7 +452,8 @@ regenerate the lockfile and verify generation/migrations before doing so.
 ### Remaining delivery work
 
 Functional P0 has passed CP4-C; the optional demo seed is available above.
-Demo access/reset guidance, clean-clone delivery and presentation remain in the plan.
+Demo access and guarded reset are documented in [the demo guide](docs/demo.md).
+The manual first-message timing, clean-clone delivery and presentation remain in the plan.
 Remote hosting is outside the current delivery scope.
 
 ## Account registration API

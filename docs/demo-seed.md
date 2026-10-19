@@ -42,7 +42,8 @@ Open **Demo Lounge** and load earlier messages twice to see all 105. Use **Demo
 Planning** for a shorter conversation. Accounts/channels are shared demo data
 inside this local database, not private sandboxes. Run only on a database where
 you intend to add these fictional accounts; never point a public demo at real
-user data. No reset/deletion command is introduced by this task.
+user data. Seeding never deletes data. The separate [demo maintenance procedure](demo.md#reset-manually)
+provides an explicit reset restricted to the dedicated demo installation.
 
 ## Reruns and collisions
 
