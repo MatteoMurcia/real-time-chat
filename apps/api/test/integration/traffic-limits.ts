@@ -10,6 +10,8 @@ import { ChannelsService } from '../../src/channels/channels.service.js';
 import { ChatGateway } from '../../src/realtime/chat.gateway.js';
 import { ConnectionsService } from '../../src/realtime/connections.service.js';
 import { hashPassword } from '../../src/identity/password.js';
+import { Logger } from '@nestjs/common';
+import type { Diagnostic } from '../../src/logging/logger.js';
 
 export async function verifyTrafficLimits(databaseUrl: string): Promise<void> {
   const { app } = await createApp({ NODE_ENV: 'test', PORT: '3000', DATABASE_URL: databaseUrl });
@@ -106,13 +108,19 @@ export async function verifyTrafficLimits(databaseUrl: string): Promise<void> {
     const connections = app.get(ConnectionsService), coordinate = connections.withChannel.bind(connections);
     let resume!: () => void; const queueGate = new Promise<void>(resolve => { resume = resolve; });
     const held = mock.method(connections, 'withChannel', async <T>(id: string, operation: () => Promise<T>) => { await queueGate; return coordinate(id, operation); });
+    const records: Diagnostic[] = [];
+    const capture = mock.method(Logger.prototype, 'warn', (record: Diagnostic) => records.push(record));
     try {
-      const burst = Array.from({ length: 31 }, () => replacement.timeout(3000).emitWithAck('message:send', { ...message, clientMessageId: randomUUID() }));
+      const requests = Array.from({ length: 31 }, () => ({ ...message, clientMessageId: randomUUID() }));
+      const burst = requests.map(input => replacement.timeout(3000).emitWithAck('message:send', input));
       const rejected = await burst[30]!; assert.equal(rejected.ok, false); limited(rejected.error);
+      const record = records.find(record => record.requestId === rejected.error.requestId);
+      assert.equal(record?.clientMessageId, requests[30]!.clientMessageId);
+      assert.equal(record?.stage, 'authorize'); assert.equal(record?.code, 'RATE_LIMITED');
       assert.equal(await db.message.count({ where: { channelId: channel.id } }), 28);
       resume(); for (const ack of await Promise.all(burst.slice(0, 30))) assert.equal(ack.ok, true);
       assert.equal(await db.message.count({ where: { channelId: channel.id } }), 58);
-    } finally { resume(); held.mock.restore(); }
+    } finally { resume(); held.mock.restore(); capture.mock.restore(); }
     for (let i = 0; i < 10; i++) {
       const currentCookie = i % 2 ? otherCookie : cookie;
       const csrf = await (await fetch(`${endpoint}/api/auth/session/csrf`, { headers: { origin, cookie: currentCookie } })).json() as { csrfToken: string };

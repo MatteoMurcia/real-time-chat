@@ -13,6 +13,8 @@ import { validateMessage } from '../messaging/validate-message.js';
 import type { PublicMessage, SendMessageAck } from '@real-time-chat/contracts/messages';
 import { socketError } from './socket-error.js';
 import { RateLimitService } from '../security/rate-limit.service.js';
+import { randomUUID } from 'node:crypto';
+import { diagnostic, type Diagnostic } from '../logging/logger.js';
 
 @WebSocketGateway({ path: '/socket.io', serveClient: false, maxHttpBufferSize: 16384, transports: ['polling', 'websocket'] })
 export class ChatGateway implements OnGatewayInit, OnGatewayConnection {
@@ -25,6 +27,13 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection {
 
   @SubscribeMessage('message:send')
   async send(@ConnectedSocket() socket: Socket, @MessageBody() body: unknown): Promise<SendMessageAck> {
+    const started = performance.now(), requestId = randomUUID();
+    const candidate = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+    const ids = {
+      ...(typeof candidate.clientMessageId === 'string' ? { clientMessageId: candidate.clientMessageId } : {}),
+      ...(typeof candidate.channelId === 'string' ? { channelId: candidate.channelId } : {}),
+    };
+    let stage: Diagnostic['stage'] = 'authorize';
     try {
       if (!socket.connected || typeof socket.data.userId !== 'string') throw new UnauthorizedException();
       this.limits.consume('send', socket.data.userId);
@@ -32,11 +41,14 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection {
       return await this.connections.withChannel(input.channelId, async () => {
         const session = await this.sessions.authenticate(socket.request.headers.cookie);
         if (!socket.connected || session.id !== socket.data.sessionId) throw new UnauthorizedException();
+        stage = 'persist';
         const { message, created } = await this.messages.send(session.user.id, input);
+        stage = 'publish';
         if (created) await this.publish(message);
+        diagnostic({ event: 'message.send', requestId, ...ids, outcome: created ? 'created' : 'duplicate', durationMs: Math.round(performance.now() - started) });
         return { ok: true, data: message };
       });
-    } catch (error: unknown) { return { ok: false, error: socketError(error) }; }
+    } catch (error: unknown) { return { ok: false, error: socketError(error, { ...ids, stage, durationMs: Math.round(performance.now() - started) }, requestId) }; }
   }
 
   private async publish(message: PublicMessage): Promise<void> {

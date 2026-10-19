@@ -642,6 +642,11 @@ emails. The ordinary development volume is separate. CI uses a disposable stack.
 
 ## Continuous integration
 
+Operational request/message correlation and the separate live/readiness endpoints
+are documented in [local diagnostics and health](docs/operations.md). API container
+health checks readiness against a bounded PostgreSQL probe; liveness stays
+independent of database availability.
+
 [CI](https://github.com/MatteoMurcia/real-time-chat/actions/workflows/ci.yml)
 runs on every pull request targeting `main` and every push to `main`.
 

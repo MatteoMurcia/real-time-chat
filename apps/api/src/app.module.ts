@@ -1,5 +1,6 @@
 import { Module, type DynamicModule } from '@nestjs/common';
 import { LiveController } from './health/live.controller.js';
+import { ReadyController } from './health/ready.controller.js';
 import { DatabaseService } from './database/database.service.js';
 import { APP_FILTER } from '@nestjs/core';
 import { ErrorFilter } from './http/error.filter.js';
@@ -21,7 +22,7 @@ import { RateLimitService } from './security/rate-limit.service.js';
 import type { TrafficLimits } from './config.js';
 
 @Module({
-  controllers: [LiveController, RegistrationController, SessionController, ChannelsController, HistoryController],
+  controllers: [LiveController, ReadyController, RegistrationController, SessionController, ChannelsController, HistoryController],
   providers: [{ provide: APP_FILTER, useClass: ErrorFilter }],
 })
 export class AppModule {
