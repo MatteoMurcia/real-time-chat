@@ -16,6 +16,14 @@ COPY tsconfig.base.json ./
 COPY apps/api ./apps/api
 RUN npm test --workspace @real-time-chat/api && npm run build --workspace @real-time-chat/api
 
+FROM build AS seed
+RUN npm run build:seed --workspace @real-time-chat/api
+COPY docker/database-env.mjs ./docker/database-env.mjs
+ENV NODE_ENV=development
+USER node
+ENTRYPOINT ["node", "--import", "./docker/database-env.mjs"]
+CMD ["apps/api/dist-seed/prisma/seed.js"]
+
 FROM dependencies AS development
 RUN node node_modules/@prisma/engines/scripts/postinstall.js
 COPY tsconfig.base.json ./

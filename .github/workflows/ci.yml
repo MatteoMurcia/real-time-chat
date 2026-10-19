@@ -95,10 +95,21 @@ jobs:
           password=$(openssl rand -hex 24)
           echo "::add-mask::$password"
           printf 'POSTGRES_DB=ci_chat\nPOSTGRES_USER=ci_user\nPOSTGRES_PASSWORD=%s\nAPP_ORIGIN=http://localhost:8080\nSEND_LIMIT=1000\nLOGIN_LIMIT=1000\nREGISTER_LIMIT=1000\nCHANNEL_CREATE_LIMIT=1000\n' "$password" > .env
+          demo_alice=$(openssl rand -hex 24)
+          demo_bob=$(openssl rand -hex 24)
+          echo "::add-mask::$demo_alice"
+          echo "::add-mask::$demo_bob"
+          printf 'DEMO_ALICE_PASSWORD=%s\nDEMO_BOB_PASSWORD=%s\n' "$demo_alice" "$demo_bob" >> .env
       - name: Build images and start the application
         run: docker compose up --build --wait --wait-timeout 120
       - name: Verify the public health endpoint
         run: test "$(curl --fail --silent --show-error http://127.0.0.1:8080/api/health/live)" = '{"status":"ok"}'
+      - name: Build the demonstration seed tool
+        run: docker compose --profile tools build seed
+      - name: Seed twice through the compiled container
+        run: |
+          docker compose --profile tools run --rm seed
+          docker compose --profile tools run --rm seed
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version-file: .node-version

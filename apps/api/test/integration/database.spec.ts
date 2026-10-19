@@ -20,12 +20,14 @@ import { verifyCommitEmissionGap } from './commit-emission.js';
 import { verifySocketSessions } from './socket-session.js';
 import { verifyTrafficLimits } from './traffic-limits.js';
 import { verifyShutdown } from './shutdown.js';
+import { verifyDemoSeed } from './demo-seed.js';
 import type { INestApplication } from '@nestjs/common';
 import { withTestDatabase } from '../setup.js';
 import { createUserFixture } from '../fixtures/users.js';
 
 type Fixture = { app: INestApplication; db: DatabaseService; databaseUrl: string };
 const suites: { name: string; timeout: number; run: (fixture: Fixture) => Promise<void> }[] = [
+  { name: 'seeds demo atomically, preserves unrelated data and supports repeated login and paginated history', timeout: 30000, run: ({ app, db }) => verifyDemoSeed(app, db) },
   { name: "drains deferred commits and rollbacks, bounds stuck work and leaked handles, and recovers original message keys", timeout: 45000, run: ({ app, db, databaseUrl }) => verifyShutdown(app, db, databaseUrl) },
   { name: "enforces default HTTP/socket quotas, input bounds and proxy trust with real clients", timeout: 30000, run: ({ databaseUrl }) => verifyTrafficLimits(databaseUrl) },
   { name: "creates channels atomically, rejects forged requests and paginates discovery", timeout: 20000, run: ({ app, db }) => verifyChannels(app, db) },
