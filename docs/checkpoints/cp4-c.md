@@ -3,10 +3,10 @@
 Review date: **2026-10-19**. Baseline: `185b28da470cdd9f785359afd7aa29bdd394e088`
 on `origin/main`, with shutdown task 4.4b merged through PR #51.
 
-**Verdict: verification in progress.** This checkpoint checks A01–A16 against
-assertions, connected implementation and a complete compiled-stack run. A green
-job alone is not a substitute for checking what each test actually proves.
-No additional product features belong to this checkpoint.
+**Verdict: verified for A01–A16 under the stated conditions.** Independent and
+parent review, local checks and the complete compiled-stack run passed. This
+closes the planned functional P0 checkpoint; owner review/manual merge of the
+checkpoint PR remains pending. No additional product features belong here.
 
 ## Acceptance evidence
 
@@ -23,8 +23,8 @@ coverage. Unit tests use controlled dependencies/time where explicitly stated.
 | A05 | Commit with lost ack | `message-retry.spec.ts`: held/lost real confirmation, original-key automatic/manual retry, one canonical result; API integration checks one publication. |
 | A06 | Event/ack in either order | `message-order.spec.ts`: release each real frame first in separate cases; first receipt clears pending, second leaves one canonical row with HTTP recovery disabled. |
 | A07 | More than two missed pages | `reconnect.spec.ts`: 105 messages, three pages, fixed upper boundary, exact ordered IDs and retained draft. |
-| A08 | Commit without emission | API `integration/commit-emission.ts`: persisted message recovered by the still-connected receiver over HTTP. `sync-gap.spec.ts` covers suppressed frames and focus recovery; Angular store test separately advances 15 seconds without focus to prove periodic recovery. |
-| A09 | Delayed transaction and concurrent writers | API `integration/message-sync-races.ts`: PostgreSQL barriers observe writer/sync/concurrent send waits for commit and rollback; no canonical message is lost behind the recovery cursor. |
+| A08 | Commit without emission | API `integration/commit-emission.ts`: persisted message recovered over authorized HTTP using the connected receiver's cookie; the socket ID stays unchanged. `sync-gap.spec.ts` covers UI recovery on focus with suppressed frames. Angular store test separately advances 15 seconds without focus, using a simulated SyncService, to prove timer dispatch. |
+| A09 | Delayed transaction and concurrent writers | API `integration/message-sync-races.ts`: the writer holds the channel lock first; sync and another send are observed waiting in PostgreSQL. Commit and rollback recover exact IDs without losing a canonical message behind the recovery cursor. |
 | A10 | Initial snapshot/live/channel races | `channel-races.spec.ts`: stale A/B responses and events around snapshots do not mix channels or advance the recovery cursor from a live event. |
 | A11 | Subscribe/send versus leave | API `integration/subscriptions.ts`: barriers enforce both operation orders; send-first persists once, leave-first cannot write. |
 | A12 | Revoked/expired idle sockets | API `integration/socket-session.ts`, `session-revocation.spec.ts`: inactive sockets close, cannot resume access, and another session stays valid. |
@@ -56,14 +56,56 @@ tests wait for each Workspace transport upgrade before asserting WebSocket frame
 
 ## Verification record
 
-Local lint, types, unit suites and build are being executed from the baseline.
-Full PostgreSQL, Nginx, compiled Angular and container evidence will come from
-Linux CI. Docker Desktop's local Linux engine is unavailable; no restart or
+Local lint, types, **51 API, 103 Angular and three contract tests**, and the full
+build passed from the baseline. The parent retained the local log in an ignored
+directory; no test was skipped or weakened for the checkpoint.
+
+[Baseline CI 39268334289](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39268334289)
+tested the exact merged revision `185b28d` and passed Quality, Integration and
+Containers: the same unit counts, **five Docker checks, 22 integration results
+in each order, 27 Chromium E2Es and six usability repetitions**. Lint, types,
+build and dependency audit passed with zero audit vulnerabilities. Both database
+cleanup checks, stack teardown and diagnostic uploads succeeded. The parent
+inspected actual logs, including the shutdown case in each integration order and
+the browser restart scenario; no skips or retries were used.
+
+The parent downloaded the baseline's
+[usability artifact](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39268334289/artifacts/12195120525),
+containing 13 PNGs from the critical and repeated runs, and inspected three:
+375px repeat2 (wrapped names/email and focused draft), reduced height repeat1
+(composer and Send accessible in 375×400), and the final desktop keyboard capture
+(visible focus on the selected channel heading). Long test directories scroll
+vertically; these images do not imply the entire page fits one viewport. Geometry
+assertions cover all six widths in each responsive run, beyond this visual sample.
+The [E2E reports](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39268334289/artifacts/12194550827)
+and PNGs expire after seven days. Downloads remain ignored and are not shipped.
+
+Docker Desktop's local Linux engine is unavailable. Actual PostgreSQL, Nginx,
+compiled Angular and container evidence comes from Linux CI; no restart or
 primary-volume operation is part of this review.
 
-An independent review checks A01–A13 against actual assertions and connected
-code. The parent reviews A14–A16, all findings and run results before the verdict.
-The final record must include exact tested revisions, counts and cleanup outcomes.
+## Independent and parent review
+
+The independent reviewer inspected A01–A13 assertions and connected services;
+the parent inspected A14–A16, the recovery/authorization barriers, CI logs and
+visual samples. No required functional finding remains in this scope.
+
+One documentation overclaim was corrected: the A09 summary said "either lock
+order", while its fixture deliberately admits the delayed writer first. It
+checks both transaction outcomes and allows either ordering of the subsequent
+sync/concurrent sender. The required delayed-transaction criterion is covered;
+an additional inverse writer order is not claimed.
+
+A08 is explicitly composite evidence, not one browser test of the entire timer
+and database-gap path: integration proves persisted-but-unemitted recovery via
+the receiver's authorized HTTP request, browser testing proves UI reconciliation
+on focus, and a controlled Angular test proves periodic dispatch without focus.
+The parent checked that these paths call the same recovery implementation.
+
+No product, schema, dependency, workflow or quality threshold
+changes were needed. Existing red/green regression evidence remains documented
+in earlier checkpoints and [operations](../operations.md); this documentation-only
+checkpoint introduces no behavior requiring a new mutation or duplicate test.
 
 ## Limits and next step
 
