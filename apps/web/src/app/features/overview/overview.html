@@ -1,6 +1,17 @@
   <p class="eyebrow">WORKSPACE OVERVIEW</p>
   <h1>A place for your team’s conversations.</h1>
-  <p>Messaging is on its way. Start by checking your connection.</p>
+  <p>Talk in shared channels, browse earlier messages and pick up the conversation after reconnecting.</p>
+  <section aria-labelledby="demo-title">
+    <h2 id="demo-title">Try the local demo</h2>
+    <p>For an installation with the demo loaded, use the two local demo passwords supplied by the person running it.</p>
+    <ol>
+      <li>Sign in as <strong>alice@demo.example.test</strong> and open <strong>Demo Lounge</strong>.</li>
+      <li>Open a private window or another browser, then sign in as <strong>bob@demo.example.test</strong> and open the same channel.</li>
+      <li>Send a message and watch it arrive in both sessions. Load earlier messages to explore the history.</li>
+    </ol>
+    <p><a routerLink="/login">Sign in to the demo</a></p>
+    <p class="note">Demo accounts and channels are shared. Other participants can see these conversations. Do not enter personal or confidential information. A demo reset clears accounts, sessions, channels and messages.</p>
+  </section>
   <section aria-labelledby="connection-title">
     <h2 id="connection-title">Connection</h2>
     <p role="status" aria-live="polite">
@@ -13,5 +24,5 @@
     <button type="button" (click)="checkConnection()" [disabled]="status() === 'loading'">
       {{ status() === 'error' ? 'Try again' : 'Check again' }}
     </button>
-    <p class="note">This checks the server connection. Messaging is not available yet.</p>
+    <p class="note">This checks whether the chat server can be reached.</p>
   </section>
