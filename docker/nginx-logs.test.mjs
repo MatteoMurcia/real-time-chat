@@ -50,7 +50,8 @@ test('real Nginx logs retain diagnostics without request credentials, including 
     assert.deepEqual(rows.map(row => row.status), ['200', '502', '405']);
     assert.equal(rows[2].method, 'OTHER');
     for (const row of rows) {
-      assert.deepEqual(Object.keys(row).sort(), ['method', 'requestId', 'requestTime', 'status', 'upstreamStatus', 'upstreamTime']);
+      assert.deepEqual(Object.keys(row).sort(), ['apiRequestId', 'method', 'requestId', 'requestTime', 'status', 'upstreamStatus', 'upstreamTime']);
+      assert.equal(row.apiRequestId, '-');
       assert.match(row.requestId, /^[a-f0-9]{32}$/);
       assert.match(row.requestTime, /^\d+\.\d{3}$/);
     }
