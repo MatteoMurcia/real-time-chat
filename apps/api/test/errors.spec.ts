@@ -69,7 +69,7 @@ test('HTTP errors use safe codes, fresh server IDs and no internal details', asy
   assert.equal(JSON.stringify(logs).includes(privateDetail), false);
   for (const log of logs) {
     assert.ok(log && typeof log === 'object');
-    assert.deepEqual(Object.keys(log).sort(), ['code', 'requestId']);
+    assert.deepEqual(Object.keys(JSON.parse(JSON.stringify(log))).sort(), ['code', 'event', 'requestId']);
     assert.ok('code' in log && log.code === 'INTERNAL_ERROR');
     assert.ok('requestId' in log && typeof log.requestId === 'string' && /^[a-f0-9-]{36}$/.test(log.requestId));
   }

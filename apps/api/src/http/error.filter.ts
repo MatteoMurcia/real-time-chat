@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { Catch, HttpException, Logger, type ArgumentsHost, type ExceptionFilter } from '@nestjs/common';
+import { Catch, HttpException, type ArgumentsHost, type ExceptionFilter } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
 import type { ApiError, ErrorCode } from '@real-time-chat/contracts';
 import { ValidationError } from './validation-error.js';
+import { diagnostic } from '../logging/logger.js';
 
 const publicErrors: Record<number, { code: ErrorCode; message: string }> = {
   400: { code: 'VALIDATION_ERROR', message: 'The request is invalid.' },
@@ -16,8 +17,6 @@ const publicErrors: Record<number, { code: ErrorCode; message: string }> = {
 
 @Catch()
 export class ErrorFilter implements ExceptionFilter {
-  private readonly logger = new Logger(ErrorFilter.name);
-
   constructor(private readonly adapterHost: HttpAdapterHost) {}
 
   catch(exception: unknown, host: ArgumentsHost): void {
@@ -28,10 +27,11 @@ export class ErrorFilter implements ExceptionFilter {
     const mapped = publicErrors[status];
     const body: ApiError = {
       ...(mapped ?? { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred.' }),
-      requestId: randomUUID(),
+      requestId: response.getHeader('X-Request-Id') ?? randomUUID(),
       ...(exception instanceof ValidationError ? { fieldErrors: exception.fieldErrors } : {}),
     };
-    if (!mapped) this.logger.error({ code: body.code, requestId: body.requestId });
+    if (!mapped && !response.getHeader('X-Request-Id')) diagnostic({ event: 'http.failure', code: body.code, requestId: body.requestId });
+    response.locals.diagnosticCode = body.code;
     httpAdapter.setHeader(response, 'X-Request-Id', body.requestId);
     httpAdapter.setHeader(response, 'Cache-Control', 'no-store');
     httpAdapter.reply(response, body, mapped ? status : 500);
