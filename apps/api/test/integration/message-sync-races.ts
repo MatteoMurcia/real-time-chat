@@ -36,25 +36,33 @@ export async function verifySyncCommitBoundary(app: INestApplication, db: Databa
       });
       const pid = await Promise.race([ready, writerResult.then(() => { throw new Error('Writer ended before the barrier'); })]);
       const recovery = sync.list(user.id, channel.id, { after: cursor(0n) });
+      const concurrent = messages.send(user.id, { ...input, clientMessageId: randomUUID(), body: 'Queued during delayed commit' });
       try {
         // Observe the real PostgreSQL wait, rather than assuming a sleep made the requests overlap.
         let blocked = false;
         const deadline = Date.now() + 2000;
         while (!blocked && Date.now() < deadline) {
-          const [row] = await db.$queryRaw<{ blocked: boolean }[]>`SELECT EXISTS (
-            SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND ${pid} = ANY(pg_blocking_pids(pid))
-          ) AS blocked`;
+          const [row] = await db.$queryRaw<{ blocked: boolean }[]>`SELECT
+            count(*) FILTER (WHERE wait_event_type = 'Lock') >= 2
+            AND bool_or(${pid} = ANY(pg_blocking_pids(pid))) AS blocked
+            FROM pg_stat_activity WHERE datname = current_database()`;
           blocked = row!.blocked;
           if (!blocked) await setTimeout(10);
         }
-        assert.equal(blocked, true, 'sync must wait for the uncommitted channel writer');
-      } finally { release(); await Promise.all([writerResult, recovery]); }
+        assert.equal(blocked, true, 'sync and the concurrent send must wait for the uncommitted writer');
+      } finally { release(); await Promise.all([writerResult, recovery, concurrent]); }
       const page = await recovery;
-      assert.equal(page.until, cursor(rollback ? 0n : 1n));
+      const queued = await concurrent;
+      const baseline = rollback ? 0n : 1n;
+      assert.ok([cursor(baseline), cursor(baseline + 1n)].includes(page.until));
       assert.equal(page.nextCursor, page.until); assert.equal(page.hasMore, false);
-      assert.deepEqual(page.items.map(item => item.clientMessageId), rollback ? [] : [input.clientMessageId]);
+      const remainder = await sync.list(user.id, channel.id, { after: page.nextCursor });
+      assert.deepEqual([...page.items, ...remainder.items].map(item => item.clientMessageId), [
+        ...(!rollback ? [input.clientMessageId] : []), queued.message.clientMessageId,
+      ]);
+      assert.equal(queued.message.sequence, String(baseline + 1n));
       const saved = await messages.send(user.id, { ...input, clientMessageId: randomUUID(), body: 'After boundary' });
-      const next = await sync.list(user.id, channel.id, { after: page.nextCursor });
+      const next = await sync.list(user.id, channel.id, { after: remainder.nextCursor });
       assert.deepEqual(next.items.map(item => item.id), [saved.message.id]);
       // Boundaries and response sequences remain exact past Number.MAX_SAFE_INTEGER.
       await db.channel.update({ where: { id: channel.id }, data: { lastSequence: 9007199254740992n } });

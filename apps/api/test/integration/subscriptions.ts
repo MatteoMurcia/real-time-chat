@@ -76,8 +76,10 @@ export async function verifySubscriptions(app: INestApplication, db: DatabaseSer
     rejected(await subscribe(), 'FORBIDDEN');
 
     // Pause the first operation under the real DB lock; queue the opposite operation before releasing it.
-    for (const subscribeFirst of [true, false]) {
+    for (const operation of ['subscribe', 'send'] as const) for (const operationFirst of [true, false]) {
       await channels.setMembership(users[0]!.id, channel.id, true);
+      const clientMessageId = randomUUID();
+      const act = operation === 'subscribe' ? subscribe : () => ack(first, 'message:send', { channelId: channel.id, clientMessageId, body: 'Send racing leave' });
       let entered!: () => void, release!: () => void, queued!: () => void;
       const started = new Promise<void>(resolve => { entered = resolve; });
       const held = new Promise<void>(resolve => { release = resolve; });
@@ -87,14 +89,15 @@ export async function verifySubscriptions(app: INestApplication, db: DatabaseSer
       const lockMock = mock.method(access, 'lockChannel', async (...args: Parameters<typeof lock>) => { await lock(...args); if (++locks === 1) { entered(); await held; } });
       const queueMock = mock.method(connections, 'withChannel', (...args: Parameters<typeof coordinate>) => { if (++operations === 2) queued(); return coordinate(...args); });
       try {
-        const firstOperation = subscribeFirst ? subscribe() : leave();
+        const firstOperation = operationFirst ? act() : leave();
         await started;
-        const secondOperation = subscribeFirst ? leave() : subscribe();
+        const secondOperation = operationFirst ? leave() : act();
         await waiting; release();
         const results = await Promise.all([firstOperation, secondOperation]);
-        const subscription = results[subscribeFirst ? 0 : 1] as ChannelSubscriptionAck;
-        if (subscribeFirst) assert.equal(subscription.ok, true); else rejected(subscription, 'FORBIDDEN');
-        assert.equal((results[subscribeFirst ? 1 : 0] as Response).status, 200);
+        const result = results[operationFirst ? 0 : 1] as ChannelSubscriptionAck;
+        if (operationFirst) assert.equal(result.ok, true); else rejected(result, 'FORBIDDEN');
+        assert.equal((results[operationFirst ? 1 : 0] as Response).status, 200);
+        assert.equal(await db.message.count({ where: { authorId: users[0]!.id, clientMessageId } }), Number(operation === 'send' && operationFirst));
         assert.equal(hasRoom(first), false); assert.equal(hasRoom(second), false);
       } finally { release(); lockMock.mock.restore(); queueMock.mock.restore(); }
     }
@@ -121,6 +124,7 @@ export async function verifySubscriptions(app: INestApplication, db: DatabaseSer
   } finally {
     for (const socket of sockets) socket.disconnect();
     const ids = users.map(user => user.id);
+    await db.message.deleteMany({ where: { authorId: { in: ids } } });
     await db.membership.deleteMany({ where: { userId: { in: ids } } });
     await db.channel.deleteMany({ where: { createdBy: { in: ids } } });
     await db.session.deleteMany({ where: { userId: { in: ids } } });
