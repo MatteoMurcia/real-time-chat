@@ -76,3 +76,21 @@ CI runs the exact Compose seed command twice before browser tests;
 and checks the populated channels/history. All credentials and data in that
 verification are synthetic. E2E traces are unredacted; use only the disposable
 stack described in the README.
+
+[CI 39313659571](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39313659571)
+on `26c6e27` passed all three jobs: 53 API, 103 Angular, three contract tests,
+five Docker checks, 23 integration results per order, 28 Chromium E2Es and six
+usability repetitions. The compiled seed command succeeded twice; both account
+logins and 105/6-message channel histories passed in the browser. Database cleanup,
+temporary-stack teardown and report uploads passed; dependency audit found no
+vulnerabilities and tests used no skips or retries.
+
+Local lint, types, all unit suites, app builds and the seed build also pass. A
+temporary mutation adding a fallback password failed the credential test; source
+was restored and all checks returned green. Compose configuration was checked
+without a daemon: ordinary startup excludes `seed`, while `--profile tools`
+includes it. Docker Desktop's local engine remains unavailable, so real database
+and container evidence comes from Linux CI. Independent and parent review found
+no remaining required changes. [PR #53](https://github.com/MatteoMurcia/real-time-chat/pull/53)
+is for owner review/manual merge. Reset/access UI work remains task 5.1b; clean-clone
+delivery and presentation remain later tasks, not certified by this seed test.
