@@ -147,6 +147,8 @@ jobs:
           path: |
             test-results/keyboard-desktop.png
             test-results/**/responsive-*.png
+            test-results/**/demo-overview-*.png
+            test-results/**/demo-after-reset.png
           if-no-files-found: error
           retention-days: 7
       # Traces contain synthetic session data: publish only after deleting the temporary database.

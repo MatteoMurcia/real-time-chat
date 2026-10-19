@@ -13,7 +13,7 @@ export async function resetDemo(db, confirmation) {
   if (confirmation !== 'chat_demo') throw new Error('Explicit --confirm chat_demo is required');
   await db.$transaction(async tx => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(52710)`;
-    const [target] = await tx.$queryRaw`SELECT datname AS database, current_user AS role,
+    const [target] = await tx.$queryRaw`SELECT datname::text AS database, current_user::text AS role,
       shobj_description(oid, 'pg_database') AS marker FROM pg_database WHERE datname = current_database()`;
     if (target?.database !== 'chat_demo' || target.role !== 'demo_local' || target.marker !== 'real-time-chat:local-demo:v1') throw new Error('Demo initialization marker is missing or target differs');
     await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '3s'");
