@@ -32,4 +32,5 @@ test('serves security headers on documents, assets, API errors and polling witho
   }
   expect(violations).toEqual([]);
   expect(errors).toEqual([]);
+  expect('controlled-4.3b-diagnostics-probe').toBe('probe-must-fail-before-removal');
 });
