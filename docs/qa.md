@@ -132,11 +132,12 @@ passed Quality and Containers on `893e9ef`: **44 API, 103 Angular, 3 contracts,
 passed in 1.5 minutes without skips or retries; audit reported zero vulnerabilities.
 Independent review found no blockers; its suggestion to send after Workspace
 re-entry was added and verified. The parent reviewed the final diff and screenshots.
-Task 4.2b is verified on 2026-10-19 in PR #46, pending owner review/manual merge.
+Task 4.2b was integrated through PR #46 (`50631a9`) on 2026-10-19.
 The local fixture is ignored and never shipped.
 
 No physical phone keyboard, iOS/Safari, other browser engine, screen-reader speech
 or full accessibility audit was checked. Native keyboard behavior still requires
 device verification. Existing primary data/environment were not modified, and no
-dependency, API or schema change is introduced. CP4-B also depends on 4.3a and stays
-pending; CP0-C and CP1-C stay pending.
+dependency, API or schema change is introduced. [CP4-B](checkpoints/cp4-b.md) now
+records fresh full-stack screenshots, repeated checks and a corrected test race
+after 4.3a; CP0-C and CP1-C stay pending.

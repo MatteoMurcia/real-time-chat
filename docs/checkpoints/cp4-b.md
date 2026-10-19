@@ -5,9 +5,10 @@ Reviewed on **2026-10-19**, starting from `origin/main`
 Scope: 4.2a keyboard/focus/IME safeguards, 4.2b responsive layout and repeated
 navigation, and 4.3a isolated container integration. CP0-C/CP1-C remain pending.
 
-**Status: verification in progress.** Independent code review and parent
-reproduction corrected one test timing defect. Compiled-app screenshots and
-the checkpoint's full CI evidence are still pending. No product behavior changed.
+**Verdict: verified for this scope.** Independent code review and parent
+reproduction corrected one test timing defect. Fresh real-stack CI, repeated
+usability checks and parent visual review are complete. Owner review/manual merge
+of PR #48 remains pending. No product behavior changed.
 
 ## Acceptance and evidence map
 
@@ -57,9 +58,37 @@ name; missing screenshots fail the capture step. Playwright clears output betwee
 invocations, and the keyboard filename represents its last repetition. Full trace
 and critical-flow reporting remain task 4.3b.
 
-Pending: download and visually inspect the compiled application's desktop/mobile
-and reduced-height images; record fresh full-suite/repeated-suite CI results and
-the final manual review status before marking CP4-B verified.
+[CI 39209784918](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39209784918)
+on `fdc4b20` passed all three jobs: **45 API, 103 Angular, 3 contracts, 5 Docker,
+21 integration results in each order and 22 Chromium E2Es**. The full browser
+suite completed in 1.4 minutes; all **six repeated keyboard/responsive executions**
+passed in 14.9 seconds. No skips, cancellations or retries were used to pass;
+dependency audit found zero vulnerabilities. Both integration cleanup queries
+and stack teardown succeeded.
+
+The parent downloaded the [usability artifact](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39209784918/artifacts/12167237635)
+(`usability-39209784918-1`, ten PNGs, about 4MB) and visually inspected four
+representative images across the three repetitions:
+
+- `responsive-375.png` from repeat2: long names/email/slugs wrap, channel controls
+  remain inside their panels and the editor retains its visible focus outline.
+- `responsive-1280.png` from repeat1: centered desktop content, visible conversation
+  controls, readable message cards and editor; long identifiers stay within panels.
+- `responsive-reduced-height.png` from the first repetition: editor, helper text
+  and Send control remain accessible in the 375×400 capture, without a fixed overlay.
+- `keyboard-desktop.png` from the last keyboard repetition: focus is on the newly
+  selected channel heading; the empty state, editor and channel form are visible.
+
+The stress directory is deliberately long and scrolls vertically. Automated
+geometry checks cover all six widths in each repetition; this sample visual
+review covers the pictured states, not every possible message or device.
+Artifacts expire after seven days (this one on 2026-10-26); the tests and workflow
+reproduce the evidence. Local downloads/logs remain ignored and are not shipped.
+
+The parent reviewed source, assertions, the local red/green reproduction, fresh
+CI logs and images after the subagent's audit. No required findings remain. The
+only correction is the test transport wait; app behavior and quality thresholds
+are unchanged. A final documentation commit records this verdict and the plan.
 
 ## Limits and next step
 
