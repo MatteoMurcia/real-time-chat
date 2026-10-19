@@ -33,7 +33,7 @@ subnet configuration, not a different application image or database URL.
 | Public `/api/health/live` and `/api/health/ready` | HTTP 200 with `{"status":"ok"}` and `{"status":"ready"}` respectively |
 | Build seed tool, run `docker compose --profile tools run --rm seed` twice | Both runs succeeded; counts `2/0/2/4/111` after the second run |
 | Clean browser → demo sign-in → Demo Lounge | Alice authenticated; live connection established; 50 canonical history rows and enabled earlier-history button |
-| `docker compose ps -a`, normal `down`, then `up --build --wait` | Named volume retained; counts `2/1/2/4/111` unchanged; migration exited zero again |
+| `docker compose ps -a`, normal `down`, then `up --build --wait` | Alice's sign-in added one Session row; counts immediately before and after recreation were `2/1/2/4/111`. Named volume retained; migration exited zero again |
 | Reload `/workspace` after recreation | Existing session restored; Alice visible and live connection established |
 | Development override `config --quiet` | Valid merged Watch configuration; source reload was not re-exercised in this task |
 
@@ -58,6 +58,6 @@ were removed. Volume deletion was test cleanup only: the normal documented stop
 is `down` **without `--volumes`**. Existing development data was not reset or moved.
 
 The [pull request](https://github.com/MatteoMurcia/real-time-chat/pull/55) records
-the final CI result and is left for owner review/manual merge. Optional host
+the final CI checks and is left for owner review/manual merge. Optional host
 development, Watch reload, physical devices, performance/load, deployment and
 CP0-C/CP1-C are not newly certified by this walkthrough.
