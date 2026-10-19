@@ -52,19 +52,20 @@ evidence is distinguished from unit/integration coverage rather than relabelled.
 | A05 | `message-retry.spec.ts`: real committed send with acknowledgement held/lost, automatic/manual retry keeps its original key. `integration/messages.ts` loses the real gateway acknowledgement after commit and confirms one publication/row. |
 | A06 | `message-order.spec.ts`: hold both real frames, release event→ack and ack→event; each first frame clears pending, exact second-frame receipt leaves one canonical row. HTTP recovery is disabled and empty initial history awaited. Reducer tests add timeout permutations. |
 | A07 | `reconnect.spec.ts`: offline receiver, 105 messages, API restart, three fixed-H pages, exact ordered IDs and retained draft. |
-| A08 | `integration/commit-emission.ts`: committed row without publication, same connected receiver, recovered over HTTP. `sync-gap.spec.ts`: suppressed live frames, fixed-H multi-page UI recovery triggered by focus. Angular store's 15-second test separately proves periodic recovery without focus. |
-| A09 | `integration/message-sync-races.ts`: real delayed writer, sync and concurrent sender observed waiting in PostgreSQL, commit and rollback. Either lock order recovers the exact complete interval; BIGINT boundaries remain exact. |
+| A08 | `integration/commit-emission.ts`: committed row without publication, recovered over HTTP with the still-connected receiver's cookie. `sync-gap.spec.ts`: suppressed live frames, fixed-H multi-page UI recovery triggered by focus. Angular store's 15-second test separately proves periodic recovery dispatch without focus using a simulated SyncService. |
+| A09 | `integration/message-sync-races.ts`: the first writer holds the channel lock; sync and a concurrent sender are observed waiting in PostgreSQL. Commit and rollback both recover the exact complete interval; BIGINT boundaries remain exact. |
 | A10 | `channel-races.spec.ts`: events around initial snapshot, stale A/B responses after returning to A, recovery cursor remains valid. |
 | A11 | `integration/subscriptions.ts`: real-lock/local-queue barriers enforce subscribe/leave and send/leave in both orders. Send-first writes once; leave-first rejects without a write. |
 | A12 | `integration/socket-session.ts`: real idle expiry and revocation races, other session survives. `session-revocation.spec.ts`: tabs, offline reconnect, cleared UI and independent valid session. |
 | A13 | HTTP integration and `subscriptions.spec.ts`: hostile origins and missing/foreign CSRF rejected. `conversation.spec.ts`: hostile HTML remains literal before/after reload, no active descendants or execution marker. |
-| A14 | `shutdown.spec.ts`: deferred real commit, SIGTERM, withdrawn readiness, rejected new work, clean container exit, lost acknowledgement/event and automatic browser recovery after restart; original-key retry returns the same row. `integration/shutdown.ts` adds rollback, stalled work and leaked-handle exits. CP4-C still requires the full checkpoint review. |
+| A14 | `shutdown.spec.ts`: deferred real commit, SIGTERM, withdrawn readiness, rejected new work, clean container exit, lost acknowledgement/event and automatic browser recovery after restart; original-key retry returns the same row. `integration/shutdown.ts` adds rollback, stalled work and leaked-handle exits. Full checkpoint review is recorded in CP4-C. |
 | A15 | `history-scroll.spec.ts`: 1280/390px anchor within 2px across pagination, errors, live traffic and held responses. |
 | A16 | `keyboard.spec.ts`, `responsive.spec.ts`: keyboard/composition/focus, six widths, reduced height, twenty channel changes and listener cleanup; each repeated three times in CI. |
 
-A14 evidence is implemented by 4.4b; CP4-C remains a separate review of A01–A16.
-A17–A18 remain CP5-B. These checks do not close those checkpoints.
-CP0-C and CP1-C also remain pending.
+A01–A16 have been reviewed for the functional P0 exit in
+[CP4-C](checkpoints/cp4-c.md), including the exact tested revision, results and
+scope limits. Owner review/manual merge of the checkpoint PR remains pending.
+A17–A18 remain CP5-B; CP0-C and CP1-C also remain pending.
 
 ## Verification record
 
