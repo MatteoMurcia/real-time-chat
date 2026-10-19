@@ -6,7 +6,7 @@ on `origin/main`, with shutdown task 4.4b merged through PR #51.
 **Verdict: verified for A01–A16 under the stated conditions.** Independent and
 parent review, local checks and the complete compiled-stack run passed. This
 closes the planned functional P0 checkpoint; owner review/manual merge of the
-checkpoint PR remains pending. No additional product features belong here.
+[PR #52](https://github.com/MatteoMurcia/real-time-chat/pull/52) remains pending. No additional product features belong here.
 
 ## Acceptance evidence
 
