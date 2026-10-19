@@ -4,6 +4,7 @@ import { HttpAdapterHost } from '@nestjs/core';
 import type { ApiError, ErrorCode } from '@real-time-chat/contracts';
 import { ValidationError } from './validation-error.js';
 import { diagnostic } from '../logging/logger.js';
+import { ShutdownError } from '../shutdown/shutdown-state.js';
 
 const publicErrors: Record<number, { code: ErrorCode; message: string }> = {
   400: { code: 'VALIDATION_ERROR', message: 'The request is invalid.' },
@@ -24,14 +25,16 @@ export class ErrorFilter implements ExceptionFilter {
     const response = host.switchToHttp().getResponse();
     if (httpAdapter.isHeadersSent(response)) return;
     const status = exception instanceof HttpException ? exception.getStatus() : 500;
-    const mapped = publicErrors[status];
+    const mapped = exception instanceof ShutdownError
+      ? { code: 'INTERNAL_ERROR' as const, message: 'The service is shutting down. Retry later.' } : publicErrors[status];
     const body: ApiError = {
       ...(mapped ?? { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred.' }),
       requestId: response.getHeader('X-Request-Id') ?? randomUUID(),
       ...(exception instanceof ValidationError ? { fieldErrors: exception.fieldErrors } : {}),
     };
     if (!mapped && !response.getHeader('X-Request-Id')) diagnostic({ event: 'http.failure', code: body.code, requestId: body.requestId });
-    response.locals.diagnosticCode = body.code;
+    response.locals.diagnosticCode = exception instanceof ShutdownError ? 'SHUTTING_DOWN' : body.code;
+    if (exception instanceof ShutdownError) httpAdapter.setHeader(response, 'Retry-After', '1');
     httpAdapter.setHeader(response, 'X-Request-Id', body.requestId);
     httpAdapter.setHeader(response, 'Cache-Control', 'no-store');
     httpAdapter.reply(response, body, mapped ? status : 500);

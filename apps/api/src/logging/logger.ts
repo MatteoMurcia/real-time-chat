@@ -2,9 +2,11 @@ import { Logger } from '@nestjs/common';
 import type { ErrorCode } from '@real-time-chat/contracts';
 
 export interface Diagnostic {
-  event: 'http.request' | 'http.failure' | 'socket.failure' | 'message.send';
+  event: 'http.request' | 'http.failure' | 'socket.failure' | 'message.send'
+    | 'shutdown.start' | 'shutdown.complete' | 'shutdown.timeout' | 'shutdown.failure';
   requestId: string;
-  code?: ErrorCode | 'DATABASE_UNAVAILABLE';
+  code?: ErrorCode | 'DATABASE_UNAVAILABLE' | 'SHUTTING_DOWN';
+  pendingOperations?: number;
   method?: string;
   route?: string;
   status?: number;
@@ -26,6 +28,7 @@ export function diagnostic(input: Diagnostic): void {
     clientMessageId: input.clientMessageId && uuid.test(input.clientMessageId) ? input.clientMessageId.toLowerCase() : undefined,
     channelId: input.channelId && uuid.test(input.channelId) ? input.channelId.toLowerCase() : undefined,
     stage: input.stage, outcome: input.outcome,
+    pendingOperations: input.pendingOperations,
   };
   if (input.code === 'INTERNAL_ERROR' || input.code === 'DATABASE_UNAVAILABLE') logger.error(record);
   else if (input.code) logger.warn(record);

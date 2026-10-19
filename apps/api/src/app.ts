@@ -6,6 +6,8 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { BadRequestException, ConsoleLogger, PayloadTooLargeException } from '@nestjs/common';
 import type { ErrorRequestHandler } from 'express';
 import { httpDiagnostics } from './logging/http-diagnostics.js';
+import { ShutdownState } from './shutdown/shutdown-state.js';
+import { configureShutdown } from './shutdown/shutdown.js';
 
 export async function createApp(env: NodeJS.ProcessEnv) {
   const config = loadConfig(env);
@@ -16,6 +18,7 @@ export async function createApp(env: NodeJS.ProcessEnv) {
   });
   app.set('trust proxy', (ip: string) => config.trustedProxyIps.includes(normalizeIp(ip)));
   app.use(httpDiagnostics);
+  configureShutdown(app, app.get(ShutdownState));
   app.useBodyParser('json', { limit: '8kb' });
   const parserErrors: ErrorRequestHandler = (error: unknown, _request, _response, next) => {
     next(error instanceof Error && 'type' in error
@@ -25,6 +28,5 @@ export async function createApp(env: NodeJS.ProcessEnv) {
   };
   app.use(parserErrors);
   app.setGlobalPrefix('api');
-  app.enableShutdownHooks();
   return { app, config };
 }
