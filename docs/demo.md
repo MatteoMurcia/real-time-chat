@@ -98,7 +98,27 @@ against the disposable stack documented in the root README; traces contain
 synthetic credentials and session data. CI withholds artifacts if either stack's
 cleanup fails.
 
-Automated timing is a regression check, not evidence of a human's reading and
-typing speed. The independent manual under-two-minute measurement remains
-pending until recorded on a prepared local demo. Clean-clone delivery and the
-presentation remain tasks 5.2a–5.2b / CP5-A.
+[CI 39317856292](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39317856292)
+on `d43c113` passed Quality, Integration and Containers: 53 API, 103 Angular,
+three contract, seven reset-guard and five Docker checks; 23 integration results
+in each order; 29 Chromium E2Es and six usability repetitions. The automated
+first confirmed demo message took **907 ms**, excluding build/seed. Both stacks'
+cleanup and artifact publication passed. Desktop/mobile overview and post-reset
+screenshots were reviewed without new visual issues.
+
+On 2026-10-19, an agent also completed an interactive, step-by-step local browser
+check in **14.644 seconds**: overview → sign-in → Demo Lounge → write/send →
+observe **Confirmed**. Timing began immediately before opening the prepared
+overview and ended after observing confirmation. The browser started at
+`about:blank` with zero cookies verified; build/seed and credential preparation
+were excluded. This was an exploratory browser-tool walkthrough, separate from
+the scripted E2E, and satisfies the plan's manual first-message check. It is not
+a human usability study or a measurement of a person's reading/typing speed.
+The documented reset sequence also ran locally and returned the old session to
+sign-in. Temporary demo data and credentials were removed afterward.
+
+Local lint, types, unit suites, Docker checks, application builds and compiled
+seed build passed. Removing the marker guard temporarily made its regression
+test fail; the guard was restored and the seven checks passed again. Independent
+and parent review found no remaining required changes. Clean-clone delivery and
+the presentation remain tasks 5.2a–5.2b / CP5-A.
