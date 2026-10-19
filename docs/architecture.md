@@ -102,6 +102,8 @@ These tests are reproducible checks, not a claim of universal reliability or
 formal verification. CI runs unit/contract/Docker checks, database integration in
 both orders, and Chromium E2Es on disposable stacks. It never deploys or merges.
 See [CI diagnostics](e2e-ci.md) and [local QA](qa.md) for existing coverage/limits.
+The [clean-checkout walkthrough](installation-verification.md) records the local
+Docker installation, empty database, seed and retained session verification.
 
 ## Decisions
 
