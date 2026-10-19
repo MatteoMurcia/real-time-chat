@@ -36,7 +36,8 @@ docker compose up --build --wait
 ```
 
 Open <http://127.0.0.1:8080>. The Angular page should show **API is reachable**.
-Change `WEB_PORT` in `.env` if port 8080 is occupied. Only this web port is
+If port 8080 is occupied, change `WEB_PORT` and the matching `APP_ORIGIN` in `.env`
+(for example, `18085` and `http://127.0.0.1:18085`). Only this web port is
 published, on loopback. API and database communicate through an internal network.
 The containers build their database URL from `POSTGRES_*`, escaping credentials;
 host `DATABASE_URL`, `NODE_ENV`, `HOST` and `PORT` values do not configure them.
@@ -61,7 +62,10 @@ tests inside Linux; final API/web processes run as non-root users. Migration
 tools are in a separate image target. Use the development override below for
 automatic source reload.
 
-`npm run test:docker` checks container URL construction and runner configuration, plus real Nginx logging in disposable containers. Docker must be running. The images exclude local
+With the optional host toolchain, `npm run test:docker` checks container URL
+construction, runner configuration and real Nginx logging in disposable
+containers. Docker must be running; this command is not needed to start the app.
+The images exclude local
 environment files, generated output, dependencies and private key files from
 their build context.
 
@@ -456,7 +460,8 @@ regenerate the lockfile and verify generation/migrations before doing so.
 
 Functional P0 has passed CP4-C; the optional demo seed is available above.
 Demo access and guarded reset are documented in [the demo guide](docs/demo.md).
-Clean-clone delivery and presentation remain in the plan.
+Installation and architecture are documented here and in [the architecture guide](docs/architecture.md).
+Presentation and final delivery verification remain in the plan.
 Remote hosting is outside the current delivery scope.
 
 ## Account registration API
