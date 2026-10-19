@@ -3,7 +3,7 @@
 The Containers job builds the complete Compose app, applies migrations to a fresh
 database and runs Chromium through Nginx. It uses only generated database
 credentials and synthetic accounts. Playwright supplies a fresh context per test;
-explicit extra contexts represent independent sessions and close in `finally`.
+explicit extra contexts represent additional clients/sessions and close in `finally`.
 The shared `chatAccount` fixture creates real accounts/channels through HTTP and
 closes its Socket.IO sender even on failure. No shared saved login state is used.
 
@@ -66,4 +66,50 @@ not close those checkpoints. CP0-C and CP1-C also remain pending.
 
 ## Verification record
 
-Runtime evidence and controlled-failure verification will be recorded here after CI.
+[CI 39212749055](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39212749055)
+on `f4c7843` passed Quality and both integration orders, then failed Containers
+with exit 1. The deliberate assertion in `security-headers.spec.ts` failed as
+intended; it also exposed a test-observer defect in the new message-order case
+(22 passed, two failed). Both failures retained diagnostics. Repetitions were
+skipped, but teardown and both artifact uploads succeeded.
+
+The parent downloaded and inspected
+[the failure artifact](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39212749055/artifacts/12167574670).
+Its HTML report and two failed-test trace/screenshot pairs were intact. The
+controlled-failure trace contains the exact assertion error, 86 actions, eight
+DOM snapshots and three network streams; no embedded source resources were found.
+The failure screenshot shows the actual sign-in page. The ordinary report can
+include Playwright's error-context attachment; this does not make traces redacted.
+
+The observer subclass had watched Playwright's native upstream socket before
+routing, so held server frames could appear received and a released frame could
+be missed. A disposable local WebSocket reproduction confirmed that behavior.
+`ade51b6` observes dispatched page-side message events instead: the same
+reproduction sees no held frame and observes both released frames in their exact
+order. This instrumentation is test-only. `85082b9` removes the deliberate failing
+assertion; no production behavior or deadline was changed.
+
+[CI 39213600128](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39213600128)
+on `85082b9` passed all three jobs: **45 API, 103 Angular, three contracts, five
+Docker checks, 21 integration results in each order, 24 Chromium E2Es and six
+repeated usability executions**. E2E took 1.6 minutes and repetitions 30.6 seconds.
+There were no skipped/flaky tests or retries; audit found zero vulnerabilities.
+Both database-cleanup checks, stack teardown and uploads passed.
+
+The parent downloaded
+[the successful diagnostic artifact](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39213600128/artifacts/12168422840)
+and decoded both HTML report manifests: critical retained 24/24 passing results,
+usability retained 6/6, each with zero unexpected/flaky/skipped results. This
+confirms the repeat invocation preserved the first report. Only failed tests
+retain traces; the successful artifact contains the reports, not success traces.
+The separate [usability artifact](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39213600128/artifacts/12169185233)
+was also uploaded. All artifacts expire after seven days.
+
+Independent review and parent review covered the final code, failure diagnostics,
+observer reproduction, acceptance map and successful CI evidence. No required
+findings remain. PR #49 is left for owner review/manual merge. No app behavior,
+API/schema, package dependencies, primary environment/data or deployment changed.
+Local lint/types, unit tests and build passed; Docker-dependent local execution
+could not complete because its engine was unavailable, so real-stack evidence is
+from Linux CI. Coverage is Chromium with synthetic data; it does not certify
+other engines, physical devices or production workloads.
