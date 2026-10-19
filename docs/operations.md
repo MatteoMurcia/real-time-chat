@@ -101,8 +101,37 @@ fixture checks correlation on the real 31st send rejected before validation.
 It verifies real API/proxy records and privacy, pauses PostgreSQL with concurrent
 probes while live remains responsive, stops it and checks a failed send, then
 restores it and retries the same key. Teardown is protected by `finally` and never
-targets the primary development volume. Runtime CI evidence will be recorded in
-the implementation plan once these checks pass.
+targets the primary development volume.
+
+[CI 39218443803](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39218443803)
+first passed both integration orders, all 26 E2Es and six repetitions. Quality
+identified an absent upstream header represented as an empty string where the
+Docker log contract expected `-`. `27d0e9b` adds an explicit Nginx map: only a
+canonical API UUID is retained; every absent/invalid value becomes `-`. The
+original Docker assertions were preserved, rather than relaxed.
+
+[CI 39219045210](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39219045210)
+on `27d0e9b` passed **Quality, Integration and Containers**: 47 API, 103 Angular,
+three contract tests, five Docker checks, 21 integration results per order,
+26 E2Es and six repeated usability executions. Build and dependency audit passed
+with zero vulnerabilities, skips or retries. The outage test successfully warmed
+the probe, paused PostgreSQL, received four concurrent 503s plus a live 200 within
+its 4,500ms budget, restored readiness, stopped the database, correlated the failed
+send and restored the original-key retry into exactly one history row.
+
+HTTP/proxy IDs, created/duplicate/conflict/forbidden outcomes, malformed-ID
+omission and private canaries all passed against real JSON container logs.
+The quota fixture separately proves the rate-limited acknowledgement's ID and
+client key remain correlated before validation. Existing rollback/commit tests
+remain intact. Cleanup and diagnostic uploads passed; the
+[E2E report artifact](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39219045210/artifacts/12170569073)
+retains this run for seven days.
+
+Independent review and parent review found no remaining required issues. Local
+lint, types, unit tests and build passed. Docker local remains unavailable, so
+real PostgreSQL/Nginx/container evidence comes from Linux CI. PR #50 is left for
+owner review/manual merge. CP0-C, CP1-C and CP4-C remain pending; 4.4a does not
+certify shutdown, draining, production load or every transport-level rejection.
 
 Configuration references: [Nest JSON logging](https://docs.nestjs.com/techniques/logger#json-logging),
 [pg timeout options](https://node-postgres.com/apis/client),
