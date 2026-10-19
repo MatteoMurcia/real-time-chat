@@ -217,6 +217,17 @@ Docker Desktop remains unavailable locally, so Linux CI supplies the real runtim
 evidence. No primary environment/volume was modified, and no deployment was made.
 CP0-C, CP1-C and CP4-C remain pending.
 
+The documentation-head rerun
+[39265735275](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39265735275)
+passed Quality and Integration but exposed a test-client deadlock: synchronous
+`docker wait` blocked the Node sender's event loop during the WebSocket close
+handshake, so the API correctly reached its hard deadline. A minimal local
+real-WebSocket/child-process reproduction timed out with the blocking wait and
+closed within 700ms with an asynchronous wait. `b38b060` replaces only that wait
+with bounded asynchronous `execFile`; the eight-second production deadline and
+strict exit-0 assertion remain unchanged. No product change or test retry hides
+the failure. The PR's latest checks provide validation of this corrected fixture.
+
 References: [Nest lifecycle order](https://docs.nestjs.com/fundamentals/lifecycle-events),
 [Node HTTP close](https://nodejs.org/api/http.html#serverclosecallback),
 [Socket.IO close](https://socket.io/docs/v4/server-api/#serverclosecallback),
