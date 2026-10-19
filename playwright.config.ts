@@ -7,5 +7,10 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   workers: 1,
   retries: 0,
-  use: { baseURL: process.env.E2E_BASE_URL, browserName: 'chromium', trace: 'off' },
+  outputDir: 'test-results/critical',
+  reporter: [['line'], ['html', { outputFolder: 'playwright-report/critical', open: 'never' }]],
+  use: {
+    baseURL: process.env.E2E_BASE_URL, browserName: 'chromium',
+    trace: { mode: 'retain-on-failure', sources: false }, screenshot: 'only-on-failure',
+  },
 });
