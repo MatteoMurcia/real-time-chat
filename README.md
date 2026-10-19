@@ -654,6 +654,8 @@ runs on every pull request targeting `main` and every push to `main`.
 - **Containers:** build the Compose images, apply migrations to an empty volume,
   wait for healthy services, verify the public health response through Nginx,
   and run the Chromium registration/session E2Es against that stack.
+  Keyboard and responsive navigation also run three times each; only their PNG
+  screenshots are retained for seven days for visual review.
 
 Jobs use read-only repository permissions and actions pinned to commit SHAs.
 Only npm's download cache is reused, keyed by the lockfile; `npm ci` still checks

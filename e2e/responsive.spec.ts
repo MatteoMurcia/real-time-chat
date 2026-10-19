@@ -8,7 +8,7 @@ test('wraps long content, adapts to a reduced viewport and cleans up twenty chan
   const email = `${'reader'.repeat(9)}@${suffix}.example.test`, password = 'a unique responsive passphrase';
   const errors: string[] = [], subscriptions: { event: string; channelId: string }[] = [];
   const received: string[] = [], expectedLive: string[] = [];
-  let upgraded = false;
+  let upgrades = 0;
   page.on('pageerror', error => errors.push(error.message));
   page.on('websocket', socket => {
     socket.on('framereceived', frame => {
@@ -19,7 +19,7 @@ test('wraps long content, adapts to a reduced viewport and cleans up twenty chan
     });
     socket.on('framesent', frame => {
       const payload = String(frame.payload);
-      if (payload === '5') upgraded = true;
+      if (payload === '5') upgrades++;
       if (!/^42\d*\[/.test(payload)) return;
       const [event, input] = JSON.parse(payload.slice(payload.indexOf('[')));
       if (event === 'channel:subscribe' || event === 'channel:unsubscribe') subscriptions.push({ event, channelId: input.channelId });
@@ -61,7 +61,7 @@ test('wraps long content, adapts to a reduced viewport and cleans up twenty chan
     await page.goto('/workspace');
     await expect(page.locator('meta[name="viewport"]')).toHaveAttribute('content', /interactive-widget=resizes-content/);
     await expect(page.getByText('Live connection established.', { exact: true })).toBeVisible();
-    await expect.poll(() => upgraded).toBe(true);
+    await expect.poll(() => upgrades).toBe(1);
     const baseline = await listenerCounts();
     const rows = page.getByRole('log').locator('[data-message-id]');
     const expectRows = async (index: number) => {
@@ -126,6 +126,7 @@ test('wraps long content, adapts to a reduced viewport and cleans up twenty chan
     await expect(page).toHaveURL(/\/$/);
     await page.getByRole('link', { name: 'Workspace', exact: true }).click();
     await expect(page.getByText('Live connection established.', { exact: true })).toBeVisible();
+    await expect.poll(() => upgrades).toBe(2);
     expect(await listenerCounts()).toEqual(baseline);
     await open(0); expect(await listenerCounts()).toEqual(activeListeners);
     expectedLive.push(await send(0, 'Live after returning to Workspace'));

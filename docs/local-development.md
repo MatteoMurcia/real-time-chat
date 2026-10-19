@@ -265,5 +265,5 @@ The independent reviewer and parent checked isolation, retained assertions,
 cleanup and final probe removal. Review suggestions added cleanup checks after
 both passes on the same server and clarified the PowerShell version. Primary
 environment/data are preserved; no production role, API, schema, dependency or
-deployment changes are included. CP4-B is a separate checkpoint; CP0-C and CP1-C
-remain pending.
+deployment changes are included. [CP4-B](checkpoints/cp4-b.md) subsequently verifies
+the merged integration alongside desktop/mobile usability. CP0-C and CP1-C remain pending.
