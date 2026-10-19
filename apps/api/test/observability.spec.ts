@@ -13,6 +13,7 @@ import { ErrorFilter } from '../src/http/error.filter.js';
 import { httpDiagnostics } from '../src/logging/http-diagnostics.js';
 import type { Diagnostic } from '../src/logging/logger.js';
 import { socketError } from '../src/realtime/socket-error.js';
+import { ShutdownState } from '../src/shutdown/shutdown-state.js';
 
 const secret = `private-${randomUUID()}`;
 let unavailable = false;
@@ -23,7 +24,7 @@ class ProbeController {
 }
 @Module({
   controllers: [ProbeController, ReadyController, LiveController],
-  providers: [{ provide: APP_FILTER, useClass: ErrorFilter },
+  providers: [ShutdownState, { provide: APP_FILTER, useClass: ErrorFilter },
     { provide: DatabaseService, useValue: { checkReady: async () => { if (unavailable) throw new Error(secret); } } }],
 })
 class DiagnosticTestModule {}

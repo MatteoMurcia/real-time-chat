@@ -58,11 +58,13 @@ evidence is distinguished from unit/integration coverage rather than relabelled.
 | A11 | `integration/subscriptions.ts`: real-lock/local-queue barriers enforce subscribe/leave and send/leave in both orders. Send-first writes once; leave-first rejects without a write. |
 | A12 | `integration/socket-session.ts`: real idle expiry and revocation races, other session survives. `session-revocation.spec.ts`: tabs, offline reconnect, cleared UI and independent valid session. |
 | A13 | HTTP integration and `subscriptions.spec.ts`: hostile origins and missing/foreign CSRF rejected. `conversation.spec.ts`: hostile HTML remains literal before/after reload, no active descendants or execution marker. |
+| A14 | `shutdown.spec.ts`: deferred real commit, SIGTERM, withdrawn readiness, rejected new work, clean container exit, lost acknowledgement/event and automatic browser recovery after restart; original-key retry returns the same row. `integration/shutdown.ts` adds rollback, stalled work and leaked-handle exits. CP4-C still requires the full checkpoint review. |
 | A15 | `history-scroll.spec.ts`: 1280/390px anchor within 2px across pagination, errors, live traffic and held responses. |
 | A16 | `keyboard.spec.ts`, `responsive.spec.ts`: keyboard/composition/focus, six widths, reduced height, twenty channel changes and listener cleanup; each repeated three times in CI. |
 
-A14 remains CP4-C; A17–A18 remain CP5-B. Partial restart/persistence checks do
-not close those checkpoints. CP0-C and CP1-C also remain pending.
+A14 evidence is implemented by 4.4b; CP4-C remains a separate review of A01–A16.
+A17–A18 remain CP5-B. These checks do not close those checkpoints.
+CP0-C and CP1-C also remain pending.
 
 ## Verification record
 

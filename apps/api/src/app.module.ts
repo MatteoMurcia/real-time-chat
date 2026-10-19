@@ -20,6 +20,7 @@ import { HistoryController } from './messaging/history.controller.js';
 import { SyncService } from './messaging/sync.service.js';
 import { RateLimitService } from './security/rate-limit.service.js';
 import type { TrafficLimits } from './config.js';
+import { ShutdownState } from './shutdown/shutdown-state.js';
 
 @Module({
   controllers: [LiveController, ReadyController, RegistrationController, SessionController, ChannelsController, HistoryController],
@@ -30,6 +31,7 @@ export class AppModule {
     return {
       module: AppModule,
       providers: [
+        ShutdownState,
         { provide: 'APP_ORIGIN', useValue: appOrigin },
         { provide: RateLimitService, useFactory: () => new RateLimitService(trafficLimits) },
         ChatGateway,

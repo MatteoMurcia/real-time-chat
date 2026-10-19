@@ -31,6 +31,7 @@ services:
         condition: service_healthy
 
   api:
+    stop_grace_period: 12s
     build:
       context: .
       dockerfile: apps/api/Dockerfile

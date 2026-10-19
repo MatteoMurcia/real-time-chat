@@ -1,14 +1,14 @@
 # Local diagnostics and health
 
 This app runs locally in Compose; no hosted telemetry, deployment, metrics stack
-or additional logging dependency is required. Shutdown/draining remains 4.4b.
+or additional logging dependency is required.
 
 ## Health
 
 | Endpoint | Meaning | Response |
 | --- | --- | --- |
 | `GET /api/health/live` | HTTP process is responding; does not query the database. | 200 `{"status":"ok"}` |
-| `GET /api/health/ready` | A real `SELECT 1` can complete against PostgreSQL. | 200 `{"status":"ready"}` or 503 `{"status":"unavailable"}` |
+| `GET /api/health/ready` | Not draining, and a real `SELECT 1` can complete against PostgreSQL. | 200 `{"status":"ready"}` or 503 `{"status":"unavailable"}` |
 
 Both responses use `Cache-Control: no-store`. Readiness exposes no driver error,
 database address or credentials. API container health uses readiness; the web
@@ -89,7 +89,51 @@ volume to repair availability. If live also fails, inspect API container status
 and startup diagnostics instead. Raw PostgreSQL diagnostic commands/output may
 contain connection information: keep them local and never paste credentials.
 
-## Verification
+## Bounded shutdown
+
+The production entrypoint handles `SIGTERM` and `SIGINT`. Use `docker compose stop api`
+without overriding its timeout: Compose allows **12 seconds**, outside the API's
+fixed **8-second** budget. The first signal synchronously withdraws readiness and
+closes admission; repeated signals during draining do not reset the deadline.
+
+- New HTTP work receives 503 and `Retry-After: 1`. The early gate runs before body
+  parsing; a second admission check also rejects bodies that finish arriving later.
+- New Engine.IO handshakes are rejected. Existing transports may finish polling or
+  upgrade, but new socket operations fail safely without touching the database.
+  This uses the existing `INTERNAL_ERROR` public code; it does not revoke a session.
+- Already admitted controllers, authentication, subscriptions and sends are awaited,
+  even if their HTTP client disconnects. Live stays 200 during draining; ready stays
+  503 without starting new database probes. An earlier probe rechecks after its await.
+- After admitted operations settle, Nest closes providers (including both database
+  pools), sockets and HTTP. The process exits naturally. A stuck operation, failed
+  resource cleanup or remaining referenced handle is bounded by exit **1** at 8s.
+
+`ShutdownState.close(app)` is the coordinated entrypoint for programmatic shutdown
+with active traffic. Plain Nest `app.close()` is appropriate for idle test cleanup
+or startup failure; it does not perform this drain. Nest destroys providers before
+transport disposal, so draining must precede that lifecycle, rather than run inside
+a later shutdown hook. Do not add Nest signal hooks alongside the installed handlers.
+
+`shutdown.start`, `shutdown.complete`, `shutdown.timeout` and `shutdown.failure`
+share a generated request ID; pending-operation counts and elapsed time help locate
+the failing phase. `shutdown.complete` means application disposal settled, not proof
+that the operating system process exited. A stray handle can still cause a timeout.
+Drain rejections use the internal diagnostic code `SHUTTING_DOWN`.
+
+A message is acknowledged successfully only after its transaction commits and the
+existing publication path settles. Shutdown adds no earlier success response. A
+commit can still outlive its client's connection: after restart the browser reconnects
+and recovers the visible channel from HTTP history/sync. Retry unconfirmed messages
+with the same `clientMessageId`; existing idempotency returns the original row.
+
+`SIGKILL`, host failure and power loss cannot drain. The deadline may terminate a
+process during a transaction; PostgreSQL rolls back uncommitted work, while committed
+work remains recoverable. There is no durable outgoing queue or exactly-once delivery
+claim. Native Windows signal behavior is not certified; the supported shutdown path
+is the Linux Node process in Compose. No deployment or multi-instance coordination
+is introduced.
+
+## Diagnostics verification — 4.4a
 
 `apps/api/test/observability.spec.ts` verifies HTTP IDs, parser/404/500 failures,
 privacy canaries, readiness failure/recovery and actual parseable JSON output.
@@ -136,3 +180,55 @@ certify shutdown, draining, production load or every transport-level rejection.
 Configuration references: [Nest JSON logging](https://docs.nestjs.com/techniques/logger#json-logging),
 [pg timeout options](https://node-postgres.com/apis/client),
 [Compose health dependencies](https://docs.docker.com/compose/how-tos/startup-order/).
+
+## Shutdown verification — 4.4b
+
+`apps/api/test/shutdown.spec.ts` covers admission, idempotent release, aborted
+HTTP controllers, late bodies, readiness races and authentication races. Removing
+the readiness recheck after its database await deliberately produced 200 instead
+of the required 503; restoring it returned all four shutdown tests to green.
+
+`apps/api/test/integration/shutdown.ts` forks compiled Linux Node processes against
+the isolated database. Deferred PostgreSQL triggers hold a real commit or force a
+rollback, with `pg_blocking_pids` proving the barrier was reached before SIGTERM.
+Readiness, live, new-work rejection and repeated signals are checked while held.
+Separate test-entrypoint faults hold a send forever or leak a referenced interval;
+both must exit 1 inside the budget. Graceful cases exit naturally with 0. Every case
+restarts and retries its original key: one row, and the original ID if committed.
+The parent bounds waits independently so a broken deadline reaches cleanup.
+These faults and triggers are test-only; the runtime image has no fault switches.
+
+`e2e/shutdown.spec.ts` verifies Compose project labels before touching disposable
+containers. It holds a real deferred commit, observes zero visible rows and no
+success acknowledgement, sends SIGTERM, verifies rejection while draining, releases
+the commit and requires exit 0. The browser loses the real acknowledgement/event;
+HTTP recovery is withheld until restart. Automatic reconnection must produce one
+canonical row and no pending duplicate, then a same-key retry returns its exact ID.
+Finally releases the database gate, drops its trigger and restarts the API.
+
+[CI 39264903128](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39264903128)
+on `cfe6bf8` passed all three jobs: **51 API, 103 Angular, three contract tests,
+five Docker checks, 22 integration results in each order, 27 Chromium E2Es and
+six usability repetitions**. Zero skips/retries or audit vulnerabilities. Both
+process-shutdown runs passed, as did the real-container/browser scenario. Database
+cleanup, stack teardown and report uploads passed. Independent and parent review
+findings were corrected before opening PR #51; the parent inspected the CI logs.
+Docker Desktop remains unavailable locally, so Linux CI supplies the real runtime
+evidence. No primary environment/volume was modified, and no deployment was made.
+CP0-C, CP1-C and CP4-C remain pending.
+
+The documentation-head rerun
+[39265735275](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39265735275)
+passed Quality and Integration but exposed a test-client deadlock: synchronous
+`docker wait` blocked the Node sender's event loop during the WebSocket close
+handshake, so the API correctly reached its hard deadline. A minimal local
+real-WebSocket/child-process reproduction timed out with the blocking wait and
+closed within 700ms with an asynchronous wait. `b38b060` replaces only that wait
+with bounded asynchronous `execFile`; the eight-second production deadline and
+strict exit-0 assertion remain unchanged. No product change or test retry hides
+the failure. The PR's latest checks provide validation of this corrected fixture.
+
+References: [Nest lifecycle order](https://docs.nestjs.com/fundamentals/lifecycle-events),
+[Node HTTP close](https://nodejs.org/api/http.html#serverclosecallback),
+[Socket.IO close](https://socket.io/docs/v4/server-api/#serverclosecallback),
+[Compose stop grace](https://docs.docker.com/reference/compose-file/services/#stop_grace_period).

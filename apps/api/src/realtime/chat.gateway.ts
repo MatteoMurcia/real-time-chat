@@ -15,15 +15,21 @@ import { socketError } from './socket-error.js';
 import { RateLimitService } from '../security/rate-limit.service.js';
 import { randomUUID } from 'node:crypto';
 import { diagnostic, type Diagnostic } from '../logging/logger.js';
+import { ShutdownError, ShutdownState } from '../shutdown/shutdown-state.js';
 
 @WebSocketGateway({ path: '/socket.io', serveClient: false, maxHttpBufferSize: 16384, transports: ['polling', 'websocket'] })
 export class ChatGateway implements OnGatewayInit, OnGatewayConnection {
   @WebSocketServer() server!: Server;
   constructor(private readonly sessions: SessionService, @Inject('APP_ORIGIN') private readonly origin: string,
     private readonly db: DatabaseService, private readonly access: ChannelAccessService, private readonly connections: ConnectionsService,
-    private readonly messages: SendMessageService, private readonly limits: RateLimitService) {}
+    private readonly messages: SendMessageService, private readonly limits: RateLimitService, private readonly shutdown: ShutdownState) {}
 
-  handleConnection(socket: Socket): Promise<void> { return this.connections.add(socket); }
+  async handleConnection(socket: Socket): Promise<void> {
+    let release = () => {};
+    try { release = this.shutdown.enter(); await this.connections.add(socket); }
+    catch { socket.conn.close(); }
+    finally { release(); }
+  }
 
   @SubscribeMessage('message:send')
   async send(@ConnectedSocket() socket: Socket, @MessageBody() body: unknown): Promise<SendMessageAck> {
@@ -34,7 +40,9 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection {
       ...(typeof candidate.channelId === 'string' ? { channelId: candidate.channelId } : {}),
     };
     let stage: Diagnostic['stage'] = 'authorize';
+    let release = () => {};
     try {
+      release = this.shutdown.enter();
       if (!socket.connected || typeof socket.data.userId !== 'string') throw new UnauthorizedException();
       this.limits.consume('send', socket.data.userId);
       const input = validateMessage(body);
@@ -49,6 +57,7 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection {
         return { ok: true, data: message };
       });
     } catch (error: unknown) { return { ok: false, error: socketError(error, { ...ids, stage, durationMs: Math.round(performance.now() - started) }, requestId) }; }
+    finally { release(); }
   }
 
   private async publish(message: PublicMessage): Promise<void> {
@@ -76,7 +85,9 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection {
   }
 
   private async subscription(socket: Socket, body: unknown, subscribed: boolean): Promise<ChannelSubscriptionAck> {
+    let release = () => {};
     try {
+      release = this.shutdown.enter();
       if (!body || typeof body !== 'object' || Array.isArray(body) || !('channelId' in body)
         || typeof body.channelId !== 'string' || Object.keys(body).length !== 1) throw new BadRequestException();
       const channelId = validateChannelId(body.channelId);
@@ -94,27 +105,34 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection {
       });
     } catch (error: unknown) {
       return { ok: false, error: socketError(error) };
-    }
+    } finally { release(); }
   }
 
   afterInit(server: Server): void {
     // Engine middleware covers polling requests and WebSocket upgrades, not only namespace connection.
     server.engine.use((request: IncomingMessage, _response: ServerResponse, next: (error?: Error) => void) => {
-      try { verifyOrigin(request.headers, this.origin); next(); }
-      catch { next(new Error('Forbidden')); }
+      try {
+        verifyOrigin(request.headers, this.origin);
+        if (this.shutdown.draining && !new URL(request.url ?? '/', this.origin).searchParams.get('sid')) throw new ShutdownError();
+        next();
+      } catch (error) { next(new Error(error instanceof ShutdownError ? 'Server shutting down' : 'Forbidden')); }
     });
     server.use(async (socket, next) => {
+      let release = () => {};
       try {
+        release = this.shutdown.enter();
         const session = await this.sessions.authenticate(socket.request.headers.cookie);
+        if (this.shutdown.draining) throw new ShutdownError();
         socket.data.sessionId = session.id;
         socket.data.userId = session.user.id;
         socket.data.expiresAt = session.expiresAt.getTime();
         this.limits.reserveConnection(socket);
         next();
       } catch (error: unknown) {
+        if (error instanceof ShutdownError) { socket.conn.close(); return; }
         const data = socketError(error);
         next(Object.assign(new Error(data.message), { data }));
-      }
+      } finally { release(); }
     });
   }
 }
