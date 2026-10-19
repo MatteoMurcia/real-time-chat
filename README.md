@@ -633,7 +633,8 @@ session. A separate case forwards logout to the real API, observes its 204, then
 drops the response while retaining the old browser cookie: manual retry discovers
 the revoked session without another logout POST. This verifies response loss after
 revocation rather than treating a timeout as proof of a committed operation. Screenshots
-for visual review are written to ignored `test-results/`; traces are disabled.
+for visual review are written to ignored `test-results/`. Failure traces and
+screenshots are retained alongside an HTML report; see [critical E2E diagnostics](docs/e2e-ci.md).
 
 Stop only this test stack with `docker compose -p chat-e2e --env-file .env.e2e down`.
 Its dedicated volume retains synthetic accounts between runs; each run uses unique
@@ -653,9 +654,10 @@ runs on every pull request targeting `main` and every push to `main`.
   image; this job does not install Node/npm on the host.
 - **Containers:** build the Compose images, apply migrations to an empty volume,
   wait for healthy services, verify the public health response through Nginx,
-  and run the Chromium registration/session E2Es against that stack.
-  Keyboard and responsive navigation also run three times each; only their PNG
-  screenshots are retained for seven days for visual review.
+  and run all critical Chromium E2Es against that stack in isolated contexts.
+  Keyboard and responsive navigation also run three times each. Separate HTML
+  reports, failed-test traces/screenshots and usability PNGs are retained for seven
+  days, only after successful stack/volume teardown.
 
 Jobs use read-only repository permissions and actions pinned to commit SHAs.
 Only npm's download cache is reused, keyed by the lockfile; `npm ci` still checks
