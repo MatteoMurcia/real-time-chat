@@ -116,6 +116,9 @@ characters in credentials) without starting Docker. The images exclude local
 environment files, generated output, dependencies and private key files from
 their build context.
 
+For an optional populated local demo, follow [the demonstration seed](docs/demo-seed.md).
+It adds two fictional accounts and paginated history through a one-shot container.
+
 ## Develop inside Docker
 
 Use Docker Compose 2.32+ (verified with 5.5.1). The following commands work in
@@ -446,7 +449,8 @@ regenerate the lockfile and verify generation/migrations before doing so.
 
 ### Remaining delivery work
 
-Application features and demo seed data remain in the plan.
+Functional P0 has passed CP4-C; the optional demo seed is available above.
+Demo access/reset guidance, clean-clone delivery and presentation remain in the plan.
 Remote hosting is outside the current delivery scope.
 
 ## Account registration API
@@ -605,10 +609,14 @@ accounts, so use an isolated project and environment file. Copy `.env.example` t
 `LOGIN_LIMIT`, `REGISTER_LIMIT` and `CHANNEL_CREATE_LIMIT` to 1000 only in this
 isolated fixture environment: recovery tests deliberately send over 100 messages
 and the suite creates many accounts on one IP. The API integration suite separately
-checks the real default quotas. Then run:
+checks the real default quotas. Also set both `DEMO_*_PASSWORD` values to local-only
+15–128-character passphrases in `.env.e2e`. Then run:
 
 ```text
 docker compose -p chat-e2e --env-file .env.e2e up --build --wait
+docker compose -p chat-e2e --env-file .env.e2e --profile tools build seed
+docker compose -p chat-e2e --env-file .env.e2e --profile tools run --rm seed
+docker compose -p chat-e2e --env-file .env.e2e --profile tools run --rm seed
 npx playwright install chromium
 ```
 
@@ -659,6 +667,7 @@ runs on every pull request targeting `main` and every push to `main`.
   image; this job does not install Node/npm on the host.
 - **Containers:** build the Compose images, apply migrations to an empty volume,
   wait for healthy services, verify the public health response through Nginx,
+  build the optional seed tool and execute it twice with temporary credentials,
   and run all critical Chromium E2Es against that stack in isolated contexts.
   Keyboard and responsive navigation also run three times each. Separate HTML
   reports, failed-test traces/screenshots and usability PNGs are retained for seven

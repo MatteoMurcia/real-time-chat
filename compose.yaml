@@ -30,6 +30,24 @@ services:
       db:
         condition: service_healthy
 
+  seed:
+    profiles: [tools]
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: seed
+    environment:
+      <<: *database-environment
+      DEMO_ALICE_PASSWORD: ${DEMO_ALICE_PASSWORD:-}
+      DEMO_BOB_PASSWORD: ${DEMO_BOB_PASSWORD:-}
+    networks: [backend]
+    init: true
+    depends_on:
+      db:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
   api:
     stop_grace_period: 12s
     build:
