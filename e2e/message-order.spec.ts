@@ -32,14 +32,13 @@ test('reconciles both event-before-ack and ack-before-event without pending or d
   const held = new Map<string, { socket: WebSocketRoute; ack?: string; event?: string; message?: PublicMessage }>();
   let upgraded = false;
   await page.addInitScript(() => {
-    const NativeWebSocket = window.WebSocket;
-    window.WebSocket = class extends NativeWebSocket {
-      constructor(...args: ConstructorParameters<typeof WebSocket>) {
-        super(...args);
-        this.addEventListener('message', event => {
-          if (typeof event.data === 'string' && /^4[23]/.test(event.data)) document.documentElement.dataset.receivedConfirmation = event.data;
-        });
+    // Observe page delivery, not the native server socket that Playwright creates behind its route.
+    const dispatch = EventTarget.prototype.dispatchEvent;
+    EventTarget.prototype.dispatchEvent = function (event: Event) {
+      if (this instanceof WebSocket && event instanceof MessageEvent && typeof event.data === 'string' && /^4[23]/.test(event.data)) {
+        document.documentElement.dataset.receivedConfirmation = event.data;
       }
+      return dispatch.call(this, event);
     };
   });
   // Exclude HTTP recovery so only the two real Socket.IO confirmations can settle these sends.
