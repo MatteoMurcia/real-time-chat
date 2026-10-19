@@ -32,6 +32,15 @@ function start(databaseUrl: string, mode = 'normal') {
   return { child, exited, ready };
 }
 
+async function within<T>(operation: Promise<T>, milliseconds: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof globalThis.setTimeout> | undefined;
+  try {
+    return await Promise.race([operation, new Promise<never>((_resolve, reject) => {
+      timer = globalThis.setTimeout(() => reject(new Error(message)), milliseconds);
+    })]);
+  } finally { clearTimeout(timer); }
+}
+
 export async function verifyShutdown(app: INestApplication, db: DatabaseService, databaseUrl: string): Promise<void> {
   assert.equal(process.platform, 'linux', 'Process signal verification runs in the Linux integration container');
   const password = 'shutdown integration passphrase', suffix = randomUUID();
@@ -70,7 +79,9 @@ export async function verifyShutdown(app: INestApplication, db: DatabaseService,
         }, { timeout: 15000 });
       }
       const barrier = lock ? await Promise.race([locked, lock.then(() => { throw new Error('Database barrier ended before acquisition'); })]) : undefined;
-      const heldSend = mode === 'stall' ? new Promise<void>(resolve => running.child.once('message', () => resolve())) : undefined;
+      const heldSend = mode === 'stall' ? new Promise<void>((resolve, reject) => running.child.once('message', message => {
+        if ((message as { event?: string }).event === 'send-held') resolve(); else reject(new Error('Unexpected stall phase'));
+      })) : undefined;
       const replies: SendMessageAck[] = [];
       const result = sender.timeout(12000).emitWithAck('message:send', input).then((ack: SendMessageAck) => { replies.push(ack); return ack; }, () => undefined);
       try {
@@ -85,7 +96,7 @@ export async function verifyShutdown(app: INestApplication, db: DatabaseService,
           }
           assert.equal(blocked, true, 'the real deferred commit must wait at its database barrier');
           assert.deepEqual(replies, []); assert.equal(await db.message.count({ where: { channelId: channel.id } }), 0);
-        } else if (heldSend) await heldSend;
+        } else if (heldSend) await within(Promise.race([heldSend, result.then(() => { throw new Error('Send ended before the stall barrier'); })]), 3000, 'Send never reached the stall barrier');
         else assert.equal((await result)?.ok, true);
         const before = Date.now(); assert.equal(running.child.kill('SIGTERM'), true);
         if (mode !== 'leak') {
@@ -103,7 +114,7 @@ export async function verifyShutdown(app: INestApplication, db: DatabaseService,
           assert.equal(running.child.kill('SIGTERM'), true); // Repeated signals must not bypass or extend draining.
         }
         release(); await lock;
-        const exit = await running.exited;
+        const exit = await within(running.exited, 10000, 'Child exceeded its shutdown budget');
         assert.equal(exit.signal, null); assert.equal(exit.code, mode === 'stall' || mode === 'leak' ? 1 : 0, `${mode} must exit with the expected status`);
         assert.ok(Date.now() - before < 10000, 'process shutdown must remain inside its fixed budget');
         await result;
@@ -125,7 +136,7 @@ export async function verifyShutdown(app: INestApplication, db: DatabaseService,
         if (committedId) assert.equal(ack.data.id, committedId, 'retry must recover the original committed row');
         assert.equal(await db.message.count({ where: { channelId: channel.id } }), 1);
         assert.equal((await db.message.findUniqueOrThrow({ where: { id: ack.data.id } })).clientMessageId, input.clientMessageId);
-      } finally { restarted.child.kill('SIGTERM'); assert.deepEqual(await restarted.exited, { code: 0, signal: null }); }
+      } finally { restarted.child.kill('SIGTERM'); assert.deepEqual(await within(restarted.exited, 10000, 'Restarted child exceeded its shutdown budget'), { code: 0, signal: null }); }
     }
   } finally {
     for (const socket of sockets) socket.disconnect();
