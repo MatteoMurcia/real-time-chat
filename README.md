@@ -116,7 +116,9 @@ characters in credentials) without starting Docker. The images exclude local
 environment files, generated output, dependencies and private key files from
 their build context.
 
-For an optional populated local demo, follow [the demonstration seed](docs/demo-seed.md).
+For an optional populated local demo in a separate database, follow
+[demo access and maintenance](docs/demo.md). The [seed reference](docs/demo-seed.md)
+explains repeat runs and collision handling.
 It adds two fictional accounts and paginated history through a one-shot container.
 
 ## Develop inside Docker
@@ -450,7 +452,8 @@ regenerate the lockfile and verify generation/migrations before doing so.
 ### Remaining delivery work
 
 Functional P0 has passed CP4-C; the optional demo seed is available above.
-Demo access/reset guidance, clean-clone delivery and presentation remain in the plan.
+Demo access and guarded reset are documented in [the demo guide](docs/demo.md).
+Clean-clone delivery and presentation remain in the plan.
 Remote hosting is outside the current delivery scope.
 
 ## Account registration API

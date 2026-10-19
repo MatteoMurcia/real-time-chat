@@ -139,19 +139,32 @@ jobs:
         id: teardown
         if: always()
         run: docker compose down --volumes --remove-orphans
+      - name: Verify disposable demo cleanup before publishing session data
+        id: demo_cleanup
+        if: always()
+        shell: bash
+        run: |
+          projects=$(docker ps -a --format '{{.Label "com.docker.compose.project"}}')
+          volumes=$(docker volume ls --format '{{.Name}}')
+          if printf '%s\n' "$projects" | grep -Eq '^demo-check-[0-9a-f]{8}$' || printf '%s\n' "$volumes" | grep -Eq '^demo-check-[0-9a-f]{8}_demo_postgres_data$'; then
+            echo 'Disposable demo resources remain; session artifacts will not be published.'
+            exit 1
+          fi
       - name: Keep desktop and mobile usability screenshots
-        if: always() && steps.teardown.outcome == 'success' && (steps.browser.outcome == 'success' || steps.browser.outcome == 'failure')
+        if: always() && steps.teardown.outcome == 'success' && steps.demo_cleanup.outcome == 'success' && (steps.browser.outcome == 'success' || steps.browser.outcome == 'failure')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: usability-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
             test-results/keyboard-desktop.png
             test-results/**/responsive-*.png
+            test-results/**/demo-overview-*.png
+            test-results/**/demo-after-reset.png
           if-no-files-found: error
           retention-days: 7
       # Traces contain synthetic session data: publish only after deleting the temporary database.
       - name: Keep E2E reports and failure traces
-        if: always() && steps.teardown.outcome == 'success' && (steps.browser.outcome == 'success' || steps.browser.outcome == 'failure')
+        if: always() && steps.teardown.outcome == 'success' && steps.demo_cleanup.outcome == 'success' && (steps.browser.outcome == 'success' || steps.browser.outcome == 'failure')
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e2e-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}

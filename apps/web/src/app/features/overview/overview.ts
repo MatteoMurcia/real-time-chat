@@ -3,9 +3,11 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { isApiError } from '@real-time-chat/contracts';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { timeout } from 'rxjs';
+import { RouterLink } from '@angular/router';
 
 @Component({
   selector: 'app-overview',
+  imports: [RouterLink],
   templateUrl: './overview.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })

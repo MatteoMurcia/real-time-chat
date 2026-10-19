@@ -3,11 +3,12 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Overview } from './overview';
+import { provideRouter } from '@angular/router';
 
 beforeEach(() => {
   TestBed.configureTestingModule({
     imports: [Overview],
-    providers: [provideHttpClient(), provideHttpClientTesting()],
+    providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
   });
 });
 

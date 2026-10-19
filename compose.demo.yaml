@@ -1,0 +1,36 @@
+name: chat-demo
+
+x-demo-database: &demo-database
+  POSTGRES_DB: chat_demo
+  POSTGRES_USER: demo_local
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a dedicated demo password}
+
+services:
+  db:
+    environment: *demo-database
+    volumes:
+      - demo_postgres_data:/var/lib/postgresql
+      - ./docker/demo-init.sql:/docker-entrypoint-initdb.d/10-demo.sql:ro
+  migrate:
+    environment: *demo-database
+  api:
+    environment: *demo-database
+  seed:
+    environment: *demo-database
+  reset:
+    profiles: [tools]
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+      target: seed
+    environment: *demo-database
+    networks: [backend]
+    init: true
+    entrypoint: ["node", "--import", "./docker/database-env.mjs", "scripts/reset-demo.mjs"]
+    command: []
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  demo_postgres_data:

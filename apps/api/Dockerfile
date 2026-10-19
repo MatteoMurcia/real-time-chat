@@ -19,6 +19,7 @@ RUN npm test --workspace @real-time-chat/api && npm run build --workspace @real-
 FROM build AS seed
 RUN npm run build:seed --workspace @real-time-chat/api
 COPY docker/database-env.mjs ./docker/database-env.mjs
+COPY scripts/reset-demo.mjs ./scripts/reset-demo.mjs
 ENV NODE_ENV=development
 USER node
 ENTRYPOINT ["node", "--import", "./docker/database-env.mjs"]
