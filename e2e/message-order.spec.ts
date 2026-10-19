@@ -8,6 +8,7 @@ test('renders ten concurrent retries as one canonical row and rejects conflictin
   await page.goto('/workspace');
   await page.getByRole('button', { name: `Open chat ${channel.name}`, exact: true }).click();
   await expect(page.getByText('Live conversation ready.', { exact: true })).toBeVisible();
+  await expect(page.getByText('No messages yet. Say hello.', { exact: true })).toBeVisible();
   const input = { channelId: channel.id, clientMessageId: randomUUID(), body: 'Ten requests, one message' };
   const results: SendMessageAck[] = await Promise.all(Array.from({ length: 10 }, () => sender.timeout(5000).emitWithAck('message:send', input)));
   expect(results.every(result => result.ok)).toBe(true);
@@ -75,6 +76,7 @@ test('reconciles both event-before-ack and ack-before-event without pending or d
   await expect.poll(() => upgraded).toBe(true);
   await page.getByRole('button', { name: `Open chat ${channel.name}`, exact: true }).click();
   await expect(page.getByText('Live conversation ready.', { exact: true })).toBeVisible();
+  await expect(page.getByText('No messages yet. Say hello.', { exact: true })).toBeVisible();
   const log = page.getByRole('log', { name: 'Conversation messages' });
   const messages: PublicMessage[] = [];
   for (const first of ['event', 'ack'] as const) {
