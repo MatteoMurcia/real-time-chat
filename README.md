@@ -1,76 +1,26 @@
 # Real-time Chat
 
-[GitHub repository](https://github.com/MatteoMurcia/real-time-chat)
+A local team chat built with Angular, NestJS/Socket.IO and PostgreSQL. The focus
+is correctness when a connection drops or a response is lost: ordered
+persistence, authorized channels, idempotent retries and bounded recovery.
 
-A fullstack portfolio project focused on reliable team messaging: persistent
-conversations, explicit channel permissions, idempotent sends, and recovery after
-connection failures.
+## Quick start
 
-## Project status
+The application runs locally; GitHub hosts the code and CI, not the chat.
+Install Git and Docker with Compose **2.32+** and Linux containers. Node, npm and
+PostgreSQL are provided by the images; they are not required on the host.
+Compose Watch needs the same minimum version. No cloud account is required.
 
-The Angular web scaffold and NestJS API run locally. The initial page checks API
-liveness and displays loading, failure, and recovery states. Environment
-validation, HTTP/component tests, and strict TypeScript checks are available.
-The web, API, PostgreSQL and migration job run locally through Docker Compose.
-Prisma manages the User/Session schema and the API database connection lifecycle.
-Container development supports automatic source reload. Account registration is
-available at `/register`, with validation, safe errors and submission feedback.
-Success redirects to `/login` with confirmation. Sign-in opens `/workspace`,
-which restores the session before rendering and lets users sign out of their
-current session. The workspace establishes an authenticated Socket.IO connection
-through the same-origin proxy and shows reconnecting feedback after interruption.
-Users can create channels and browse a paginated directory in the workspace;
-creation includes the creator's membership. See [channel contracts and verification](docs/channels.md).
-Users can join and leave from the directory, with safe manual retry after an
-unconfirmed response. Socket subscriptions require current membership; leaving
-removes all of the user's subscriptions to that channel before the HTTP response.
-The API persists messages with per-channel ordering and retry deduplication,
-then acknowledges and emits them after commit. See [message contracts and limits](docs/messages.md).
-HTTP and socket operations enforce [traffic and input limits](docs/traffic-limits.md),
-including shared user send budgets and explicit proxy trust.
-Members can open a live conversation, exchange plain text with author/time and
-confirmation, and retry unconfirmed sends without changing their keys. The UI
-retries once automatically after five seconds without confirmation, then offers
-manual retry. Late acknowledgements converge without duplicating confirmed rows.
-It deduplicates ack/event delivery and resubscribes after reconnecting. It currently
-loads the latest 50 saved messages and offers earlier pages using channel-bound
-snapshot cursors. Live events merge by ID without replacing loaded history.
-The visible conversation recovers missed messages through ascending pages with a
-fixed committed boundary after reconnecting, on focus and every 15 seconds.
-Failures preserve loaded messages and offer a recovery retry. See [local Socket.IO setup](docs/local-development.md)
-for localhost configuration and the isolated restart test.
-See [container persistence checks](docs/local-development.md#stop-recreate-and-verify-persistence-manually)
-for recreating containers, preserving sessions and testing a separate empty database.
+```text
+git clone https://github.com/MatteoMurcia/real-time-chat.git
+cd real-time-chat
+```
 
-The implementation checklist is maintained in [tasks/plan.md](tasks/plan.md).
-Product choices and scope are documented in
-[docs/ideas/real-time-chat.md](docs/ideas/real-time-chat.md).
-Planning documents are in Spanish; public project documentation is in English.
+Copy `.env.example` to `.env` (`Copy-Item .env.example .env` in PowerShell,
+`cp .env.example .env` on Unix). Set a private `POSTGRES_PASSWORD` in that file;
+do not overwrite an existing environment or reuse personal credentials.
+Leave the example database/user and blank connection URLs for Docker startup.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch and commit conventions,
-pull request process, and verification requirements.
-
-## Planned scope
-
-- Registration, login, logout, and server-side sessions.
-- Open team channels with explicit membership and authorization.
-- Persistent text messages and cursor-based history pagination.
-- Send confirmations, retries without duplicate messages, and reconnection recovery.
-- Responsive, accessible UI and tests for failure scenarios.
-
-Read receipts, typing indicators, and presence are planned follow-up features.
-Private conversations, attachments, video calls, and multiple organizations are
-outside the initial scope.
-
-## Planned stack
-
-| Layer | Technology |
-| --- | --- |
-| Frontend | Angular and TypeScript |
-| Backend | Node.js, NestJS, and Socket.IO |
-| Database | PostgreSQL and Prisma |
-| Local runtime | Docker Compose |
-| Verification | Unit and integration tests, Playwright E2E, GitHub Actions |
 
 ## Run everything with Docker
 
@@ -86,7 +36,8 @@ docker compose up --build --wait
 ```
 
 Open <http://127.0.0.1:8080>. The Angular page should show **API is reachable**.
-Change `WEB_PORT` in `.env` if port 8080 is occupied. Only this web port is
+If port 8080 is occupied, change `WEB_PORT` and the matching `APP_ORIGIN` in `.env`
+(for example, `18085` and `http://127.0.0.1:18085`). Only this web port is
 published, on loopback. API and database communicate through an internal network.
 The containers build their database URL from `POSTGRES_*`, escaping credentials;
 host `DATABASE_URL`, `NODE_ENV`, `HOST` and `PORT` values do not configure them.
@@ -111,8 +62,10 @@ tests inside Linux; final API/web processes run as non-root users. Migration
 tools are in a separate image target. Use the development override below for
 automatic source reload.
 
-`npm run test:docker` checks container URL construction (including reserved
-characters in credentials) without starting Docker. The images exclude local
+With the optional host toolchain, `npm run test:docker` checks container URL
+construction, runner configuration and real Nginx logging in disposable
+containers. Docker must be running; this command is not needed to start the app.
+The images exclude local
 environment files, generated output, dependencies and private key files from
 their build context.
 
@@ -120,6 +73,58 @@ For an optional populated local demo in a separate database, follow
 [demo access and maintenance](docs/demo.md). The [seed reference](docs/demo-seed.md)
 explains repeat runs and collision handling.
 It adds two fictional accounts and paginated history through a one-shot container.
+
+## Try the conversation
+
+Create two accounts at `/register`, then sign in using a normal window and a
+private window (ordinary tabs share the session cookie). Create a channel in
+one window, join it from the other and open its chat in both. Send a message,
+interrupt one connection, send from the other and reconnect to recover history.
+Registration does not sign in automatically. Channels are open to registered
+users; membership grants access to earlier history, not confidentiality.
+
+For ready-made accounts and 105/6-message histories, use the separate
+[local demo installation](docs/demo.md). It has its own volume and guarded
+manual reset. The operator supplies the local demo passwords.
+
+## Architecture and guarantees
+
+| Area | Implemented behavior and evidence |
+| --- | --- |
+| Identity | Server-side sessions with hashed opaque tokens, CSRF, revocation and expiry: [session decision](docs/decisions/003-server-side-sessions.md) |
+| Channels | Discovery, create/join/leave and membership-checked history/subscriptions: [channel contract](docs/channels.md) |
+| Messaging | Per-channel committed order, idempotency by author/key, retries and bounded recovery: [message decision](docs/decisions/004-message-guarantees.md) |
+| Transport | HTTP for identity/discovery/history; Socket.IO for sends/events: [transport decision](docs/decisions/002-socket-io-transport.md) |
+| Quality | Keyboard/responsive interaction, security checks, diagnostics and bounded shutdown: [QA](docs/qa.md), [operations](docs/operations.md) |
+
+See the [architecture diagram, module boundaries and guarantee/test matrix](docs/architecture.md).
+There is one API process. Live events are best-effort; commit can precede a lost
+ack/event. Retrying the same key or reading bounded recovery repairs the view.
+There is **no exactly-once delivery, durable offline queue or offline-first mode**.
+Drafts/unconfirmed messages live only in the current view and can be lost on
+reload. No outbox, Redis, multiple API replicas or load-capacity claim is included.
+Read/unread state, typing and presence are later work; private chats, attachments,
+search and video are outside the initial scope. Remote deployment needs a separate
+security/operations review; this loopback setup is not a production deployment.
+
+## Documentation map
+
+| Need | Read |
+| --- | --- |
+| Run/reseed/reset the fictional demo | [Demo guide](docs/demo.md), [seed behavior](docs/demo-seed.md) |
+| Review the clean-checkout Docker walkthrough | [Installation verification](docs/installation-verification.md) |
+| Understand design choices | [Architecture](docs/architecture.md), [decisions](docs/architecture.md#decisions) |
+| Develop with container reload | [Develop inside Docker](#develop-inside-docker) |
+| Diagnose startup, health or shutdown | [Operations](docs/operations.md), [local development](docs/local-development.md) |
+| Run isolated database checks without host Node | [Container integration](docs/local-development.md#reproducible-integration-in-containers) |
+| Inspect browser tests and CI artifacts | [Browser verification](#browser-verification), [E2E diagnostics](docs/e2e-ci.md) |
+| Review security/input boundaries | [Security](docs/security-boundaries.md), [traffic limits](docs/traffic-limits.md) |
+| Contribute or follow delivery progress | [Contributing](CONTRIBUTING.md), [implementation plan](tasks/plan.md) |
+
+The public documentation is in English; planning/product records are in Spanish.
+Detailed optional host setup and API contracts follow. These require the pinned
+host toolchain only if you choose to develop or run browser tooling outside Docker.
+
 
 ## Develop inside Docker
 
@@ -195,7 +200,7 @@ defined in their own configuration.
 TypeScript 6.0 was selected against the
 [Angular compatibility table](https://angular.dev/reference/versions) and the
 published Nest CLI 12.0.8 dependency on `~6.0.2`. Node 24 is compatible with the
-planned frameworks and npm 12.1.0. The API uses NestJS 12.1.2 with ESM and the
+application frameworks and npm 12.1.0. The API uses NestJS 12.1.2 with ESM and the
 Express adapter. Compilation uses TypeScript directly; tests use Node's built-in
 runner and real HTTP requests.
 
@@ -214,8 +219,7 @@ npm start
 ```
 
 `GET http://127.0.0.1:3000/api/health/live` returns HTTP 200 with
-`{"status":"ok"}`. This checks that the HTTP process is alive; database readiness
-will be added when database integration exists. Stop the server with Ctrl+C.
+`{"status":"ok"}`. This checks that the HTTP process is alive; database readiness is checked separately at `/api/health/ready`. Stop the server with Ctrl+C.
 
 | Variable | Contract |
 | --- | --- |
@@ -246,14 +250,17 @@ checks, including template accessibility. Generated files are excluded.
 
 ## Run the web on the host
 
-With the API running in one terminal, open another at the repository root:
+Set `APP_ORIGIN=http://127.0.0.1:4200` in `.env` and restart the host API so
+identity and socket origin checks match the browser. With the API running in one
+terminal, open another at the repository root:
 
 ```text
 npm run start:web
 ```
 
 Open <http://127.0.0.1:4200>. The page requests `/api/health/live` on the same
-origin. Angular's development server proxies `/api/**` to `127.0.0.1:3000` using
+origin. Angular's development server proxies `/api/**` and `/socket.io/**`
+(including WebSocket upgrades) to `127.0.0.1:3000` using
 `apps/web/proxy.conf.json`. If you change the API port, update that target and
 restart the web server. This proxy only applies to development; serving the
 production build uses the Nginx API reverse proxy in the Docker setup above.
@@ -264,9 +271,8 @@ the button stays disabled while loading. This is a manual liveness check, not
 continuous monitoring or messaging readiness.
 
 Angular 22.2.1 uses standalone components, signals and strict template checking;
-the CLI/build tools are pinned to 22.2.2. The shell has a single Overview page,
-semantic navigation and a keyboard skip link. Routing will be added with the
-first additional screen.
+the CLI/build tools are pinned to 22.2.2. The app has overview, registration, login and protected workspace routes,
+semantic navigation and a keyboard skip link.
 
 Root `npm run build`, `npm run typecheck` and `npm test` check both applications.
 Use `npm run build --workspace @real-time-chat/web` (or `typecheck` / `test`) for
@@ -286,14 +292,16 @@ copied into the response. Clients decide by `code`, not by message text.
 | 403 | `FORBIDDEN` |
 | 404 | `NOT_FOUND` |
 | 409 | `CONFLICT` |
+| 413 | `VALIDATION_ERROR` |
 | 429 | `RATE_LIMITED` |
 | 500 | `INTERNAL_ERROR` |
+| 503 during shutdown | `INTERNAL_ERROR` |
 
 Unmapped exceptions/statuses currently normalize to 500; extend this mapping
 when an endpoint needs another HTTP semantic. A fresh server UUID v4 appears in
 the body and `X-Request-Id` header for each error, with `Cache-Control: no-store`.
-Incoming request IDs are not trusted. Internal failures log only code/requestId;
-full request tracing and structured diagnostics belong to the observability stage.
+Incoming request IDs are not trusted. Internal failures use safe codes and IDs;
+allowlisted HTTP/socket diagnostics are described in [operations](docs/operations.md).
 Successful responses keep their existing shape. Proxy/network failures may not
 follow this contract, so Angular retains its generic connection-error fallback.
 
@@ -301,7 +309,7 @@ The existing connection UI recognizes validated server errors and gives a
 specific retry message for rate limiting. It never renders server-provided text.
 No error-only endpoint is exposed: requesting `/api/missing` exercises the
 404 contract. HTTP tests use isolated controllers for the other failure cases.
-Field-level validation errors will be introduced with the registration form.
+Registration validation can include safe `fieldErrors`.
 
 `@real-time-chat/contracts` is a private npm workspace containing the TypeScript
 contract and `isApiError` runtime guard. Package exports point to generated JS
@@ -453,7 +461,8 @@ regenerate the lockfile and verify generation/migrations before doing so.
 
 Functional P0 has passed CP4-C; the optional demo seed is available above.
 Demo access and guarded reset are documented in [the demo guide](docs/demo.md).
-Clean-clone delivery and presentation remain in the plan.
+Installation and architecture are documented here and in [the architecture guide](docs/architecture.md).
+Presentation and final delivery verification remain in the plan.
 Remote hosting is outside the current delivery scope.
 
 ## Account registration API
@@ -502,7 +511,7 @@ between cookie and header, plus an exact origin check. The cookie expires after
 10 minutes, uses `Path=/`, HttpOnly and SameSite=Lax; HTTPS additionally uses
 Secure and the `__Host-` prefix. The signing key lives in one API process, so
 restart requires a fresh bootstrap. Multiple API replicas require shared key
-management; authenticated session binding belongs to the session task, following
+management; authenticated CSRF binds to the current session, following
 the [OWASP CSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html).
 Host/forwarded headers do not determine the trusted origin. Registration uses a
 per-IP attempt budget; see [traffic limits](docs/traffic-limits.md).
@@ -562,7 +571,7 @@ not clear the cookie or confirm success. No session ID supplied by the client is
 used as a revocation target.
 
 After deletion, `SessionService.revoked` emits `{ sessionId }` locally, once per
-deleted row. This is the hook for later socket disconnection, not a durable or
+deleted row. The connection service uses this to close the revoked session sockets; it is not a durable or
 cross-process event bus. CSRF signing keys are process-local: restart requires a
 fresh token, and multiple API instances need shared signing configuration before
 deployment. Other sessions are not revoked on login. Login attempts share a
@@ -705,6 +714,4 @@ commands to your persistent local database.
 ## Repository hygiene
 
 Environment files, credentials, dependencies, build output, and test artifacts
-are excluded from version control. Environment templates such as `.env.example`
-will be tracked when introduced. Dependency lockfiles and database migrations
-will also be tracked.
+are excluded from version control. Safe environment templates, dependency lockfiles and database migrations are tracked.
