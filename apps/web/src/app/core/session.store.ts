@@ -37,6 +37,7 @@ export class SessionStore {
   }
 
   end(): void {
+    if (this.phase() === 'signed-out') return;
     // Let our logout response clear the HTTP-only cookie before navigation cancels its request.
     if (this.logoutState !== 'idle') this.logoutState = 'ended';
     else this.clear();
