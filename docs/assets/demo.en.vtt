@@ -1,0 +1,29 @@
+WEBVTT
+
+1
+00:00:00.013 --> 00:00:06.306
+Alice is already signed in. Open the shared Demo Planning channel.
+
+2
+00:00:06.306 --> 00:00:14.308
+Send a message. Confirmed means it is saved, not that somebody read it.
+
+3
+00:00:14.308 --> 00:00:22.274
+Bob replies from an independent browser session.
+
+4
+00:00:22.274 --> 00:00:30.382
+Only Alice goes offline. The real server and Bob stay connected.
+
+5
+00:00:30.382 --> 00:00:39.675
+Bob sends two messages while Alice is offline. Her draft remains unsent.
+
+6
+00:00:39.675 --> 00:00:45.929
+Reconnect Alice. Persisted messages arrive through bounded recovery.
+
+7
+00:00:45.929 --> 00:00:52.003
+Send the retained draft. Recovery does not provide durable offline sending.

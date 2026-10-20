@@ -71,7 +71,7 @@ try {
   phase('Bob replies from an independent browser session.');
   await send(bob, 'Yes. I will check the rollout notes.');
   await expect(rows(alice).filter({ hasText: 'Yes. I will check the rollout notes.' })).toHaveCount(1);
-  await alice.getByRole('heading', { name: '#demo-planning', exact: true }).scrollIntoViewIfNeeded();
+  await alice.getByRole('log').scrollIntoViewIfNeeded();
   await alice.screenshot({ path: `${output}/chat-desktop.png`, fullPage: true }); await pause();
   phase('Only Alice goes offline. The real server and Bob stay connected.');
   await aliceContext.setOffline(true); await aliceSocket.close({ code: 1001, reason: 'Demo network interruption' });
@@ -96,7 +96,7 @@ try {
   await expect(alice.getByLabel('Message', { exact: true })).toHaveValue(draft);
   await expect(rows(alice)).toContainText(['The checklist is ready for review.', 'I also checked the migration plan.']);
   assert.equal(new Set(await rows(alice).evaluateAll(nodes => nodes.map(node => node.getAttribute('data-message-id')))).size, 10);
-  await alice.getByRole('heading', { name: '#demo-planning', exact: true }).scrollIntoViewIfNeeded();
+  await alice.getByRole('log').scrollIntoViewIfNeeded();
   await alice.screenshot({ path: `${output}/chat-recovered.png`, fullPage: true }); await pause();
   phase('Send the retained draft. Recovery does not provide durable offline sending.');
   await alice.getByRole('button', { name: 'Send message', exact: true }).click();

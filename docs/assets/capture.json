@@ -1,0 +1,46 @@
+{
+  "viewport": {
+    "width": 1280,
+    "height": 900
+  },
+  "mobileViewport": {
+    "width": 375,
+    "height": 812
+  },
+  "durationSeconds": 52.0027252,
+  "initialRows": 6,
+  "offlineRows": 8,
+  "recoveredRows": 10,
+  "recoveryPageMessages": 2,
+  "finalRows": 11,
+  "phases": [
+    {
+      "seconds": 0.012731600000000981,
+      "text": "Alice is already signed in. Open the shared Demo Planning channel."
+    },
+    {
+      "seconds": 6.306271900000001,
+      "text": "Send a message. Confirmed means it is saved, not that somebody read it."
+    },
+    {
+      "seconds": 14.307538200000002,
+      "text": "Bob replies from an independent browser session."
+    },
+    {
+      "seconds": 22.273673300000002,
+      "text": "Only Alice goes offline. The real server and Bob stay connected."
+    },
+    {
+      "seconds": 30.381558,
+      "text": "Bob sends two messages while Alice is offline. Her draft remains unsent."
+    },
+    {
+      "seconds": 39.67488409999999,
+      "text": "Reconnect Alice. Persisted messages arrive through bounded recovery."
+    },
+    {
+      "seconds": 45.9290458,
+      "text": "Send the retained draft. Recovery does not provide durable offline sending."
+    }
+  ]
+}
