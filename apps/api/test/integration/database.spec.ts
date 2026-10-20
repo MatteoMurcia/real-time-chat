@@ -21,12 +21,14 @@ import { verifySocketSessions } from './socket-session.js';
 import { verifyTrafficLimits } from './traffic-limits.js';
 import { verifyShutdown } from './shutdown.js';
 import { verifyDemoSeed } from './demo-seed.js';
+import { verifyReadCursors } from './read-cursor.js';
 import type { INestApplication } from '@nestjs/common';
 import { withTestDatabase } from '../setup.js';
 import { createUserFixture } from '../fixtures/users.js';
 
 type Fixture = { app: INestApplication; db: DatabaseService; databaseUrl: string };
 const suites: { name: string; timeout: number; run: (fixture: Fixture) => Promise<void> }[] = [
+  { name: 'advances read cursors monotonically across sessions with membership and committed sequence bounds', timeout: 20000, run: ({ app, db }) => verifyReadCursors(app, db) },
   { name: 'seeds demo atomically, preserves unrelated data and supports repeated login and paginated history', timeout: 30000, run: ({ app, db }) => verifyDemoSeed(app, db) },
   { name: "drains deferred commits and rollbacks, bounds stuck work and leaked handles, and recovers original message keys", timeout: 45000, run: ({ app, db, databaseUrl }) => verifyShutdown(app, db, databaseUrl) },
   { name: "enforces default HTTP/socket quotas, input bounds and proxy trust with real clients", timeout: 30000, run: ({ databaseUrl }) => verifyTrafficLimits(databaseUrl) },
@@ -360,7 +362,7 @@ test('isolated integration suites start empty and apply committed migrations', {
     try {
       await app.listen(0, '127.0.0.1');
       const db = app.get(DatabaseService);
-      assert.deepEqual(await Promise.all([db.user.count(), db.session.count(), db.channel.count(), db.membership.count(), db.message.count()]), [0, 0, 0, 0, 0]);
+      assert.deepEqual(await Promise.all([db.user.count(), db.session.count(), db.channel.count(), db.membership.count(), db.message.count(), db.readCursor.count()]), [0, 0, 0, 0, 0, 0]);
       await suite.run({ app, db, databaseUrl });
     } finally { await app.close(); }
   }))));

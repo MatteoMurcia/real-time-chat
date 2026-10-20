@@ -18,7 +18,7 @@ export async function resetDemo(db, confirmation) {
     if (target?.database !== 'chat_demo' || target.role !== 'demo_local' || target.marker !== 'real-time-chat:local-demo:v1') throw new Error('Demo initialization marker is missing or target differs');
     await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '3s'");
     // No CASCADE: unexpected foreign-key dependencies must fail instead of deleting other tables.
-    await tx.$executeRawUnsafe('TRUNCATE TABLE public."Message", public."Membership", public."Session", public."Channel", public."User"');
+    await tx.$executeRawUnsafe('TRUNCATE TABLE public."ReadCursor", public."Message", public."Membership", public."Session", public."Channel", public."User"');
   }, { timeout: 10000 });
 }
 

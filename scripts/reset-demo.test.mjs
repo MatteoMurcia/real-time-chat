@@ -31,6 +31,16 @@ test('explicit confirmation is required before any database work', async () => {
   assert.equal(connected, false);
 });
 
+test('confirmed demo reset explicitly includes read cursors without cascading', async () => {
+  const statements = [];
+  const tx = { $executeRaw: async () => {}, $queryRaw: async () => [{ database: 'chat_demo', role: 'demo_local', marker: 'real-time-chat:local-demo:v1' }],
+    $executeRawUnsafe: async sql => { statements.push(sql); } };
+  await resetDemo({ $transaction: async callback => callback(tx) }, 'chat_demo');
+  const truncate = statements.find(sql => sql.startsWith('TRUNCATE TABLE'));
+  assert.match(truncate, /public\."ReadCursor"/);
+  assert.doesNotMatch(truncate, /CASCADE/);
+});
+
 test('reset CLI refuses unconfirmed input without printing private arguments', () => {
   const secret = 'private-reset-canary';
   const result = spawnSync(process.execPath, [fileURLToPath(new URL('./reset-demo.mjs', import.meta.url)), '--confirm', secret], { encoding: 'utf8', timeout: 5000 });

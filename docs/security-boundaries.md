@@ -6,6 +6,11 @@ operations and future server delivery; it cannot retract data already received.
 
 ## Identity, origin and membership
 
+[Read cursors](read-cursors.md) use the authenticated session's user and current
+channel membership for both reads and writes. Advancing also requires the
+existing Origin/session-CSRF checks and an actually committed message boundary.
+Requests cannot select another user's cursor or regress stored progress.
+
 The session cookie determines the actor. A client-supplied `authorId`, `userId`,
 Socket.IO auth field or query parameter cannot impersonate another account.
 Message requests reject extra fields; canonical acknowledgements, events and

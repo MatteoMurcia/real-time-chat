@@ -55,6 +55,10 @@ test('preserves accounts, sessions and message idempotency after recreating the 
   };
   const originalMessage = await send();
   expect(originalMessage).toMatchObject({ ok: true, data: { ...message, sequence: '1' } });
+  const readPath = `/api/channels/${channel.id}/read-cursor`;
+  const marked = await context.request.put(readPath, { headers: { origin, 'x-csrf-token': csrf }, data: { lastReadSequence: '1' } });
+  expect(marked.status()).toBe(200);
+  expect(await marked.json()).toEqual({ channelId: channel.id, lastReadSequence: '1' });
 
   try {
     compose('down', '--timeout', '5');
@@ -69,6 +73,9 @@ test('preserves accounts, sessions and message idempotency after recreating the 
   await expect(page.getByText('Live connection established.', { exact: true })).toBeVisible();
   expect((await context.cookies()).find(item => item.name === 'chat_session')?.value).toBe(cookie.value);
   expect(await send()).toEqual(originalMessage);
+  const restored = await context.request.get(readPath);
+  expect(restored.status()).toBe(200);
+  expect(await restored.json()).toEqual({ channelId: channel.id, lastReadSequence: '1' });
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(page).toHaveURL(/\/login\?reason=signed-out$/);
   await signIn();

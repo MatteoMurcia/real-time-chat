@@ -14,9 +14,11 @@ export async function verifyDemoSeed(app: INestApplication, db: DatabaseService)
   const foreign = await db.channel.create({ data: { name: 'Unrelated channel', nameKey: 'unrelated channel', slug: 'unrelated-channel', createdBy: outsider.id, lastSequence: 1n } });
   await db.membership.create({ data: { userId: outsider.id, channelId: foreign.id } });
   await db.message.create({ data: { authorId: outsider.id, channelId: foreign.id, clientMessageId: randomUUID(), sequence: 1n, body: 'Keep this unrelated message' } });
+  await db.readCursor.create({ data: { userId: outsider.id, channelId: foreign.id, lastReadSequence: 1n } });
   const fingerprint = async () => Promise.all([
     db.user.findMany({ orderBy: { id: 'asc' } }), db.channel.findMany({ orderBy: { id: 'asc' } }),
     db.membership.findMany({ orderBy: [{ channelId: 'asc' }, { userId: 'asc' }] }), db.message.findMany({ orderBy: { id: 'asc' } }),
+    db.readCursor.findMany({ orderBy: [{ userId: 'asc' }, { channelId: 'asc' }] }),
   ]);
   await seedDemo(db, env);
   const original = await fingerprint();
@@ -40,6 +42,7 @@ export async function verifyDemoSeed(app: INestApplication, db: DatabaseService)
   }
   const lounge = await db.channel.findUniqueOrThrow({ where: { slug: 'demo-lounge' } });
   await app.get(SendMessageService).send(accounts[0]!.id, { channelId: lounge.id, clientMessageId: randomUUID(), body: 'Added after seeding' });
+  await db.readCursor.create({ data: { userId: accounts[0]!.id, channelId: lounge.id, lastReadSequence: 105n } });
   const withActivity = await fingerprint();
   await seedDemo(db, env); assert.deepEqual(await fingerprint(), withActivity, 'rerun preserves subsequent conversation and its sequence counter');
   await assert.rejects(seedDemo(db, { ...env, DEMO_BOB_PASSWORD: 'changed bob demo passphrase' }));
@@ -49,6 +52,7 @@ export async function verifyDemoSeed(app: INestApplication, db: DatabaseService)
   const changedMessage = await fingerprint(); await assert.rejects(seedDemo(db, env));
   assert.deepEqual(await fingerprint(), changedMessage, 'a reserved client key never overwrites changed content');
   // A conflict after earlier inserts must roll the entire run back, including users/channels/counters.
+  await db.readCursor.deleteMany({ where: { userId: { in: accounts.map(account => account.id) } } });
   await db.message.deleteMany({ where: { authorId: { in: accounts.map(account => account.id) } } });
   await db.membership.deleteMany({ where: { userId: { in: accounts.map(account => account.id) } } });
   await db.channel.deleteMany({ where: { createdBy: accounts[0]!.id } });

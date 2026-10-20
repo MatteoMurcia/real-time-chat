@@ -47,7 +47,7 @@ page or built into the browser bundle.
 
 All demo accounts, channels and messages are shared inside this installation.
 Other participants can read joined channels. Use fictional content only. Reset
-deletes **all** users, sessions, memberships, channels and messages in this demo
+deletes **all** users, sessions, memberships, channels, messages and read cursors in this demo
 database, including anything added by visitors.
 
 For the manual first-message check, start timing when the prepared overview opens
