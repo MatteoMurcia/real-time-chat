@@ -124,6 +124,7 @@ security/operations review; this loopback setup is not a production deployment.
 | --- | --- |
 | Run/reseed/reset the fictional demo | [Demo guide](docs/demo.md), [seed behavior](docs/demo-seed.md) |
 | Review the clean-checkout Docker walkthrough | [Installation verification](docs/installation-verification.md) |
+| Review final local delivery and future hosting requirements | [Delivery verification](docs/delivery-verification.md), [deployment requirements](docs/deployment-readiness.md) |
 | Understand design choices | [Architecture](docs/architecture.md), [decisions](docs/architecture.md#decisions) |
 | Develop with container reload | [Develop inside Docker](#develop-inside-docker) |
 | Diagnose startup, health or shutdown | [Operations](docs/operations.md), [local development](docs/local-development.md) |

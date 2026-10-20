@@ -8,6 +8,12 @@ Prisma, PostgreSQL and Nginx run in images; host Node/Playwright is needed only
 for the automated browser tests below. Base Compose has no bind mounts: the
 database uses a named volume, and application files are copied during build.
 
+The [final local delivery smoke](delivery-verification.md) records a clean GitHub
+clone, two-user permissions and recovery after API restart, then full container
+recreation with retained sessions and saved messages. See
+[future deployment requirements](deployment-readiness.md) for the work needed
+before any remote exposure; the current supported installation remains local.
+
 ## Run at localhost:8080
 
 Copy `.env.example` to `.env` and set a private `POSTGRES_PASSWORD`.
