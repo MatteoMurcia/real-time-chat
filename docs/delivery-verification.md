@@ -111,7 +111,7 @@ shutdown preserves the volume.
 ## CI and remaining scope
 
 [Integrated baseline CI 39408568373](https://github.com/MatteoMurcia/real-time-chat/actions/runs/39408568373)
-passed Quality, Integration and Containers on `51eb848`. The task PR records
+passed Quality, Integration and Containers on `51eb848`. [PR #58](https://github.com/MatteoMurcia/real-time-chat/pull/58) records
 the additional checks against the final documentation branch. Existing tests
 cover deeper identity, authorization, ordering, retry, recovery and shutdown
 cases; this local smoke does not claim to repeat every negative case manually.
