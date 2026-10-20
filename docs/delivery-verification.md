@@ -122,3 +122,5 @@ a deployment. No public URL, registry publication, remote TLS verification,
 load/multi-instance certification or rollback/restore exercise is included.
 CP0-C and CP1-C remain pending; CP5-B must still review the complete A01–A18
 evidence. Passing 5.3a does not silently close those gates.
+The subsequent [CP5-B review](checkpoints/cp5-b.md) explicitly evaluates those
+remaining gates and the full acceptance matrix against integrated main.

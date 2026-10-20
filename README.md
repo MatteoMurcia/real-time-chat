@@ -4,6 +4,11 @@ A local team chat built with Angular, NestJS/Socket.IO and PostgreSQL. The focus
 is correctness when a connection drops or a response is lost: ordered
 persistence, authorized channels, idempotent retries and bounded recovery.
 
+The [P0 acceptance review](docs/checkpoints/cp5-b.md) maps all eighteen scenarios
+to executed evidence, including clean Docker installation and two-user recovery.
+The supported delivery is local and uses one API instance; unread state,
+typing/presence and capacity measurement remain optional later work.
+
 ## Quick start
 
 The application runs locally; GitHub hosts the code and CI, not the chat.
