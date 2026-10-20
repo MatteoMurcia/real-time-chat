@@ -120,5 +120,7 @@ sign-in. Temporary demo data and credentials were removed afterward.
 Local lint, types, unit suites, Docker checks, application builds and compiled
 seed build passed. Removing the marker guard temporarily made its regression
 test fail; the guard was restored and the seven checks passed again. Independent
-and parent review found no remaining required changes. Clean-clone delivery and
-the presentation remain tasks 5.2a–5.2b / CP5-A.
+and parent review found no remaining required changes. The subsequent
+[clean-checkout installation walkthrough](installation-verification.md) is
+implemented by 5.2a (merged PR #55). The [plan](../tasks/plan.md) tracks checkpoint
+review, presentation and final delivery separately.

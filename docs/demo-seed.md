@@ -93,8 +93,10 @@ Local lint, types, all unit suites, app builds and the seed build also pass. A
 temporary mutation adding a fallback password failed the credential test; source
 was restored and all checks returned green. Compose configuration was checked
 without a daemon: ordinary startup excludes `seed`, while `--profile tools`
-includes it. Docker Desktop's local engine remains unavailable, so real database
-and container evidence comes from Linux CI. Independent and parent review found
-no remaining required changes. [PR #53](https://github.com/MatteoMurcia/real-time-chat/pull/53)
-is for owner review/manual merge. Reset/access UI work remains task 5.1b; clean-clone
-delivery and presentation remain later tasks, not certified by this seed test.
+includes it. During 5.1a verification the local Docker engine was unavailable,
+so its real database/container evidence came from Linux CI. Independent and
+parent review found no remaining required changes; [PR #53](https://github.com/MatteoMurcia/real-time-chat/pull/53)
+is merged. Subsequent [access/reset verification](demo.md) and
+[clean-checkout installation](installation-verification.md) include local Docker
+evidence from 5.1b/5.2a. Presentation and final delivery remain separate from the
+seed test; follow the [current plan](../tasks/plan.md).
