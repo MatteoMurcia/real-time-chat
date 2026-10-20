@@ -57,7 +57,9 @@ project, the disposable containers/networks/volume and ignored credential file
 were removed. Volume deletion was test cleanup only: the normal documented stop
 is `down` **without `--volumes`**. Existing development data was not reset or moved.
 
-The [pull request](https://github.com/MatteoMurcia/real-time-chat/pull/55) records
-the final CI checks and is left for owner review/manual merge. Optional host
+The merged [pull request](https://github.com/MatteoMurcia/real-time-chat/pull/55)
+records the final CI checks. Optional host
 development, Watch reload, physical devices, performance/load, deployment and
 CP0-C/CP1-C are not newly certified by this walkthrough.
+The subsequent [CP5-A review](checkpoints/cp5-a.md) independently reproduces the
+dedicated demo installation from merged main.
