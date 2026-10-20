@@ -6,10 +6,16 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ChannelList } from './channel-list';
 import { signal } from '@angular/core';
 import { ActivityService } from '../../core/activity.service';
+import { SessionStore } from '../../core/session.store';
 
 const channel = { id: 'channel-id', name: 'Design', slug: 'design-team', createdAt: '2026-10-10T12:00:00Z', isMember: true, unreadCount: 0 };
 const token = `${'a'.repeat(64)}.1800000000.${'b'.repeat(64)}`;
-beforeEach(() => TestBed.configureTestingModule({ imports: [ChannelList], providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([]), { provide: ActivityService, useValue: { revision: signal(0) } }] }));
+const sessions = { status: signal('authenticated'), end: vi.fn() };
+beforeEach(() => {
+  sessions.status.set('authenticated'); sessions.end.mockClear();
+  TestBed.configureTestingModule({ imports: [ChannelList], providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([]),
+    { provide: ActivityService, useValue: { revision: signal(0) } }, { provide: SessionStore, useValue: sessions }] });
+});
 afterEach(() => { try { TestBed.inject(HttpTestingController).verify(); } finally { TestBed.resetTestingModule(); vi.useRealTimers(); } });
 
 function setup() {
@@ -98,7 +104,8 @@ it('rejects malformed pages and sends revoked sessions back to login', () => {
   expect(element.textContent).toContain('Could not load channels');
   click('Refresh channels');
   http.expectOne('/api/channels').flush(null, { status: 401, statusText: 'Unauthorized' });
-  expect(navigate).toHaveBeenCalledWith(['/login'], { queryParams: { reason: 'expired' } });
+  expect(sessions.end).toHaveBeenCalledOnce();
+  expect(navigate).not.toHaveBeenCalled();
 });
 
 it('confirms membership changes before updating and blocks overlapping reads or mutations', () => {
@@ -176,4 +183,14 @@ it.each([-1, 1.5, '3', undefined, Number.MAX_SAFE_INTEGER + 1])('rejects invalid
   const { fixture, element, http } = setup();
   http.expectOne('/api/channels').flush({ channels: [{ ...channel, unreadCount }], nextCursor: null }); fixture.detectChanges();
   expect(element.textContent).toContain('Could not load channels');
+});
+
+it('ignores a late unread refresh rejection after explicit sign-out', () => {
+  const { fixture, http } = setup();
+  http.expectOne('/api/channels').flush({ channels: [channel], nextCursor: null }); fixture.detectChanges();
+  TestBed.inject(ActivityService).revision.update(value => value + 1); fixture.detectChanges();
+  sessions.status.set('signed-out');
+  const navigate = vi.spyOn(TestBed.inject(Router), 'navigate');
+  http.expectOne('/api/channels').flush(null, { status: 401, statusText: 'Unauthorized' });
+  expect(sessions.end).not.toHaveBeenCalled(); expect(navigate).not.toHaveBeenCalled();
 });

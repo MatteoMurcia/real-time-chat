@@ -1,13 +1,13 @@
 import { ChangeDetectionStrategy, ChangeDetectorRef, Component, DestroyRef, effect, ElementRef, inject, output, signal, untracked } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, type AbstractControl } from '@angular/forms';
-import { Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { finalize, type Subscription } from 'rxjs';
 import { isApiError } from '@real-time-chat/contracts';
 import type { ListedChannel, PublicChannel } from '@real-time-chat/contracts/channels';
 import { ChannelsClient } from './channels-client';
 import { ActivityService } from '../../core/activity.service';
+import { SessionStore } from '../../core/session.store';
 
 @Component({
   selector: 'app-channel-list',
@@ -23,7 +23,7 @@ export class ChannelList {
   private readonly destroyRef = inject(DestroyRef);
   private readonly element = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly changeDetector = inject(ChangeDetectorRef);
-  private readonly router = inject(Router);
+  private readonly sessions = inject(SessionStore);
   private readonly activity = inject(ActivityService);
   private refreshRequest?: Subscription;
   protected readonly channels = signal<ListedChannel[]>([]);
@@ -153,6 +153,6 @@ export class ChannelList {
   }
 
   private handleUnauthorized(error: unknown): void {
-    if (error instanceof HttpErrorResponse && error.status === 401) void this.router.navigate(['/login'], { queryParams: { reason: 'expired' } });
+    if (error instanceof HttpErrorResponse && error.status === 401 && this.sessions.status() === 'authenticated') this.sessions.end();
   }
 }

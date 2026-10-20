@@ -2,6 +2,30 @@ import { randomUUID } from 'node:crypto';
 import { io } from 'socket.io-client';
 import { test, expect } from './fixtures';
 
+test('preserves explicit sign-out when an unread refresh is rejected before logout responds', async ({ page, chatAccount }) => {
+  await page.goto('/workspace');
+  await expect(page.getByRole('button', { name: `Open chat ${chatAccount.channel.name}`, exact: true })).toBeVisible();
+  const refresh = Promise.withResolvers<void>(), committed = Promise.withResolvers<void>(), rejected = Promise.withResolvers<void>();
+  try {
+    await page.route('**/api/channels', async route => {
+      refresh.resolve(); await committed.promise;
+      const response = await route.fetch();
+      expect(response.status()).toBe(401);
+      await route.fulfill({ response }); rejected.resolve();
+    });
+    await page.route('**/api/auth/logout', async route => {
+      const response = await route.fetch(); expect(response.status()).toBe(204);
+      committed.resolve(); await rejected.promise; await route.fulfill({ response });
+    });
+    await page.evaluate(() => window.dispatchEvent(new Event('focus'))); await refresh.promise;
+    await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+    await expect(page).toHaveURL(/\/login\?reason=signed-out$/);
+    expect(await page.context().cookies()).not.toEqual(expect.arrayContaining([expect.objectContaining({ name: 'chat_session' })]));
+  } finally {
+    committed.resolve(); rejected.resolve(); await page.unrouteAll({ behavior: 'ignoreErrors' });
+  }
+});
+
 test('persists foreign-message counts and synchronizes reached messages without reading in background', async ({ page, context, browser, chatAccount }) => {
   test.setTimeout(90000);
   const origin = process.env.E2E_BASE_URL!, suffix = randomUUID();
