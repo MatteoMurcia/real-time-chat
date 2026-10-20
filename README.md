@@ -6,7 +6,7 @@ persistence, authorized channels, idempotent retries and bounded recovery.
 
 The [P0 acceptance review](docs/checkpoints/cp5-b.md) maps all eighteen scenarios
 to executed evidence, including clean Docker installation and two-user recovery.
-The supported delivery is local and uses one API instance; unread state,
+The supported delivery is local and uses one API instance; unread counters/UI,
 typing/presence and capacity measurement remain optional later work.
 
 ## Quick start
@@ -119,7 +119,8 @@ ack/event. Retrying the same key or reading bounded recovery repairs the view.
 There is **no exactly-once delivery, durable offline queue or offline-first mode**.
 Drafts/unconfirmed messages live only in the current view and can be lost on
 reload. No outbox, Redis, multiple API replicas or load-capacity claim is included.
-Read/unread state, typing and presence are later work; private chats, attachments,
+[Read-cursor persistence](docs/read-cursors.md) is available through the API;
+unread counters/UI, typing and presence are later work. Private chats, attachments,
 search and video are outside the initial scope. Remote deployment needs a separate
 security/operations review; this loopback setup is not a production deployment.
 
@@ -460,7 +461,7 @@ npm run test:integration --workspace @real-time-chat/api
 
 The runner refuses a missing URL or the development database name. Each suite
 creates a unique database from `template0`, applies committed migrations, checks
-all five data tables are empty and starts its own app. Minimal fixtures belong
+all six data tables are empty and starts its own app. Minimal fixtures belong
 to that suite; its generated database is dropped in `finally`, including on
 failure. The base database remains empty. Constraints, rollback, real HTTP/socket
 clients and Nest connection cleanup retain their original assertions.
