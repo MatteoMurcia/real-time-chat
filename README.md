@@ -87,6 +87,17 @@ For ready-made accounts and 105/6-message histories, use the separate
 [local demo installation](docs/demo.md). It has its own volume and guarded
 manual reset. The operator supplies the local demo passwords.
 
+## Watch the demo
+
+[![Local demo overview](docs/assets/overview-desktop.png)](docs/assets/demo.webm)
+
+[Watch/download the short WebM](docs/assets/demo.webm): Alice and Bob exchange
+messages, Alice disconnects, and recovery restores two missed messages while
+keeping her unsent draft. The recording has no audio. Read the
+[English presentation script and captions](docs/demo-script.md), including
+[desktop/mobile screenshots](docs/demo-script.md#watch-and-inspect), capture
+instructions and the limits of the demonstration.
+
 ## Architecture and guarantees
 
 | Area | Implemented behavior and evidence |
