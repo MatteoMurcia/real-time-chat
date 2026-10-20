@@ -61,3 +61,5 @@ The merged [pull request](https://github.com/MatteoMurcia/real-time-chat/pull/55
 records the final CI checks. Optional host
 development, Watch reload, physical devices, performance/load, deployment and
 CP0-C/CP1-C are not newly certified by this walkthrough.
+The subsequent [CP5-A review](checkpoints/cp5-a.md) independently reproduces the
+dedicated demo installation from merged main.

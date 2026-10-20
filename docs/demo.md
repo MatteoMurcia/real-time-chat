@@ -124,3 +124,5 @@ and parent review found no remaining required changes. The subsequent
 [clean-checkout installation walkthrough](installation-verification.md) is
 implemented by 5.2a (merged PR #55). The [plan](../tasks/plan.md) tracks checkpoint
 review, presentation and final delivery separately.
+The subsequent [CP5-A review](checkpoints/cp5-a.md) reproduces this demo from a
+fresh clone of integrated main.
