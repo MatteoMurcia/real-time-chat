@@ -19,7 +19,7 @@
       <article class="message" [attr.data-message-id]="message.id">
         <div class="meta"><strong>{{ message.author.displayName }}</strong> <time [attr.datetime]="message.createdAt">{{ message.createdAt | date:'short' }}</time></div>
         <p class="body">{{ message.body }}</p>
-        <small>Confirmed</small>
+        <small class="read-marker" [attr.data-read-sequence]="message.sequence" [attr.data-read-channel]="message.channelId">Confirmed</small>
       </article>
     }
     @for (item of store.outgoing(); track item.request.clientMessageId; let index = $index) {
@@ -37,6 +37,7 @@
     <p role="alert" class="error-summary">{{ store.syncError() }}</p>
     <button type="button" (click)="recover()" [disabled]="!store.ready() || store.syncLoading()">Retry recovery</button>
   }
+  @if (activity.readError()?.channelId === channel().id) { <p role="status">{{ activity.readError()?.message }}</p> }
   <button class="latest" type="button" (click)="scrollToLatest()">{{ hasNewMessages() ? 'New messages — show latest' : following() ? 'Scroll to latest message' : 'Show latest messages' }}</button>
   <form (submit)="$event.preventDefault(); send()">
     <label for="message-body">Message</label>

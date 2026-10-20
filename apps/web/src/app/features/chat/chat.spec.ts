@@ -3,20 +3,40 @@ import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Chat } from './chat';
 import { ChatStore } from './chat.store';
+import { ActivityService } from '../../core/activity.service';
 
 const store = {
   open: vi.fn(), send: vi.fn(() => true), retry: vi.fn(), recover: vi.fn(), loadHistory: vi.fn(),
   messages: signal<unknown[]>([]), outgoing: signal<unknown[]>([]), outgoingNotice: signal('No messages awaiting confirmation.'), liveNotice: signal(''), notice: signal(''),
   ready: signal(true), historyLoading: signal(false), historyError: signal(''), olderCursor: signal<string | null>(null),
-  snapshotCursor: signal('snapshot'), syncLoading: signal(false), syncError: signal(''),
+  snapshotCursor: signal('snapshot'), syncCursor: signal('djE6Y2hhbm5lbDoxMDoxMA'), recoveredSequence: signal('10'), syncLoading: signal(false), syncError: signal(''),
 };
+const activity = { revision: signal(0), visible: signal(true), readError: signal(null), mark: vi.fn() };
+let intersect: IntersectionObserverCallback;
 const channel = (id: string) => ({ id, name: id, slug: id, isMember: true, createdAt: '2026-10-18T00:00:00Z' });
 beforeEach(() => {
+  vi.stubGlobal('IntersectionObserver', class { constructor(callback: IntersectionObserverCallback) { intersect = callback; } observe() {} disconnect() {} });
   vi.clearAllMocks(); store.messages.set([]); store.outgoing.set([]); store.liveNotice.set('');
+  activity.visible.set(true); store.recoveredSequence.set('10');
   store.syncError.set(''); store.syncLoading.set(false);
-  TestBed.configureTestingModule({ imports: [Chat] }).overrideComponent(Chat, { set: { providers: [{ provide: ChatStore, useValue: store }] } });
+  TestBed.configureTestingModule({ imports: [Chat], providers: [{ provide: ActivityService, useValue: activity }] }).overrideComponent(Chat, { set: { providers: [{ provide: ChatStore, useValue: store }] } });
 });
-afterEach(() => TestBed.resetTestingModule());
+afterEach(() => { TestBed.resetTestingModule(); vi.unstubAllGlobals(); });
+
+it('marks only reached, fully visible, recovered messages in the current channel', () => {
+  const { fixture, element } = setup();
+  store.messages.set([{ id: 'one', channelId: 'first', sequence: '10', author: { displayName: 'Other' }, createdAt: '2026-10-20T00:00:00Z', body: 'Read me' }]);
+  fixture.detectChanges();
+  const marker = element.querySelector('[data-read-sequence]')!;
+  const notify = (ratio = 1) => intersect([{ target: marker, isIntersecting: true, intersectionRatio: ratio } as IntersectionObserverEntry], {} as IntersectionObserver);
+  activity.visible.set(false); notify(); expect(activity.mark).not.toHaveBeenCalled();
+  activity.visible.set(true); store.syncLoading.set(true); notify(); expect(activity.mark).not.toHaveBeenCalled();
+  store.syncLoading.set(false); store.recoveredSequence.set('9'); notify(); expect(activity.mark).not.toHaveBeenCalled();
+  store.recoveredSequence.set('10'); notify(.5); expect(activity.mark).not.toHaveBeenCalled();
+  notify(); expect(activity.mark).toHaveBeenCalledExactlyOnceWith('first', '10');
+  activity.mark.mockClear(); fixture.componentRef.setInput('channel', channel('second')); fixture.detectChanges();
+  notify(); expect(activity.mark).not.toHaveBeenCalled();
+});
 
 function setup() {
   const fixture = TestBed.createComponent(Chat);

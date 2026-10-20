@@ -23,7 +23,11 @@ export class ChannelsClient {
       timeout(5000), map(body => {
         if (!body || !Array.isArray(body.channels) || body.channels.length > 100
           || (body.nextCursor !== null && (typeof body.nextCursor !== 'string' || !/^[A-Za-z0-9_-]{1,100}$/.test(body.nextCursor)))) throw new Error('Invalid channel page');
-        return { channels: body.channels.map(readChannel), nextCursor: body.nextCursor };
+        return { channels: body.channels.map(value => {
+          const channel = readChannel(value);
+          if (channel.isMember ? !Number.isSafeInteger(value.unreadCount) || value.unreadCount! < 0 : value.unreadCount !== null) throw new Error('Invalid unread count');
+          return { ...channel, unreadCount: value.unreadCount };
+        }), nextCursor: body.nextCursor };
       }),
     );
   }

@@ -4,11 +4,13 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ChannelList } from './channel-list';
+import { signal } from '@angular/core';
+import { ActivityService } from '../../core/activity.service';
 
-const channel = { id: 'channel-id', name: 'Design', slug: 'design-team', createdAt: '2026-10-10T12:00:00Z', isMember: true };
+const channel = { id: 'channel-id', name: 'Design', slug: 'design-team', createdAt: '2026-10-10T12:00:00Z', isMember: true, unreadCount: 0 };
 const token = `${'a'.repeat(64)}.1800000000.${'b'.repeat(64)}`;
-beforeEach(() => TestBed.configureTestingModule({ imports: [ChannelList], providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])] }));
-afterEach(() => { TestBed.inject(HttpTestingController).verify(); TestBed.resetTestingModule(); vi.useRealTimers(); });
+beforeEach(() => TestBed.configureTestingModule({ imports: [ChannelList], providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([]), { provide: ActivityService, useValue: { revision: signal(0) } }] }));
+afterEach(() => { try { TestBed.inject(HttpTestingController).verify(); } finally { TestBed.resetTestingModule(); vi.useRealTimers(); } });
 
 function setup() {
   const fixture = TestBed.createComponent(ChannelList);
@@ -64,7 +66,7 @@ it('keeps the current page on failure and allows pagination and refresh without 
   expect(element.querySelector('li')!.textContent).toContain('Design');
   expect(element.textContent).toContain('Could not load channels');
   click('Next channels');
-  http.expectOne('/api/channels?cursor=djE6ZGVzaWdu').flush({ channels: [{ ...channel, id: 'other', name: 'Engineering', isMember: false }], nextCursor: null }); fixture.detectChanges();
+  http.expectOne('/api/channels?cursor=djE6ZGVzaWdu').flush({ channels: [{ ...channel, id: 'other', name: 'Engineering', isMember: false, unreadCount: null }], nextCursor: null }); fixture.detectChanges();
   expect(element.querySelectorAll('li')).toHaveLength(1);
   expect(document.activeElement).toBe(element.querySelector('#channels-title'));
   expect(element.querySelector('li')!.textContent).toContain('Open channel');
@@ -112,12 +114,14 @@ it('confirms membership changes before updating and blocks overlapping reads or 
   expect(request.request.body).toBe(null);
   expect(request.request.headers.get('X-CSRF-Token')).toBe(token);
   request.flush({ channelId: channel.id, isMember: false }); fixture.detectChanges();
+  http.expectOne('/api/channels').flush({ channels: [{ ...channel, isMember: false, unreadCount: null }], nextCursor: null });
   expect(element.querySelector('li')!.textContent).toContain('Open channel');
   expect(document.activeElement).toBe(element.querySelector('#membership-channel-id'));
   click('Join');
   http.expectOne('/api/auth/session/csrf').flush({ csrfToken: token });
   const join = http.expectOne('/api/channels/channel-id/membership');
   expect(join.request.method).toBe('PUT'); join.flush({ channelId: channel.id, isMember: true }); fixture.detectChanges();
+  http.expectOne('/api/channels').flush({ channels: [channel], nextCursor: null });
   expect(element.querySelector('li')!.textContent).toContain('Member');
 });
 
@@ -137,7 +141,7 @@ it('retains the original action after timeout and requires explicit retry or ref
   retry.flush({ channelId: 'different-channel', isMember: false }); fixture.detectChanges();
   expect(element.textContent).toContain('Membership could not be confirmed');
   click('Refresh channels');
-  http.expectOne('/api/channels').flush({ channels: [{ ...channel, isMember: false }], nextCursor: null }); fixture.detectChanges();
+  http.expectOne('/api/channels').flush({ channels: [{ ...channel, isMember: false, unreadCount: null }], nextCursor: null }); fixture.detectChanges();
   expect(element.textContent).not.toContain('Status unconfirmed');
   expect(element.querySelector('li')!.textContent).toContain('Open channel');
 });
@@ -148,4 +152,28 @@ it('cancels an in-flight membership request when leaving the workspace', () => {
   click('Leave'); http.expectOne('/api/auth/session/csrf').flush({ csrfToken: token });
   const request = http.expectOne('/api/channels/channel-id/membership'); fixture.destroy();
   expect(request.cancelled).toBe(true);
+});
+
+it('refreshes counts without moving focus, cancels stale reads before leave and hides failed counts', () => {
+  const { fixture, element, http, click } = setup();
+  http.expectOne('/api/channels').flush({ channels: [{ ...channel, unreadCount: 2 }], nextCursor: null }); fixture.detectChanges();
+  expect(element.textContent).toContain('2 unread');
+  const activity = TestBed.inject(ActivityService);
+  activity.revision.update(value => value + 1); fixture.detectChanges();
+  const stale = http.expectOne('/api/channels');
+  click('Leave'); expect(stale.cancelled).toBe(true);
+  http.expectOne('/api/auth/session/csrf').flush({ csrfToken: token });
+  http.expectOne('/api/channels/channel-id/membership').flush({ channelId: channel.id, isMember: false }); fixture.detectChanges();
+  http.expectOne('/api/channels').flush({ channels: [{ ...channel, isMember: false, unreadCount: null }], nextCursor: null }); fixture.detectChanges();
+  expect(element.textContent).not.toContain('2 unread');
+  expect(document.activeElement).toBe(element.querySelector('#membership-channel-id'));
+  activity.revision.update(value => value + 1); fixture.detectChanges();
+  http.expectOne('/api/channels').flush(null, { status: 503, statusText: 'Unavailable' }); fixture.detectChanges();
+  expect(element.textContent).toContain('Unread counts are unavailable');
+});
+
+it.each([-1, 1.5, '3', undefined, Number.MAX_SAFE_INTEGER + 1])('rejects invalid unread counts: %s', unreadCount => {
+  const { fixture, element, http } = setup();
+  http.expectOne('/api/channels').flush({ channels: [{ ...channel, unreadCount }], nextCursor: null }); fixture.detectChanges();
+  expect(element.textContent).toContain('Could not load channels');
 });

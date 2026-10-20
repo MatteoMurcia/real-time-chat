@@ -1,12 +1,13 @@
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, DestroyRef, ElementRef, inject, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, DestroyRef, effect, ElementRef, inject, output, signal, untracked } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder, ReactiveFormsModule, type AbstractControl } from '@angular/forms';
 import { Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { finalize } from 'rxjs';
+import { finalize, type Subscription } from 'rxjs';
 import { isApiError } from '@real-time-chat/contracts';
-import type { PublicChannel } from '@real-time-chat/contracts/channels';
+import type { ListedChannel, PublicChannel } from '@real-time-chat/contracts/channels';
 import { ChannelsClient } from './channels-client';
+import { ActivityService } from '../../core/activity.service';
 
 @Component({
   selector: 'app-channel-list',
@@ -23,7 +24,10 @@ export class ChannelList {
   private readonly element = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly changeDetector = inject(ChangeDetectorRef);
   private readonly router = inject(Router);
-  protected readonly channels = signal<PublicChannel[]>([]);
+  private readonly activity = inject(ActivityService);
+  private refreshRequest?: Subscription;
+  protected readonly channels = signal<ListedChannel[]>([]);
+  protected readonly countsStale = signal(false);
   protected readonly loading = signal(false);
   protected readonly pending = signal(false);
   protected readonly membershipPending = signal<string | null>(null);
@@ -42,16 +46,34 @@ export class ChannelList {
     slug: ['', (control: AbstractControl<string>) => /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(control.value.trim()) && control.value.trim().length >= 3 && control.value.trim().length <= 48 ? null : { slug: true }],
   });
 
-  constructor() { this.load(); }
+  constructor() {
+    this.load();
+    effect(() => { this.activity.revision(); untracked(() => this.refreshCounts()); });
+  }
+
+  private refreshCounts(): void {
+    if (this.loading() || this.pending() || this.membershipPending()) return;
+    this.refreshRequest?.unsubscribe();
+    this.refreshRequest = this.client.list(this.currentCursor()).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: page => {
+        const fresh = new Map(page.channels.map(channel => [channel.id, channel]));
+        this.channels.update(channels => channels.map(channel => fresh.get(channel.id) ?? { ...channel, unreadCount: null }));
+        this.countsStale.set(false);
+      },
+      error: (error: unknown) => { this.handleUnauthorized(error); this.countsStale.set(true); },
+    });
+  }
 
   protected load(cursor: string | null = null): void {
     if (this.loading() || this.pending() || this.membershipPending()) return;
+    this.refreshRequest?.unsubscribe();
     this.loading.set(true);
     this.listError.set('');
     this.client.list(cursor).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.loading.set(false))).subscribe({
       next: page => {
         const changedPage = cursor !== this.currentCursor();
         this.channels.set(page.channels); this.nextCursor.set(page.nextCursor); this.currentCursor.set(cursor);
+        this.countsStale.set(false);
         this.membershipError.set(null);
         this.membershipNotice.set('');
         if (changedPage) {
@@ -103,15 +125,17 @@ export class ChannelList {
     const previousError = this.membershipError();
     if (this.loading() || this.pending() || this.membershipPending() || (previousError && previousError.channelId !== channel.id)) return;
     const desired = previousError?.desired ?? !channel.isMember;
+    this.refreshRequest?.unsubscribe();
     this.membershipPending.set(channel.id);
     this.membershipNotice.set('');
     this.client.setMembership(channel.id, desired).pipe(takeUntilDestroyed(this.destroyRef), finalize(() => this.membershipPending.set(null))).subscribe({
       next: result => {
         if (!result.isMember) this.left.emit(result.channelId);
-        this.channels.update(channels => channels.map(item => item.id === result.channelId ? { ...item, isMember: result.isMember } : item));
+        this.channels.update(channels => channels.map(item => item.id === result.channelId ? { ...item, isMember: result.isMember, unreadCount: null } : item));
         this.membershipError.set(null);
         this.membershipNotice.set(`${desired ? 'Joined' : 'Left'} #${channel.slug}.`);
         this.finishMembership(channel.id);
+        this.activity.revision.update(value => value + 1);
       },
       error: (error: unknown) => {
         this.handleUnauthorized(error);
