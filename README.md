@@ -89,7 +89,7 @@ manual reset. The operator supplies the local demo passwords.
 
 ## Watch the demo
 
-[![Local demo overview](docs/assets/overview-desktop.png)](docs/assets/demo.webm)
+https://github.com/user-attachments/assets/3cdc8b08-4487-41c2-8dec-2be76099ab24
 
 [Watch/download the short WebM](docs/assets/demo.webm): Alice and Bob exchange
 messages, Alice disconnects, and recovery restores two missed messages while
