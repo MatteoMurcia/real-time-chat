@@ -40,6 +40,7 @@ export class ChatStore {
   readonly olderCursor = signal<string | null>(null);
   readonly snapshotCursor = signal<string | null>(null);
   readonly syncCursor = signal<string | null>(null);
+  readonly recoveredSequence = signal('0');
   readonly syncLoading = signal(false);
   readonly syncError = signal('');
   readonly ready = computed(() => this.subscribed() && this.connection.status() === 'connected');
@@ -106,7 +107,7 @@ export class ChatStore {
 
   private resetContent(): void {
     ++this.viewRevision;
-    this.stopSync(); this.syncCursor.set(null); this.syncError.set('');
+    this.stopSync(); this.syncCursor.set(null); this.recoveredSequence.set('0'); this.syncError.set('');
     for (const deadline of this.deadlines) clearTimeout(deadline);
     this.deadlines.clear();
     this.historyRequest?.unsubscribe();
@@ -129,6 +130,7 @@ export class ChatStore {
         this.snapshotCursor.set(page.snapshotCursor); this.olderCursor.set(page.olderCursor);
         this.historyLoading.set(false);
         if (this.syncCursor() === null) {
+          this.recoveredSequence.set(page.items.at(-1)?.sequence ?? '0');
           this.syncCursor.set(page.snapshotCursor);
           if (recover) this.recover();
         }
@@ -157,6 +159,7 @@ export class ChatStore {
         const count = this.messages().length;
         for (const message of page.items) this.confirm(message);
         this.syncCursor.set(page.nextCursor);
+        if (page.items.length) this.recoveredSequence.set(page.items.at(-1)!.sequence);
         const added = this.messages().length - count;
         if (added) { recovered += added; lastRecoveredSequence = page.items.at(-1)!.sequence; }
       },

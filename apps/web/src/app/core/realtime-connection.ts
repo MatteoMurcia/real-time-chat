@@ -13,7 +13,7 @@ export class RealtimeConnection {
   readonly status = this.phase.asReadonly();
   private subscriptions: Promise<unknown> = Promise.resolve();
 
-  listen(event: 'message:created' | 'channel:access-revoked', listener: (payload: unknown) => void): () => void {
+  listen(event: 'message:created' | 'channel:access-revoked' | 'activity:changed', listener: (payload: unknown) => void): () => void {
     this.socket.on(event, listener);
     return () => { this.socket.off(event, listener); };
   }

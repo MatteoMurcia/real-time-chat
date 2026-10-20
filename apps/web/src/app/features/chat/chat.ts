@@ -1,9 +1,10 @@
-import { afterRenderEffect, ChangeDetectionStrategy, Component, effect, ElementRef, inject, input, output, signal, untracked } from '@angular/core';
+import { afterRenderEffect, ChangeDetectionStrategy, Component, DestroyRef, effect, ElementRef, inject, input, output, signal, untracked } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import type { PublicChannel } from '@real-time-chat/contracts/channels';
 import { ChatStore } from './chat.store';
 import type { Outgoing } from './message.reducer';
+import { ActivityService } from '../../core/activity.service';
 
 @Component({
   selector: 'app-chat',
@@ -17,6 +18,7 @@ export class Chat {
   readonly channel = input.required<PublicChannel>();
   readonly closed = output<void>();
   protected readonly store = inject(ChatStore);
+  protected readonly activity = inject(ActivityService);
   protected readonly draft = new FormControl('', { nonNullable: true });
   protected readonly following = signal(true);
   protected readonly hasNewMessages = signal(false);
@@ -26,6 +28,26 @@ export class Chat {
   private lastLiveNotice = '';
 
   constructor() {
+    const observer = new IntersectionObserver(entries => {
+      if (!this.activity.visible() || !this.store.ready() || this.store.syncLoading() || this.store.historyLoading()) return;
+      const recovered = this.store.recoveredSequence();
+      let reached = 0n;
+      for (const entry of entries) {
+        const sequence = (entry.target as HTMLElement).dataset['readSequence'];
+        if (entry.target.isConnected && entry.target.getAttribute('data-read-channel') === this.channel().id
+          && entry.isIntersecting && entry.intersectionRatio === 1 && sequence
+          && BigInt(sequence) <= BigInt(recovered) && BigInt(sequence) > reached) reached = BigInt(sequence);
+      }
+      if (reached > 0n) this.activity.mark(this.channel().id, reached.toString());
+    }, { threshold: 1 });
+    inject(DestroyRef).onDestroy(() => observer.disconnect());
+    effect(() => { this.activity.revision(); untracked(() => this.store.recover()); });
+    afterRenderEffect(() => {
+      this.store.messages(); this.store.recoveredSequence(); this.store.syncLoading(); this.store.historyLoading();
+      this.activity.visible(); this.activity.revision();
+      observer.disconnect();
+      for (const marker of this.element.nativeElement.querySelectorAll('[data-read-sequence]')) observer.observe(marker);
+    });
     effect(() => {
       const channelId = this.channel().id;
       untracked(() => {

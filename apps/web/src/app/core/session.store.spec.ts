@@ -131,6 +131,8 @@ it('clears identity on confirmed logout and ignores an older restoration respons
   stale.flush(session());
   expect(store.session()).toBeNull();
   expect(store.status()).toBe('signed-out');
+  store.end(); // A socket revocation can arrive after the HTTP logout response.
+  expect(store.status()).toBe('signed-out');
   vi.advanceTimersByTime(60000);
   expect(store.status()).toBe('signed-out');
 });

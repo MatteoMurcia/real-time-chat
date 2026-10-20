@@ -4,6 +4,7 @@ import { finalize } from 'rxjs';
 import { Router, RouterLink } from '@angular/router';
 import { SessionStore } from '../../core/session.store';
 import { RealtimeConnection } from '../../core/realtime-connection';
+import { ActivityService } from '../../core/activity.service';
 import { ChannelList } from '../channels/channel-list';
 import { Chat } from '../chat/chat';
 import type { PublicChannel } from '@real-time-chat/contracts/channels';
@@ -11,7 +12,7 @@ import type { PublicChannel } from '@real-time-chat/contracts/channels';
 @Component({
   selector: 'app-workspace',
   imports: [RouterLink, ChannelList, Chat],
-  providers: [RealtimeConnection],
+  providers: [RealtimeConnection, ActivityService],
   template: `
     @if (sessions.session(); as current) {
       <p class="eyebrow">YOUR WORKSPACE</p>

@@ -6,3 +6,4 @@ li span { color: var(--muted); font-size: .875rem; }
 .pagination { display: flex; flex-wrap: wrap; gap: .75rem; }
 #channel-notice:empty { margin: 0; }
 .membership-action { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
+.unread { display: inline-block; font-size: .875rem; font-weight: 600; }

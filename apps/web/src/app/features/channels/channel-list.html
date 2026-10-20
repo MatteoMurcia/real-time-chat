@@ -5,11 +5,16 @@
   <p role="status">{{ membershipNotice() }}</p>
   @if (loading()) { <p role="status">Loading channels…</p> }
   @if (listError()) { <p class="error-summary" role="alert">{{ listError() }}</p> }
+  @if (countsStale()) { <p role="status">Unread counts are unavailable. Refresh channels to retry.</p> }
   @if (!loading() && !listError() && !channels().length) { <p>No channels yet. Create the first one below.</p> }
   <ul aria-label="Available channels" [attr.aria-busy]="loading()">
     @for (channel of channels(); track channel.id) {
       <li [attr.aria-busy]="membershipPending() === channel.id">
-        <div><strong>{{ channel.name }}</strong><p class="slug">#{{ channel.slug }}</p></div>
+        <div><strong>{{ channel.name }}</strong><p class="slug">#{{ channel.slug }}</p>
+          @if (channel.isMember && channel.unreadCount !== null && !countsStale()) {
+            <span class="unread" [attr.aria-label]="channel.unreadCount + ' unread messages in ' + channel.name">{{ channel.unreadCount === 0 ? 'All caught up' : channel.unreadCount + ' unread' }}</span>
+          }
+        </div>
         <div class="membership-action">
           @if (channel.isMember) {
             <button type="button" (click)="opened.emit(channel)" [disabled]="loading() || pending() || membershipPending() || membershipError()" [attr.aria-label]="'Open chat ' + channel.name">Open chat</button>

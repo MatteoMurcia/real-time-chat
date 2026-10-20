@@ -86,9 +86,11 @@ it('seeds C from the snapshot, advances only after recovery pages and preserves 
   const pending = new Subject<MessageSyncPage>(); sync.recover.mockReturnValue(pending);
   store.recover(); event(canonical({ id: 'live', sequence: '9' }));
   expect(store.syncCursor()).toBe('snapshot');
+  expect(store.recoveredSequence()).toBe('0');
   pending.next({ items: [canonical()], nextCursor: 'page-1', until: 'H', hasMore: true });
   expect(store.messages().map(item => item.id)).toEqual(['message-1', 'live']);
   expect(store.syncCursor()).toBe('page-1');
+  expect(store.recoveredSequence()).toBe('1');
   pending.error(new HttpErrorResponse({ status: 503 }));
   expect(store.syncError()).not.toBe(''); expect(store.syncLoading()).toBe(false);
   sync.recover.mockReturnValue(EMPTY); store.recover();
