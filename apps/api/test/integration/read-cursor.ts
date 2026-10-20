@@ -40,6 +40,14 @@ export async function verifyReadCursors(app: INestApplication, db: DatabaseServi
   assert.equal(await db.readCursor.count({ where: { userId: users[0]!.id, channelId: channel.id } }), 1);
   await cursor(await put('2', 1), '10'); await cursor(await put('0'), '10'); await cursor(await put('10'), '10');
   await cursor(await get(2), '0'); await cursor(await put('3', 2), '3'); await cursor(await get(), '10');
+  const unread = async (userId: string) => (await channels.list(userId, {})).channels.find(item => item.id === channel.id) as unknown as { unreadCount: number | null };
+  assert.equal((await unread(users[0]!.id)).unreadCount, 0, 'own messages never count');
+  assert.equal((await unread(users[1]!.id)).unreadCount, 7, 'count actual foreign messages after the saved cursor');
+  assert.equal((await unread(users[2]!.id)).unreadCount, null, 'nonmembers receive no count');
+  await channels.setMembership(users[1]!.id, channel.id, false);
+  assert.equal((await unread(users[1]!.id)).unreadCount, null);
+  await channels.setMembership(users[1]!.id, channel.id, true);
+  assert.equal((await unread(users[1]!.id)).unreadCount, 7, 'rejoining restores the saved boundary');
   assert.equal((await fetch(endpoint)).status, 401);
   for (const method of ['GET', 'PUT']) {
     assert.equal((await fetch(endpoint, { method, headers: headers[3]!, ...(method === 'PUT' ? { body: JSON.stringify({ lastReadSequence: '1' }) } : {}) })).status, 403);

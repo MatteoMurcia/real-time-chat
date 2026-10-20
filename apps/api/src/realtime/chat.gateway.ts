@@ -61,6 +61,8 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection {
   }
 
   private async publish(message: PublicMessage): Promise<void> {
+    const members = await this.db.membership.findMany({ where: { channelId: message.channelId }, select: { userId: true } });
+    this.connections.activityChanged(members.map(member => member.userId));
     const namespace = this.server.of('/');
     const sockets = [...(namespace.adapter.rooms.get(`channel:${message.channelId}`) ?? [])]
       .map(id => namespace.sockets.get(id)).filter((socket): socket is Socket => !!socket);

@@ -15,6 +15,23 @@ function socket(sessionId: string, expiresAt = Date.now() + 60000) {
   }) as unknown as Socket;
 }
 
+test('activity invalidations reach only the target user and never expired or revoked sessions', async t => {
+  const revoked = new Subject<{ sessionId: string }>();
+  const service = new ConnectionsService({ revoked, authenticate: async (id: string) => ({ id }) } as unknown as SessionService);
+  t.after(() => service.onModuleDestroy());
+  const first = socket('one'), second = socket('two'), stranger = socket('three');
+  stranger.data.userId = 'different-user';
+  await Promise.all([first, second, stranger].map(socket => service.add(socket)));
+  const seen = [t.mock.fn(), t.mock.fn(), t.mock.fn()];
+  [first, second, stranger].forEach((socket, i) => socket.on('activity:changed', seen[i]!));
+  service.activityChanged(['same-user']);
+  assert.deepEqual(seen.map(fn => fn.mock.callCount()), [1, 1, 0]);
+  first.data.expiresAt = Date.now() - 1;
+  revoked.next({ sessionId: 'two' });
+  service.activityChanged(['same-user']);
+  assert.deepEqual(seen.map(fn => fn.mock.callCount()), [1, 1, 0]);
+});
+
 test('revocation closes every socket of that session and preserves another session of the same user', async t => {
   const revoked = new Subject<{ sessionId: string }>();
   const service = new ConnectionsService({ revoked, authenticate: async (id: string) => ({ id }) } as unknown as SessionService);

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import type { ReadCursorResponse } from '@real-time-chat/contracts/activity';
 import { ChannelAccessService, validateChannelId } from '../channels/channel-access.service.js';
 import { DatabaseService } from '../database/database.service.js';
+import { ConnectionsService } from '../realtime/connections.service.js';
 
 export function validateReadSequence(body: unknown): bigint {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new BadRequestException();
@@ -15,7 +16,7 @@ export function validateReadSequence(body: unknown): bigint {
 
 @Injectable()
 export class ReadCursorService {
-  constructor(private readonly db: DatabaseService, private readonly access: ChannelAccessService) {}
+  constructor(private readonly db: DatabaseService, private readonly access: ChannelAccessService, private readonly connections: ConnectionsService) {}
 
   get(userId: string, id: string): Promise<ReadCursorResponse> { return this.cursor(userId, id, null); }
 
@@ -25,7 +26,7 @@ export class ReadCursorService {
 
   private async cursor(userId: string, id: string, sequence: bigint | null): Promise<ReadCursorResponse> {
     const channelId = validateChannelId(id);
-    return this.db.$transaction(async tx => {
+    const result = await this.db.$transaction(async tx => {
       await this.access.lockChannel(tx, channelId);
       await this.access.requireMember(userId, channelId, tx);
       if (sequence !== null && sequence > 0n && !await tx.message.findUnique({
@@ -40,5 +41,7 @@ export class ReadCursorService {
       }
       return { channelId, lastReadSequence: (current?.lastReadSequence ?? 0n).toString() };
     });
+    if (sequence !== null) this.connections.activityChanged([userId]);
+    return result;
   }
 }

@@ -48,6 +48,7 @@ export class ChannelsService {
         }
       });
       if (!isMember) this.connections.revokeChannel(userId, channelId);
+      this.connections.activityChanged([userId]);
     });
     return { channelId, isMember };
   }
@@ -71,10 +72,20 @@ export class ChannelsService {
     const { limit, after } = validateChannelPage(query);
     const rows = await this.db.channel.findMany({
       where: after ? { slug: { gt: after } } : {}, orderBy: { slug: 'asc' }, take: limit + 1,
-      select: { ...publicChannel, memberships: { where: { userId }, select: { userId: true }, take: 1 } },
+      select: publicChannel,
     });
-    const channels = rows.slice(0, limit).map(({ memberships, createdAt, ...channel }) => ({
-      ...channel, createdAt: createdAt.toISOString(), isMember: memberships.length > 0,
+    const page = rows.slice(0, limit);
+    const counts = page.length ? await this.db.$queryRaw<{ channelId: string; unreadCount: number }[]>`
+      SELECT ms."channelId", count(m.id)::int AS "unreadCount"
+      FROM "Membership" ms
+      LEFT JOIN "ReadCursor" r ON r."userId" = ms."userId" AND r."channelId" = ms."channelId"
+      LEFT JOIN "Message" m ON m."channelId" = ms."channelId"
+        AND m.sequence > COALESCE(r."lastReadSequence", 0) AND m."authorId" <> ms."userId"
+      WHERE ms."userId" = ${userId}::uuid AND ms."channelId" IN (${Prisma.join(page.map(channel => channel.id))})
+      GROUP BY ms."channelId"` : [];
+    const byChannel = new Map(counts.map(row => [row.channelId, row.unreadCount]));
+    const channels = page.map(({ createdAt, ...channel }) => ({
+      ...channel, createdAt: createdAt.toISOString(), isMember: byChannel.has(channel.id), unreadCount: byChannel.get(channel.id) ?? null,
     }));
     return { channels, nextCursor: rows.length > limit ? Buffer.from(`v1:${channels.at(-1)!.slug}`).toString('base64url') : null };
   }

@@ -99,4 +99,11 @@ export class ConnectionsService implements OnModuleDestroy {
       socket.emit('channel:access-revoked', { channelId });
     }
   }
+
+  activityChanged(userIds: string[]): void {
+    for (const userId of userIds) for (const socket of this.users.get(userId) ?? []) {
+      // Invalidation carries no channel data; the authenticated HTTP read remains authoritative.
+      if (socket.connected && Number(socket.data.expiresAt) > Date.now()) socket.emit('activity:changed');
+    }
+  }
 }
