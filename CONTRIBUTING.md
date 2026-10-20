@@ -7,7 +7,7 @@ task whose dependencies are complete, keep its acceptance criteria in scope,
 and record verification evidence before marking it complete. Do not duplicate
 the checklist in GitHub Issues or Projects.
 
-The application runs locally with Docker Compose once that setup is implemented.
+The application runs locally with Docker Compose.
 There is no hosting or deployment workflow in the current scope.
 
 ## Branches and pull requests
@@ -72,10 +72,13 @@ Run `npm run lint`, `npm test`, `npm run typecheck`, and `npm run build` from th
 both applications, or use `--workspace` to check one application during an
 increment. The API uses Node's built-in test runner, including real HTTP checks;
 the web uses Angular's Vitest runner with HTTP testing utilities. The CI workflow
-runs **Quality** (including PostgreSQL integration and audit) and **Containers**
-(image builds and application startup). Both must pass before merging; do not
-rename jobs without updating branch protection. Lint must pass without warnings.
-Later tasks extend integration and E2E coverage.
+runs **Quality** (lint, types, unit/contract/Docker tests, build and audit),
+**Integration** (fresh PostgreSQL suites in both orders) and **Containers**
+(image startup, seed and full Chromium E2E). Review all three results and require
+them to pass before merging. GitHub branch protection currently requires
+**Quality** and **Containers**; **Integration** runs but is not a configured
+required check. Do not rename protected jobs without updating branch protection.
+Lint must pass without warnings.
 
 Angular tests explicitly enable file isolation. The connection tests mock
 `socket.io-client`, while chat-store tests import the real connection class as a
