@@ -21,9 +21,11 @@ import { SyncService } from './messaging/sync.service.js';
 import { RateLimitService } from './security/rate-limit.service.js';
 import type { TrafficLimits } from './config.js';
 import { ShutdownState } from './shutdown/shutdown-state.js';
+import { ActivityController } from './activity/activity.controller.js';
+import { ReadCursorService } from './activity/read-cursor.service.js';
 
 @Module({
-  controllers: [LiveController, ReadyController, RegistrationController, SessionController, ChannelsController, HistoryController],
+  controllers: [LiveController, ReadyController, RegistrationController, SessionController, ChannelsController, HistoryController, ActivityController],
   providers: [{ provide: APP_FILTER, useClass: ErrorFilter }],
 })
 export class AppModule {
@@ -39,6 +41,7 @@ export class AppModule {
         SendMessageService,
         HistoryService,
         SyncService,
+        ReadCursorService,
         { provide: DatabaseService, useFactory: () => new DatabaseService(databaseUrl) },
         { provide: CsrfService, useFactory: () => new CsrfService(appOrigin) },
         RegistrationService,

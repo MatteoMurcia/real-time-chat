@@ -74,6 +74,13 @@ test('guides a first conversation and resets only the marked disposable demo', a
     await bob.getByLabel('Message', { exact: true }).fill('Reply from the second demo session');
     await bob.getByRole('button', { name: 'Send message', exact: true }).click();
     await expect(alice.getByRole('log')).toContainText('Reply from the second demo session');
+    const demoChannels = await (await aliceContext.request.get('/api/channels')).json();
+    const loungeId = demoChannels.channels.find((channel: { slug: string }) => channel.slug === 'demo-lounge').id;
+    const readPath = `/api/channels/${loungeId}/read-cursor`;
+    const csrf = (await (await aliceContext.request.get('/api/auth/session/csrf', { headers: { origin } })).json()).csrfToken;
+    const marked = await aliceContext.request.put(readPath, { headers: { origin, 'x-csrf-token': csrf }, data: { lastReadSequence: '105' } });
+    expect(marked.status()).toBe(200);
+    expect(await marked.json()).toEqual({ channelId: loungeId, lastReadSequence: '105' });
     const oldCookie = (await aliceContext.cookies()).find(cookie => cookie.name === 'chat_session')!;
     await alice.getByLabel('Channel name', { exact: true }).fill('Temporary demo conversation');
     await alice.getByLabel('Channel slug', { exact: true }).fill('temporary-demo-conversation');
@@ -95,6 +102,9 @@ test('guides a first conversation and resets only the marked disposable demo', a
     await expect(alice.locator('app-chat')).toHaveCount(0);
     expect((await request.get(`${origin}/api/auth/me`, { headers: { cookie: `${oldCookie.name}=${oldCookie.value}` } })).status()).toBe(401);
     await login(alice, 'alice', alicePassword);
+    const resetCursor = await aliceContext.request.get(readPath);
+    expect(resetCursor.status()).toBe(200);
+    expect(await resetCursor.json()).toEqual({ channelId: loungeId, lastReadSequence: '0' });
     await expect(alice.getByRole('log')).not.toContainText(firstBody);
     expect((await aliceContext.request.get(`/api/channels/${oldChannel}/messages`)).status()).toBe(404);
     await alice.screenshot({ path: testInfo.outputPath('demo-after-reset.png'), fullPage: true });
