@@ -19,6 +19,7 @@ model User {
   channels     Channel[]
   memberships  Membership[]
   messages     Message[]
+  readCursors  ReadCursor[]
 }
 
 model Channel {
@@ -32,6 +33,7 @@ model Channel {
   createdAt    DateTime     @default(now()) @db.Timestamptz(3)
   memberships  Membership[]
   messages     Message[]
+  readCursors  ReadCursor[]
 }
 
 model Message {
@@ -70,4 +72,15 @@ model Session {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+model ReadCursor {
+  userId           String  @db.Uuid
+  channelId        String  @db.Uuid
+  lastReadSequence BigInt  @default(0)
+  user             User    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  channel          Channel @relation(fields: [channelId], references: [id], onDelete: Restrict)
+
+  @@id([userId, channelId])
+  @@index([channelId])
 }

@@ -7,7 +7,8 @@
     ".": { "types": "./dist/errors.d.ts", "default": "./dist/errors.js" },
     "./auth": { "types": "./dist/auth.d.ts", "default": "./dist/auth.js" },
     "./channels": { "types": "./dist/channels.d.ts", "default": "./dist/channels.js" },
-    "./messages": { "types": "./dist/messages.d.ts", "default": "./dist/messages.js" }
+    "./messages": { "types": "./dist/messages.d.ts", "default": "./dist/messages.js" },
+    "./activity": { "types": "./dist/activity.d.ts", "default": "./dist/activity.js" }
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
