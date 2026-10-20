@@ -57,8 +57,8 @@ export class ChannelList {
     this.refreshRequest = this.client.list(this.currentCursor()).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: page => {
         const fresh = new Map(page.channels.map(channel => [channel.id, channel]));
+        this.countsStale.set(this.channels().some(channel => !fresh.has(channel.id)));
         this.channels.update(channels => channels.map(channel => fresh.get(channel.id) ?? { ...channel, unreadCount: null }));
-        this.countsStale.set(false);
       },
       error: (error: unknown) => { this.handleUnauthorized(error); this.countsStale.set(true); },
     });

@@ -194,3 +194,21 @@ it('ignores a late unread refresh rejection after explicit sign-out', () => {
   http.expectOne('/api/channels').flush(null, { status: 401, statusText: 'Unauthorized' });
   expect(sessions.end).not.toHaveBeenCalled(); expect(navigate).not.toHaveBeenCalled();
 });
+
+it('asks for a manual directory refresh when a concurrent insert shifts a displayed row off its page', () => {
+  const { fixture, element, http, click } = setup();
+  const original = Array.from({ length: 50 }, (_, index) => ({ ...channel, id: `channel-${index}`, name: `Channel ${index}`, slug: `channel-${index}`, unreadCount: 3 }));
+  http.expectOne('/api/channels').flush({ channels: original, nextCursor: 'djE6ZGVzaWdu' }); fixture.detectChanges();
+  const focused = element.querySelector<HTMLElement>('#membership-channel-49')!; focused.focus();
+  TestBed.inject(ActivityService).revision.update(value => value + 1); fixture.detectChanges();
+  const shifted = [{ ...channel, id: 'new-channel', name: 'New channel', slug: 'aaa-first', isMember: false, unreadCount: null }, ...original.slice(0, 49)];
+  http.expectOne('/api/channels').flush({ channels: shifted, nextCursor: 'djE6ZGVzaWdu' }); fixture.detectChanges();
+  expect(document.activeElement).toBe(focused);
+  expect(element.textContent).toContain('Unread counts are unavailable. Refresh channels to retry.');
+  expect(element.textContent).not.toContain('3 unread');
+  click('Refresh channels');
+  http.expectOne('/api/channels').flush({ channels: shifted, nextCursor: 'djE6ZGVzaWdu' }); fixture.detectChanges();
+  expect(element.textContent).not.toContain('Unread counts are unavailable');
+  expect(element.textContent).toContain('3 unread');
+  expect(element.querySelector('#membership-channel-49')).toBeNull();
+});
