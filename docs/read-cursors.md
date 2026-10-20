@@ -84,3 +84,5 @@ Run the [isolated database suite](local-development.md#reproducible-integration-
 and [browser checks](../README.md#browser-verification) with their documented
 disposable projects. Do not migrate or reset the ordinary development database
 as part of test execution. New UI/count behavior remains separate work.
+
+[PR #60](https://github.com/MatteoMurcia/real-time-chat/pull/60) records the final branch CI and review results.
