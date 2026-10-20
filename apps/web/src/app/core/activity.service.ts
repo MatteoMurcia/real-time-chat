@@ -36,7 +36,7 @@ export class ActivityService {
     const reached = BigInt(sequence);
     if (reached <= (this.saved.get(channelId) ?? 0n)) return;
     const pending = this.pending.get(channelId);
-    this.pending.set(channelId, reached > (pending ?? 0n) ? reached : pending!);
+    this.pending.set(channelId, pending === undefined || reached > pending ? reached : pending);
     if (pending !== undefined) return;
     this.auth.authenticatedRequest('PUT', `/api/channels/${encodeURIComponent(channelId)}/read-cursor`, { lastReadSequence: sequence })
       .pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
@@ -50,7 +50,8 @@ export class ActivityService {
           const queued = this.pending.get(channelId)!;
           this.pending.delete(channelId);
           this.saved.set(channelId, BigInt(body.lastReadSequence));
-          this.readError.set(null); this.revision.update(value => value + 1);
+          if (this.readError()?.channelId === channelId) this.readError.set(null);
+          this.revision.update(value => value + 1);
           if (queued > BigInt(body.lastReadSequence)) this.mark(channelId, queued.toString());
         },
         error: () => this.failed(channelId),

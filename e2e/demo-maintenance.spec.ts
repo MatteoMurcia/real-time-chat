@@ -53,13 +53,15 @@ test('guides a first conversation and resets only the marked disposable demo', a
     await alice.screenshot({ path: testInfo.outputPath('demo-overview-mobile.png'), fullPage: true });
     await alice.setViewportSize({ width: 1280, height: 900 });
     await alice.getByRole('link', { name: 'Sign in to the demo', exact: true }).click();
-    const login = async (page: typeof alice, name: 'alice' | 'bob', password: string) => {
+    const login = async (page: typeof alice, name: 'alice' | 'bob', password: string, open = true) => {
       await page.getByLabel('Email address', { exact: true }).fill(`${name}@demo.example.test`);
       await page.getByLabel('Password', { exact: true }).fill(password);
       await page.getByRole('button', { name: 'Sign in', exact: true }).click();
       await expect(page.getByText('Live connection established.', { exact: true })).toBeVisible();
-      await page.getByRole('button', { name: 'Open chat Demo Lounge', exact: true }).click();
-      await expect(page.getByRole('log').locator('[data-message-id]')).toHaveCount(50);
+      if (open) {
+        await page.getByRole('button', { name: 'Open chat Demo Lounge', exact: true }).click();
+        await expect(page.getByRole('log').locator('[data-message-id]')).toHaveCount(50);
+      }
     };
     await login(alice, 'alice', alicePassword);
     const firstBody = `First demo message ${randomUUID()}`;
@@ -77,10 +79,13 @@ test('guides a first conversation and resets only the marked disposable demo', a
     const demoChannels = await (await aliceContext.request.get('/api/channels')).json();
     const loungeId = demoChannels.channels.find((channel: { slug: string }) => channel.slug === 'demo-lounge').id;
     const readPath = `/api/channels/${loungeId}/read-cursor`;
+    const reached = await alice.locator('[data-read-sequence]').last().getAttribute('data-read-sequence');
+    await alice.locator('[data-read-sequence]').last().scrollIntoViewIfNeeded();
+    await expect.poll(async () => (await (await aliceContext.request.get(readPath)).json()).lastReadSequence).toBe(reached);
     const csrf = (await (await aliceContext.request.get('/api/auth/session/csrf', { headers: { origin } })).json()).csrfToken;
     const marked = await aliceContext.request.put(readPath, { headers: { origin, 'x-csrf-token': csrf }, data: { lastReadSequence: '105' } });
     expect(marked.status()).toBe(200);
-    expect(await marked.json()).toEqual({ channelId: loungeId, lastReadSequence: '105' });
+    expect(await marked.json()).toEqual({ channelId: loungeId, lastReadSequence: reached });
     const oldCookie = (await aliceContext.cookies()).find(cookie => cookie.name === 'chat_session')!;
     await alice.getByLabel('Channel name', { exact: true }).fill('Temporary demo conversation');
     await alice.getByLabel('Channel slug', { exact: true }).fill('temporary-demo-conversation');
@@ -101,10 +106,12 @@ test('guides a first conversation and resets only the marked disposable demo', a
     await expect(bob).toHaveURL(/\/login(?:\?|$)/, { timeout: 15000 });
     await expect(alice.locator('app-chat')).toHaveCount(0);
     expect((await request.get(`${origin}/api/auth/me`, { headers: { cookie: `${oldCookie.name}=${oldCookie.value}` } })).status()).toBe(401);
-    await login(alice, 'alice', alicePassword);
+    await login(alice, 'alice', alicePassword, false);
     const resetCursor = await aliceContext.request.get(readPath);
     expect(resetCursor.status()).toBe(200);
     expect(await resetCursor.json()).toEqual({ channelId: loungeId, lastReadSequence: '0' });
+    await alice.getByRole('button', { name: 'Open chat Demo Lounge', exact: true }).click();
+    await expect(alice.getByRole('log').locator('[data-message-id]')).toHaveCount(50);
     await expect(alice.getByRole('log')).not.toContainText(firstBody);
     expect((await aliceContext.request.get(`/api/channels/${oldChannel}/messages`)).status()).toBe(404);
     await alice.screenshot({ path: testInfo.outputPath('demo-after-reset.png'), fullPage: true });

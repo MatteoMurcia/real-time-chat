@@ -18,6 +18,8 @@ test('recovers missing events while connected, keeps H fixed under live traffic 
       const match = typeof frame === 'string' && /^42(\[.*)$/.exec(frame);
       if (match) {
         const [event, message] = JSON.parse(match[1]!) as [string, PublicMessage];
+        // Lose the new invalidation too: this scenario must still repair through focus/timer.
+        if (event === 'activity:changed') return;
         if (event === 'message:created' && message.body.startsWith('Missing ')) { dropped.push(message.id); return; }
       }
       socket.send(frame);
@@ -67,11 +69,14 @@ test('recovers missing events while connected, keeps H fixed under live traffic 
     await initialResponse;
     await expect(page.getByText('Recovering missed messages…', { exact: true })).toHaveCount(0);
     expect(pages).toHaveLength(1); const initialC = pages[0]!.data.nextCursor;
+    // Keep the conversation outside the viewport so automatic reading cannot start another recovery.
+    await page.getByRole('heading', { name: 'Create a channel', exact: true }).scrollIntoViewIfNeeded();
     phase = 'bounded'; pages.length = 0;
     for (let i = 1; i <= 105; i++) await send(`Missing ${i}`);
     await expect.poll(() => dropped.length).toBe(105); expect(dropped).toEqual(ids);
     await expectIds([]);
     const live = await send('Live beyond the gap'); await expectIds([live]);
+    expect((await (await context.request.get(`/api/channels/${channel.id}/read-cursor`)).json()).lastReadSequence).toBe('0');
     // Release any periodic request already waiting, or start one explicitly through focus.
     release.resolve(); await page.evaluate(() => window.dispatchEvent(new Event('focus')));
     await expectIds(ids);

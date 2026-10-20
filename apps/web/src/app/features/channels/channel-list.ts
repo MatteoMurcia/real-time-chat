@@ -83,6 +83,7 @@ export class ChannelList {
       },
       error: (error: unknown) => {
         this.handleUnauthorized(error);
+        this.countsStale.set(true);
         this.listError.set('Could not load channels. Try again.');
       },
     });
