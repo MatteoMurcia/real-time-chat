@@ -3,8 +3,9 @@
 Read progress is a private, server-side boundary per user and channel. It is
 shared by that user's sessions and survives API/container recreation. The
 cursor is an explicit client report, not proof that a person read the content.
-Task 6.1a provides the API/storage only; it does not add counters, automatic
-marking, cross-tab notifications or a UI read receipt.
+Task 6.1a provides storage and the cursor API; 6.1b adds private unread counts,
+visible-message marking and synchronization between the user's tabs/sessions.
+It does not expose read receipts to other people.
 
 ## HTTP contract
 
@@ -61,9 +62,73 @@ complete; after leave commits, subsequent operations are rejected.
 
 This serializes operations on a channel and shares its existing contention
 limits; no throughput claim is made. The cursor is a sequence prefix, independent
-of who authored its messages. Whether future unread counters exclude a user's
-own messages, and when a visible UI may advance the boundary, belong to 6.1b/CP6-A.
-Receiving a live event alone does not mark anything read in this implementation.
+of who authored its messages. The unread rule is defined below.
+Receiving a live event alone never marks it read.
+
+## Unread counts and visible reading
+
+Confirmed product rule (2026-10-20): **only messages from other people count**.
+`GET /api/channels` adds `unreadCount` to each directory entry: an integer
+for a current member, or `null` for a nonmember. It counts committed messages
+whose `sequence > lastReadSequence` and `authorId != authenticatedUserId`.
+It is not the channel sequence minus the cursor. Missing progress means zero,
+so joining includes older foreign messages; leaving hides the count, and
+rejoining uses the preserved boundary. An empty channel has zero unread messages.
+No user ID or count is accepted from the client. Directory pagination remains
+bounded at 100 entries, with one aggregate query for counts on the returned page,
+rather than a request or database query per channel.
+
+The channel list shows a labeled count or “All caught up” without stealing focus
+or announcing every counter change. Failed count refreshes hide the cached counts
+and offer the existing Refresh channels action. Membership changes cancel older
+background directory reads, so a late response cannot undo a confirmed leave.
+An authenticated directory 401 uses the shared session-ending flow, preserving
+an in-flight explicit logout and its cookie cleanup. A late 401 after sign-out
+cannot replace the intended sign-out result with a session-expired redirect.
+The session store also ignores a late socket end after a confirmed sign-out;
+a subsequently authenticated session can still end normally.
+
+The conversation observes each confirmed message's final “Confirmed” line using
+IntersectionObserver, including clipping by the message log and browser viewport.
+It reports the highest fully visible marker only when the document is visible,
+the subscription is ready and history/recovery are not loading. It cannot advance
+past `recoveredSequence`, which comes from validated HTTP history/sync items;
+opaque recovery cursors stay opaque. Live events and send acknowledgements do
+not advance that boundary. Obsolete observers cannot mark another channel after
+a switch. A hidden document receiving a message or a reader scrolled above the
+new message keeps it unread. A hidden tab's return triggers recovery and a fresh
+visibility observation.
+
+This is **read through this message**, not an individual-message receipt: opening
+the latest page and reaching its end marks the earlier prefix read, including
+older pages not loaded into this view. The browser checks document visibility,
+not human attention or whether another application covers the window. These
+limits follow the existing single monotonic cursor model.
+
+PUT writes are coalesced per channel and the server's returned maximum is
+authoritative. A failed or malformed confirmation leaves progress retryable,
+shows a status message and does not optimistically clear a counter. Focus,
+foreground activity and the 15-second refresh retry markers still in view.
+
+## Synchronization between tabs
+
+After a committed cursor write or membership change, the API sends an empty
+`activity:changed` Socket.IO invalidation to that user's connected sessions.
+A newly committed message invalidates its channel members, including sockets
+without an active subscription. This signal contains no channel IDs, messages,
+counts or other users' progress; the authenticated, no-store HTTP directory
+query remains authoritative. Expired sockets are excluded, and the existing
+session-revocation registry removes revoked connections.
+
+The workspace refreshes its current directory page on invalidation, connection,
+focus and visibility restoration; a visible-tab 15-second timer repairs a lost
+signal or a commit/emission gap. Received invalidations never write a cursor.
+The conversation also recovers on activity, then rechecks reached markers.
+Hidden tabs defer invalidation/timer refreshes until visible. Counts on other directory pages load
+when those pages are selected; Refresh channels discovers newly created entries.
+The signal uses the existing process-local connection registry: multiple API
+instances remain unsupported. Neither transient socket delivery nor a timer is
+a durable notification guarantee.
 
 ## Verification
 
@@ -73,6 +138,15 @@ Receiving a live event alone does not mark anything read in this implementation.
   PostgreSQL lock waits against leave and delayed commit/rollback.
 - [Boundary validation](../apps/api/test/read-cursor.spec.ts): canonical strings,
   numeric limits and forged/invalid fields.
+- [Unread browser scenario](../e2e/unread.spec.ts): two tabs, own-message
+  exclusion, another channel, reload, hidden reception, save failure/retry and
+  scrolling above new arrivals. Headless Chromium keeps pages visible, so this
+  scenario explicitly controls the browser's document-visibility boundary.
+- [Activity client](../apps/web/src/app/core/activity.service.spec.ts),
+  [conversation](../apps/web/src/app/features/chat/chat.spec.ts) and
+  [directory](../apps/web/src/app/features/channels/channel-list.spec.ts): queued
+  advances, server maximum, malformed confirmations, recovered boundaries,
+  obsolete observations, membership races and count failures.
 - [Seed regression](../apps/api/test/integration/demo-seed.ts): reruns preserve
   both unrelated and demo read progress.
 - [Container persistence](../e2e/persistence.spec.ts) and

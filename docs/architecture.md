@@ -89,7 +89,7 @@ commit boundary, and [message contracts](messages.md) define cursors and UI race
 | Claim | Executable evidence | Limit |
 | --- | --- | --- |
 | Valid sessions survive API/container recreation | [persistence E2E](../e2e/persistence.spec.ts) | The database volume and credentials must be retained; CSRF keys restart |
-| Read progress advances monotonically for the authenticated member | [read-cursor integration](../apps/api/test/integration/read-cursor.ts), [API contract](read-cursors.md) | Explicit sequence prefix; no automatic read marking or unread counters/UI |
+| Read progress advances monotonically for the authenticated member; only foreign messages count as unread | [read-cursor integration](../apps/api/test/integration/read-cursor.ts), [unread E2E](../e2e/unread.spec.ts), [contract](read-cursors.md) | Visible reached message within recovered HTTP boundary; sequence prefix rather than proof of attention |
 | Logout/expiry close affected sockets | [socket sessions](../apps/api/test/integration/socket-session.ts), [browser revocation](../e2e/session-revocation.spec.ts) | Local notifications/timers; transmitted data cannot be recalled |
 | Membership authorizes history, sends and subscription | [membership](../apps/api/test/integration/membership.ts), [subscriptions](../apps/api/test/integration/subscriptions.ts) | Channels are open to registered users; membership is not confidentiality |
 | Retried keys resolve once in persistence or conflict | [concurrent idempotency](../apps/api/test/integration/message-idempotency.ts) | Key is scoped to author; authorization still applies; not exactly-once delivery |
@@ -125,7 +125,7 @@ credentials are not a least-privilege deployment configuration. HTTPS, distribut
 state, backups and capacity measurement need separate work before remote hosting.
 
 There is no outbox, durable offline queue, offline-first mode, exactly-once network
-delivery, unread counters/UI, typing or presence in the current implementation.
+delivery, typing or presence in the current implementation.
 Live events are best-effort and recovery does not prove a recipient read a message.
 Browser evidence is Chromium, without a physical-device or exhaustive accessibility
 audit. [Operations](operations.md) covers safe logs, readiness/liveness and shutdown.
