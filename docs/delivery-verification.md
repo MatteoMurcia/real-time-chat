@@ -120,7 +120,7 @@ cases; this local smoke does not claim to repeat every negative case manually.
 proxy trust, secrets/roles, backups, migrations and operations without creating
 a deployment. No public URL, registry publication, remote TLS verification,
 load/multi-instance certification or rollback/restore exercise is included.
-CP0-C and CP1-C remain pending; CP5-B must still review the complete A01–A18
-evidence. Passing 5.3a does not silently close those gates.
+At the time of this 5.3a check, CP0-C and CP1-C remained pending; CP5-B still
+needed to review the complete A01–A18 evidence. Passing 5.3a did not close those gates.
 The subsequent [CP5-B review](checkpoints/cp5-b.md) explicitly evaluates those
 remaining gates and the full acceptance matrix against integrated main.

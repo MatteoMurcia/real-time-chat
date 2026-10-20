@@ -123,7 +123,8 @@ that future dependencies or environments will have the same outcome.
 
 The independent source/assertion audit and parent trace found no missing A01–A18
 case. Documentation corrections distinguish composite recovery evidence,
-historical local runs and actual protected checks. The checkpoint PR records
-its final diff review, local link checks and additional CI against the final
-documentation head. Product code, schema, Compose, workflow, dependencies,
+historical local runs and actual protected checks. Local documentation links
+and whitespace have been checked. Final diff review and CI against the final
+documentation head must pass before the checkpoint PR is made ready.
+Product code, schema, Compose, workflow, dependencies,
 existing assertions and test thresholds are unchanged.
