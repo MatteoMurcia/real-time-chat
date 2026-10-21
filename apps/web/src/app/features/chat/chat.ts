@@ -6,11 +6,12 @@ import { ChatStore } from './chat.store';
 import type { Outgoing } from './message.reducer';
 import { ActivityService } from '../../core/activity.service';
 import { TypingStore } from './typing.store';
+import { PresenceStore } from './presence.store';
 
 @Component({
   selector: 'app-chat',
   imports: [DatePipe, ReactiveFormsModule],
-  providers: [ChatStore, TypingStore],
+  providers: [ChatStore, TypingStore, PresenceStore],
   templateUrl: './chat.html',
   styleUrl: './chat.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -21,6 +22,7 @@ export class Chat {
   protected readonly store = inject(ChatStore);
   protected readonly activity = inject(ActivityService);
   protected readonly typing = inject(TypingStore);
+  protected readonly presence = inject(PresenceStore);
   protected readonly draft = new FormControl('', { nonNullable: true });
   protected readonly following = signal(true);
   protected readonly hasNewMessages = signal(false);
@@ -30,6 +32,11 @@ export class Chat {
   private lastLiveNotice = '';
 
   constructor() {
+    effect(() => {
+      const channelId = this.channel().id, ready = this.store.ready();
+      const authors = this.store.messages().map(message => message.author.id);
+      untracked(() => this.presence.select(channelId, ready, authors));
+    });
     effect(() => {
       const channelId = this.channel().id, ready = this.store.ready();
       untracked(() => this.typing.open(channelId, ready));

@@ -5,6 +5,7 @@ import { Chat } from './chat';
 import { ChatStore } from './chat.store';
 import { ActivityService } from '../../core/activity.service';
 import { TypingStore } from './typing.store';
+import { PresenceStore } from './presence.store';
 
 const store = {
   open: vi.fn(), send: vi.fn(() => true), retry: vi.fn(), recover: vi.fn(), loadHistory: vi.fn(),
@@ -14,14 +15,16 @@ const store = {
 };
 const activity = { revision: signal(0), visible: signal(true), readError: signal(null), mark: vi.fn() };
 const typing = { open: vi.fn(), input: vi.fn(), stop: vi.fn(), notice: signal('') };
+const presence = { select: vi.fn(), label: vi.fn(() => 'Presence unknown'), notice: signal('') };
 let intersect: IntersectionObserverCallback;
 const channel = (id: string) => ({ id, name: id, slug: id, isMember: true, createdAt: '2026-10-18T00:00:00Z' });
 beforeEach(() => {
   vi.stubGlobal('IntersectionObserver', class { constructor(callback: IntersectionObserverCallback) { intersect = callback; } observe() {} disconnect() {} });
+  presence.label.mockReturnValue('Presence unknown'); presence.notice.set('');
   vi.clearAllMocks(); store.messages.set([]); store.outgoing.set([]); store.liveNotice.set('');
   activity.visible.set(true); store.recoveredSequence.set('10');
   store.syncError.set(''); store.syncLoading.set(false);
-  TestBed.configureTestingModule({ imports: [Chat], providers: [{ provide: ActivityService, useValue: activity }] }).overrideComponent(Chat, { set: { providers: [{ provide: ChatStore, useValue: store }, { provide: TypingStore, useValue: typing }] } });
+  TestBed.configureTestingModule({ imports: [Chat], providers: [{ provide: ActivityService, useValue: activity }] }).overrideComponent(Chat, { set: { providers: [{ provide: ChatStore, useValue: store }, { provide: TypingStore, useValue: typing }, { provide: PresenceStore, useValue: presence }] } });
 });
 afterEach(() => { TestBed.resetTestingModule(); vi.unstubAllGlobals(); });
 
