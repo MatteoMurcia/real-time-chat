@@ -100,8 +100,9 @@ export class ConnectionsService implements OnModuleDestroy {
     const channelId = socket.data.typingChannelId as string | undefined;
     delete socket.data.typingChannelId;
     if (!channelId) return;
-    for (const sockets of this.users.values()) for (const recipient of sockets) {
-      if (recipient !== socket && recipient.connected && Number(recipient.data.expiresAt) > Date.now()
+    for (const id of socket.nsp.adapter.rooms.get(`channel:${channelId}`) ?? []) {
+      const recipient = socket.nsp.sockets.get(id);
+      if (recipient && recipient !== socket && recipient.connected && Number(recipient.data.expiresAt) > Date.now()
         && recipient.rooms.has(`channel:${channelId}`)) {
         recipient.volatile.emit('typing:changed', { channelId, connectionId: socket.id, user: null });
       }

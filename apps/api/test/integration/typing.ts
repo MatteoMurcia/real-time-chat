@@ -42,6 +42,12 @@ export async function verifyTyping(app: INestApplication, db: DatabaseService): 
     const changed = new Promise<TypingChanged>(resolve => receiver!.once('typing:changed', resolve));
     assert.equal((await ack(sender!, 'typing:update', input)).ok, true);
     assert.deepEqual(await changed, { channelId: channel.id, connectionId: sender!.id, user: { id: users[0]!.id, displayName: users[0]!.displayName } });
+    const receiverStarted = new Promise(resolve => sender!.once('typing:changed', resolve));
+    assert.equal((await ack(receiver!, 'typing:update', input)).ok, true); await receiverStarted;
+    const unsubscribed = new Promise<TypingChanged>(resolve => sender!.once('typing:changed', resolve));
+    assert.equal((await ack(receiver!, 'channel:unsubscribe', { channelId: channel.id })).ok, true);
+    assert.deepEqual(await unsubscribed, { channelId: channel.id, connectionId: receiver!.id, user: null });
+    assert.equal((await ack(receiver!, 'channel:subscribe', { channelId: channel.id })).ok, true);
     const stop = new Promise<TypingChanged>(resolve => receiver!.once('typing:changed', resolve));
     assert.equal((await ack(sender!, 'typing:update', { ...input, typing: false })).ok, true);
     assert.equal((await stop).user, null);

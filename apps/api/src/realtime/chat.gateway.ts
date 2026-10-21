@@ -106,7 +106,8 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection {
       select: { id: true, expiresAt: true },
     });
     const valid = new Set(sessions.filter(session => session.expiresAt.getTime() > Date.now()).map(session => session.id));
-    if (sender && (!sender.connected || sender.data.typingChannelId !== channelId)) return;
+    if (sender && (!sender.connected || Number(sender.data.expiresAt) <= Date.now()
+      || sender.data.typingChannelId !== channelId || !valid.has(sender.data.sessionId as string))) return;
     for (const socket of sockets) if (socket !== sender && socket.connected && socket.rooms.has(`channel:${channelId}`)
       && valid.has(socket.data.sessionId as string)) {
       if (event === 'typing:changed') socket.volatile.emit(event, payload);
