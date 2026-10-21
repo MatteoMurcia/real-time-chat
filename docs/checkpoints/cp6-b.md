@@ -64,7 +64,7 @@ conversation/restart, revocation and lifecycle regression block passed **8/8**.
 The local quality checks passed **61 API, 138 Angular, 3 contract, 8 demo/reset
 and 5 Docker tests**, lint, types, workspace builds and audit (zero vulnerabilities).
 Executed checkpoint counts, cleanup and final-head CI are recorded in the
-[implementation plan](../../tasks/plan.md) and this checkpoint's pull request.
+[implementation plan](../../tasks/plan.md) and [PR #66](https://github.com/MatteoMurcia/real-time-chat/pull/66).
 
 ## Scope limits
 
