@@ -1,6 +1,6 @@
 import { isIP } from 'node:net';
 
-export const defaultTrafficLimits = { send: 30, typing: 10, login: 10, register: 5, createChannel: 10, connections: 5 };
+export const defaultTrafficLimits = { send: 30, typing: 10, presence: 20, login: 10, register: 5, createChannel: 10, connections: 5 };
 export type TrafficLimits = typeof defaultTrafficLimits;
 
 export function normalizeIp(ip: string): string {
@@ -51,7 +51,7 @@ export function loadConfig(env: NodeJS.ProcessEnv) {
   }
 
   const trafficLimits = { ...defaultTrafficLimits };
-  const names = { send: 'SEND_LIMIT', typing: 'TYPING_LIMIT', login: 'LOGIN_LIMIT', register: 'REGISTER_LIMIT', createChannel: 'CHANNEL_CREATE_LIMIT', connections: 'SESSION_CONNECTION_LIMIT' } as const;
+  const names = { send: 'SEND_LIMIT', typing: 'TYPING_LIMIT', presence: 'PRESENCE_LIMIT', login: 'LOGIN_LIMIT', register: 'REGISTER_LIMIT', createChannel: 'CHANNEL_CREATE_LIMIT', connections: 'SESSION_CONNECTION_LIMIT' } as const;
   for (const key of Object.keys(names) as (keyof TrafficLimits)[]) {
     const raw = env[names[key]] ?? String(trafficLimits[key]);
     if (!/^\d+$/.test(raw) || Number(raw) < 1 || Number(raw) > 1000) throw new Error(`${names[key]} must be an integer between 1 and 1000`);

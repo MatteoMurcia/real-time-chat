@@ -18,18 +18,42 @@ import { diagnostic, type Diagnostic } from '../logging/logger.js';
 import { ShutdownError, ShutdownState } from '../shutdown/shutdown-state.js';
 import { validateTyping } from '../activity/validate-typing.js';
 import type { TypingAck, TypingChanged } from '@real-time-chat/contracts/activity';
+import { PRESENCE_PING_INTERVAL_MS, PRESENCE_PING_TIMEOUT_MS, type PresenceAck } from '@real-time-chat/contracts/activity';
+import { PresenceService, validatePresence } from '../activity/presence.service.js';
 
-@WebSocketGateway({ path: '/socket.io', serveClient: false, maxHttpBufferSize: 16384, transports: ['polling', 'websocket'] })
+@WebSocketGateway({ path: '/socket.io', serveClient: false, maxHttpBufferSize: 16384, transports: ['polling', 'websocket'],
+  pingInterval: PRESENCE_PING_INTERVAL_MS, pingTimeout: PRESENCE_PING_TIMEOUT_MS })
 export class ChatGateway implements OnGatewayInit, OnGatewayConnection {
   @WebSocketServer() server!: Server;
   constructor(private readonly sessions: SessionService, @Inject('APP_ORIGIN') private readonly origin: string,
     private readonly db: DatabaseService, private readonly access: ChannelAccessService, private readonly connections: ConnectionsService,
-    private readonly messages: SendMessageService, private readonly limits: RateLimitService, private readonly shutdown: ShutdownState) {}
+    private readonly messages: SendMessageService, private readonly limits: RateLimitService, private readonly shutdown: ShutdownState,
+    private readonly presence: PresenceService) {}
 
   async handleConnection(socket: Socket): Promise<void> {
     let release = () => {};
     try { release = this.shutdown.enter(); await this.connections.add(socket); }
     catch { socket.conn.close(); }
+    finally { release(); }
+  }
+
+  @SubscribeMessage('presence:get')
+  async getPresence(@ConnectedSocket() socket: Socket, @MessageBody() body: unknown): Promise<PresenceAck> {
+    let release = () => {};
+    try {
+      release = this.shutdown.enter();
+      if (!socket.connected || typeof socket.data.userId !== 'string') throw new UnauthorizedException();
+      this.limits.consume('presence', socket.data.userId);
+      const input = validatePresence(body);
+      return await this.connections.withChannel(input.channelId, async () => {
+        const session = await this.sessions.authenticate(socket.request.headers.cookie);
+        if (!socket.connected || session.id !== socket.data.sessionId) throw new UnauthorizedException();
+        const data = await this.presence.snapshot(session.user.id, input);
+        if (!socket.connected || Number(socket.data.expiresAt) <= Date.now()) throw new UnauthorizedException();
+        if (socket.data.channelId !== input.channelId) throw new ForbiddenException();
+        return { ok: true, data };
+      });
+    } catch (error) { return { ok: false, error: socketError(error) }; }
     finally { release(); }
   }
 

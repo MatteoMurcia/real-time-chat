@@ -23,12 +23,14 @@ import { verifyShutdown } from './shutdown.js';
 import { verifyDemoSeed } from './demo-seed.js';
 import { verifyReadCursors } from './read-cursor.js';
 import { verifyTyping } from './typing.js';
+import { verifyPresence } from './presence.js';
 import type { INestApplication } from '@nestjs/common';
 import { withTestDatabase } from '../setup.js';
 import { createUserFixture } from '../fixtures/users.js';
 
 type Fixture = { app: INestApplication; db: DatabaseService; databaseUrl: string };
 const suites: { name: string; timeout: number; run: (fixture: Fixture) => Promise<void> }[] = [
+  { name: 'scopes presence to shared members, retains other tabs and detects a silent link with real heartbeat deadlines', timeout: 80000, run: ({ app, db }) => verifyPresence(app, db) },
   { name: 'authorizes ephemeral typing, isolates rooms and clears disconnected or departed writers without persistence', timeout: 20000, run: ({ app, db }) => verifyTyping(app, db) },
   { name: 'advances read cursors monotonically across sessions with membership and committed sequence bounds', timeout: 20000, run: ({ app, db }) => verifyReadCursors(app, db) },
   { name: 'seeds demo atomically, preserves unrelated data and supports repeated login and paginated history', timeout: 30000, run: ({ app, db }) => verifyDemoSeed(app, db) },

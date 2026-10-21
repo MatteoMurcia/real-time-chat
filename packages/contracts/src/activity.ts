@@ -10,3 +10,9 @@ export interface TypingChanged {
 export type TypingAck = { ok: true; data: { channelId: string } } | { ok: false; error: import('./errors.js').ApiError };
 export const TYPING_TTL_MS = 5000;
 export const TYPING_INTERVAL_MS = 2000;
+
+export interface PresenceRequest { channelId: string; userIds: string[] }
+export interface PresenceResponse { channelId: string; users: { userId: string; online: boolean }[] }
+export type PresenceAck = { ok: true; data: PresenceResponse } | { ok: false; error: import('./errors.js').ApiError };
+export const PRESENCE_PING_INTERVAL_MS = 25000;
+export const PRESENCE_PING_TIMEOUT_MS = 20000;

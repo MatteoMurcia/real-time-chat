@@ -13,6 +13,7 @@ import { httpDiagnostics } from '../src/logging/http-diagnostics.js';
 import { ShutdownError, ShutdownState } from '../src/shutdown/shutdown-state.js';
 import { configureShutdown } from '../src/shutdown/shutdown.js';
 import { ChatGateway } from '../src/realtime/chat.gateway.js';
+import type { PresenceService } from '../src/activity/presence.service.js';
 import type { SessionService } from '../src/identity/session.service.js';
 import type { ChannelAccessService } from '../src/channels/channel-access.service.js';
 import type { ConnectionsService } from '../src/realtime/connections.service.js';
@@ -102,7 +103,7 @@ test('drain rejects new engines and closes raced authentication by transport wit
   const reserve = t.mock.fn(), add = t.mock.fn(), next = t.mock.fn(), close = t.mock.fn(), disconnect = t.mock.fn();
   const gateway = new ChatGateway({ authenticate: authenticateSession } as unknown as SessionService, 'http://127.0.0.1:8080',
     {} as DatabaseService, {} as ChannelAccessService, { add } as unknown as ConnectionsService,
-    {} as SendMessageService, { reserveConnection: reserve } as unknown as RateLimitService, state);
+    {} as SendMessageService, { reserveConnection: reserve } as unknown as RateLimitService, state, {} as PresenceService);
   let namespace!: (socket: Socket, next: (error?: Error) => void) => Promise<void>;
   let engine!: (req: IncomingMessage, res: ServerResponse, next: (error?: Error) => void) => void;
   gateway.afterInit({ engine: { use: (callback: typeof engine) => { engine = callback; } }, use: (callback: typeof namespace) => { namespace = callback; } } as unknown as Server);
