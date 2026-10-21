@@ -2,7 +2,7 @@ import { HttpException, UnauthorizedException, type OnModuleDestroy } from '@nes
 import type { Socket } from 'socket.io';
 import type { TrafficLimits } from '../config.js';
 
-const windows = { send: 10000, typing: 10000, login: 60000, register: 3600000, createChannel: 3600000 };
+const windows = { send: 10000, typing: 10000, presence: 10000, login: 60000, register: 3600000, createChannel: 3600000 };
 type Action = keyof typeof windows;
 type Bucket = { attempts: number[]; window: number };
 

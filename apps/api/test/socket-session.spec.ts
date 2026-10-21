@@ -15,6 +15,34 @@ function socket(sessionId: string, expiresAt = Date.now() + 60000) {
   }) as unknown as Socket;
 }
 
+test('presence counts valid connections per user across tabs and removes revoked and expired sessions', async t => {
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: 1000 });
+  const revoked = new Subject<{ sessionId: string }>();
+  const service = new ConnectionsService({ revoked, authenticate: async (id: string) => ({ id }) } as unknown as SessionService);
+  t.after(() => service.onModuleDestroy());
+  const first = socket('one', 2000), second = socket('one', 2000), other = socket('two', 3000);
+  const valid = new Set(['one', 'two']);
+  await Promise.all([first, second, other].map(client => service.add(client)));
+  assert.deepEqual(service.connectedSessionIds(['same-user']), ['one', 'two']);
+  assert.equal(service.countConnections('same-user', valid), 3);
+  first.disconnect(); assert.equal(service.countConnections('same-user', valid), 2);
+  revoked.next({ sessionId: 'one' }); assert.equal(service.countConnections('same-user', valid), 1);
+  assert.equal(service.countConnections('same-user', new Set()), 0);
+  t.mock.timers.tick(2000); assert.equal(service.countConnections('same-user', valid), 0);
+  assert.deepEqual(service.connectedSessionIds(['same-user']), []);
+});
+
+test('presence excludes registration until reauthentication succeeds and cannot revive a disconnected socket', async t => {
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  const service = new ConnectionsService({ revoked: new Subject(), authenticate: async () => { await held; return { id: 'one' }; } } as unknown as SessionService);
+  t.after(() => service.onModuleDestroy());
+  const client = socket('one'), registered = service.add(client);
+  assert.equal(service.countConnections('same-user', new Set(['one'])), 0);
+  client.disconnect(); release(); await registered;
+  assert.equal(service.countConnections('same-user', new Set(['one'])), 0);
+});
+
 test('activity invalidations reach only the target user and never expired or revoked sessions', async t => {
   const revoked = new Subject<{ sessionId: string }>();
   const service = new ConnectionsService({ revoked, authenticate: async (id: string) => ({ id }) } as unknown as SessionService);

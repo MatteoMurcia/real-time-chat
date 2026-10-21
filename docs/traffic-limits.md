@@ -8,6 +8,7 @@ not add timestamps.
 | --- | --- | --- | --- |
 | `message:send` | 30 attempts / 10 seconds | User, across every socket and session | `SEND_LIMIT` |
 | `typing:update` | 10 attempts / 10 seconds | User, across every socket and session | `TYPING_LIMIT` |
+| `presence:get` | 20 attempts / 10 seconds | User, across every socket and session | `PRESENCE_LIMIT` |
 | `POST /auth/login` | 10 attempts / minute | Client IP | `LOGIN_LIMIT` |
 | `POST /auth/register` | 5 attempts / hour | Client IP | `REGISTER_LIMIT` |
 | `POST /channels` | 10 attempts / hour | Authenticated user, across sessions | `CHANNEL_CREATE_LIMIT` |
@@ -23,6 +24,9 @@ payload validation, channel queueing or another database authentication read.
 Typing follows the same ordering with its own budget; start, stop and invalid
 attempts all count. Typing is optional and the browser does not await or retry
 its ack. Rejected/dropped updates disappear through the [five-second TTL](typing.md).
+Presence queries use the same ordering with their own budget and at most 100
+unique target IDs. Invalid requests count too; safe errors never imply offline.
+The [presence contract](presence.md) requires live sessions and shared membership.
 Malformed messages, conflicts and idempotent retries consume budget too. Live
 session/membership authorization still runs for accepted operations. Login and
 registration count before CSRF, input validation and password hashing; channel
@@ -82,7 +86,7 @@ budgets. Connection accounting also caps tracked sessions at 10,000. Cleanup
 timers do not keep the process alive and are cleared on application shutdown.
 Replace this store with shared accounting before running multiple API instances.
 These are the section 6.7 operation quotas, not general denial-of-service
-protection: reads, subscriptions and unauthenticated transport handshakes do not
+protection: other reads, subscriptions and unauthenticated transport handshakes do not
 have additional quotas in this task.
 
 Unit tests use a controlled clock for exact sliding boundaries, cleanup and slot

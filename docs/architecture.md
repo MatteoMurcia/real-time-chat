@@ -92,6 +92,7 @@ commit boundary, and [message contracts](messages.md) define cursors and UI race
 | Read progress advances monotonically for the authenticated member; only foreign messages count as unread | [read-cursor integration](../apps/api/test/integration/read-cursor.ts), [unread E2E](../e2e/unread.spec.ts), [contract](read-cursors.md) | Visible reached message within recovered HTTP boundary; sequence prefix rather than proof of attention |
 | Independent sessions converge after a read even if its activity invalidation is lost | [cross-session E2E](../e2e/read-consistency.spec.ts), [CP6-A](checkpoints/cp6-a.md) | Visible-tab 15-second repair interval; authenticated HTTP remains authoritative, without a delivery SLA |
 | Logout/expiry close affected sockets | [socket sessions](../apps/api/test/integration/socket-session.ts), [browser revocation](../e2e/session-revocation.spec.ts) | Local notifications/timers; transmitted data cannot be recalled |
+| Presence stays online while a valid tab/session remains and is scoped to shared members | [presence integration](../apps/api/test/integration/presence.ts), [contract](presence.md) | One API; silent-link detection uses a 25s/20s heartbeat; UI is task 6.3b |
 | Membership authorizes history, sends and subscription | [membership](../apps/api/test/integration/membership.ts), [subscriptions](../apps/api/test/integration/subscriptions.ts) | Channels are open to registered users; membership is not confidentiality |
 | Retried keys resolve once in persistence or conflict | [concurrent idempotency](../apps/api/test/integration/message-idempotency.ts) | Key is scoped to author; authorization still applies; not exactly-once delivery |
 | Sequence reflects per-channel transactional commits | [message writes](../apps/api/test/integration/messages.ts), [commit/rollback races](../apps/api/test/integration/message-sync-races.ts) | Supported write path and immutable messages; no cross-channel total order |
@@ -126,8 +127,11 @@ credentials are not a least-privilege deployment configuration. HTTPS, distribut
 state, backups and capacity measurement need separate work before remote hosting.
 
 There is no outbox, durable offline queue, offline-first mode, exactly-once network
-delivery or presence in the current implementation. [Typing](typing.md) is an
+delivery in the current implementation. [Typing](typing.md) is an
 authorized, volatile hint with a five-second receiver TTL, without persistence.
+[Presence](presence.md) counts valid connections per user and serves authorized
+shared-channel snapshots; its visual UI is separate work. Silent-link detection
+uses the explicit 25s/20s heartbeat and is not a delivery SLA.
 Live events are best-effort and recovery does not prove a recipient read a message.
 Browser evidence is Chromium, without a physical-device or exhaustive accessibility
 audit. [Operations](operations.md) covers safe logs, readiness/liveness and shutdown.

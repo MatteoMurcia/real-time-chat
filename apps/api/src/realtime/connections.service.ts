@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException, type OnModuleDestroy } from '@nestjs/common';
 import type { Socket } from 'socket.io';
 import { SessionService } from '../identity/session.service.js';
+import { Subject } from 'rxjs';
 
 type SessionConnections = { sockets: Set<Socket>; expiresAt: number; timer: ReturnType<typeof setTimeout> | undefined };
 
@@ -10,6 +11,8 @@ export class ConnectionsService implements OnModuleDestroy {
   private readonly sessions = new Map<string, SessionConnections>();
   private readonly channels = new Map<string, Promise<void>>();
   private readonly revocations;
+  private readonly presence = new Subject<string>();
+  readonly presenceChanges = this.presence.asObservable();
 
   constructor(private readonly identity: SessionService) {
     this.revocations = identity.revoked.subscribe(({ sessionId }) => this.endSession(sessionId));
@@ -31,6 +34,7 @@ export class ConnectionsService implements OnModuleDestroy {
       if (!sockets.size) this.users.delete(userId);
       session.sockets.delete(socket);
       if (!session.sockets.size) { clearTimeout(session.timer); this.sessions.delete(sessionId); }
+      if (socket.data.presenceReady) { delete socket.data.presenceReady; this.presence.next(userId); }
     });
     if (!session.timer) this.scheduleExpiry(sessionId, session);
     if (!socket.connected) return;
@@ -38,6 +42,10 @@ export class ConnectionsService implements OnModuleDestroy {
     try {
       const current = await this.identity.authenticate(socket.request.headers.cookie);
       if (current.id !== sessionId) this.endSession(sessionId);
+      else if (socket.connected && Number(socket.data.expiresAt) > Date.now()) {
+        socket.data.presenceReady = true;
+        this.presence.next(userId);
+      }
     } catch (error) {
       if (error instanceof UnauthorizedException) this.endSession(sessionId);
       else socket.disconnect(true);
@@ -62,9 +70,36 @@ export class ConnectionsService implements OnModuleDestroy {
   }
 
   onModuleDestroy(): void {
+    this.presence.complete();
     this.revocations.unsubscribe();
     for (const session of this.sessions.values()) clearTimeout(session.timer);
     this.sessions.clear(); this.users.clear();
+  }
+
+  connectedSessionIds(userIds: string[]): string[] {
+    const ids = new Set<string>();
+    for (const userId of userIds) for (const socket of this.users.get(userId) ?? []) {
+      if (this.present(socket)) ids.add(socket.data.sessionId as string);
+    }
+    return [...ids];
+  }
+
+  countConnections(userId: string, validSessionIds: ReadonlySet<string>): number {
+    let count = 0;
+    for (const socket of this.users.get(userId) ?? []) {
+      if (this.present(socket) && validSessionIds.has(socket.data.sessionId as string)) count++;
+    }
+    return count;
+  }
+
+  private present(socket: Socket): boolean {
+    return socket.connected && socket.data.presenceReady === true && Number(socket.data.expiresAt) > Date.now();
+  }
+
+  presenceChanged(userIds: string[]): void {
+    for (const userId of userIds) for (const socket of this.users.get(userId) ?? []) {
+      if (this.present(socket)) socket.emit('presence:changed');
+    }
   }
 
   // shortcut: coordination and rooms are process-local; replace both before running multiple API instances.

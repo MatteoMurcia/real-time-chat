@@ -23,6 +23,7 @@ import type { TrafficLimits } from './config.js';
 import { ShutdownState } from './shutdown/shutdown-state.js';
 import { ActivityController } from './activity/activity.controller.js';
 import { ReadCursorService } from './activity/read-cursor.service.js';
+import { PresenceService } from './activity/presence.service.js';
 
 @Module({
   controllers: [LiveController, ReadyController, RegistrationController, SessionController, ChannelsController, HistoryController, ActivityController],
@@ -42,6 +43,7 @@ export class AppModule {
         HistoryService,
         SyncService,
         ReadCursorService,
+        PresenceService,
         { provide: DatabaseService, useFactory: () => new DatabaseService(databaseUrl) },
         { provide: CsrfService, useFactory: () => new CsrfService(appOrigin) },
         RegistrationService,
