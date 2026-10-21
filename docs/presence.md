@@ -127,6 +127,10 @@ invalidation coalescing, cleanup and stale-channel rejection. The
 association and subscription changes; [Chromium scenarios](../e2e/presence.spec.ts)
 exercise two writer tabs, reader reconnect/draft preservation, offline versus
 omitted members, delayed refresh, channel changes and desktop/mobile layouts.
+The [timer-repair scenario](../e2e/presence-repair.spec.ts) drops real presence hints
+and filters any activity invalidations. It verifies offline/omitted-member repair
+without focus, navigation, new read writes or reconnection. [CP6-B](checkpoints/cp6-b.md) records the combined activity
+review, executable evidence and scope limits.
 
 The [plan](../tasks/plan.md) records executed commands. Backend [PR #64](https://github.com/MatteoMurcia/real-time-chat/pull/64)
 and UI [PR #65](https://github.com/MatteoMurcia/real-time-chat/pull/65) record CI status
