@@ -1,7 +1,8 @@
-import { computed, DestroyRef, DOCUMENT, effect, inject, Injectable, signal, untracked } from '@angular/core';
+import { computed, DestroyRef, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { TYPING_INTERVAL_MS, TYPING_TTL_MS, type TypingChanged } from '@real-time-chat/contracts/activity';
 import { RealtimeConnection } from '../../core/realtime-connection';
 import { SessionStore } from '../../core/session.store';
+import { ActivityService } from '../../core/activity.service';
 
 function isTypingChanged(value: unknown): value is TypingChanged {
   if (!value || typeof value !== 'object' || !('channelId' in value) || typeof value.channelId !== 'string'
@@ -16,7 +17,7 @@ function isTypingChanged(value: unknown): value is TypingChanged {
 export class TypingStore {
   private readonly connection = inject(RealtimeConnection);
   private readonly sessions = inject(SessionStore);
-  private readonly document = inject(DOCUMENT);
+  private readonly activity = inject(ActivityService);
   private channelId: string | null = null;
   private ready = false;
   private lastSent = -Infinity;
@@ -32,12 +33,11 @@ export class TypingStore {
 
   constructor() {
     const stopListening = this.connection.listen('typing:changed', value => this.receive(value));
-    const visibility = () => { if (this.document.visibilityState !== 'visible') this.clear(); };
-    this.document.addEventListener('visibilitychange', visibility);
-    effect(() => { if (this.connection.status() !== 'connected') untracked(() => this.clear()); });
-    inject(DestroyRef).onDestroy(() => {
-      this.clear(); stopListening(); this.document.removeEventListener('visibilitychange', visibility);
+    effect(() => {
+      const connected = this.connection.status() === 'connected', visible = this.activity.visible();
+      if (!connected || !visible) untracked(() => this.clear());
     });
+    inject(DestroyRef).onDestroy(() => { this.clear(); stopListening(); });
   }
 
   open(channelId: string, ready: boolean): void {
@@ -62,7 +62,7 @@ export class TypingStore {
   }
 
   private available(): boolean {
-    return !!this.channelId && this.ready && this.connection.status() === 'connected' && this.document.visibilityState === 'visible';
+    return !!this.channelId && this.ready && this.connection.status() === 'connected' && this.activity.visible();
   }
 
   private receive(value: unknown): void {

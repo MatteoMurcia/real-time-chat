@@ -3,17 +3,19 @@ import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { RealtimeConnection } from '../../core/realtime-connection';
 import { SessionStore } from '../../core/session.store';
+import { ActivityService } from '../../core/activity.service';
 import { TypingStore } from './typing.store';
 
 let receive: (value: unknown) => void;
-const status = signal('connected'), typing = vi.fn(), stop = vi.fn();
+const status = signal('connected'), visible = signal(true), typing = vi.fn(), stop = vi.fn();
 const event = (connectionId = 'socket-one', id = 'other') => ({ channelId: 'channel', connectionId, user: { id, displayName: 'Alice' } });
 beforeEach(() => {
   vi.useFakeTimers(); vi.setSystemTime(10000); status.set('connected'); typing.mockClear(); stop.mockClear();
-  Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+  visible.set(true);
   TestBed.configureTestingModule({ providers: [TypingStore,
     { provide: RealtimeConnection, useValue: { status, typing, listen: (_: string, listener: typeof receive) => { receive = listener; return stop; } } },
     { provide: SessionStore, useValue: { session: signal({ user: { id: 'self' } }) } },
+    { provide: ActivityService, useValue: { visible } },
   ] });
 });
 afterEach(() => { TestBed.resetTestingModule(); vi.useRealTimers(); });
@@ -48,9 +50,9 @@ it('clears on channel change, failed subscription, hidden document, disconnectio
   expect(store.notice()).toBe(''); expect(typing).toHaveBeenLastCalledWith({ channelId: 'channel', typing: false });
   receive({ ...event(), channelId: 'another' }); store.open('another', false); expect(store.notice()).toBe('');
   store.open('channel', true); receive(event()); store.input('draft');
-  Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' }); document.dispatchEvent(new Event('visibilitychange'));
+  visible.set(false); TestBed.tick();
   expect(store.notice()).toBe(''); const calls = typing.mock.calls.length; store.input('hidden'); receive(event()); expect(typing).toHaveBeenCalledTimes(calls);
-  Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' }); document.dispatchEvent(new Event('visibilitychange'));
+  visible.set(true); TestBed.tick();
   receive(event()); status.set('reconnecting'); TestBed.tick(); expect(store.notice()).toBe('');
   store.input('offline'); expect(typing).toHaveBeenCalledTimes(calls);
   TestBed.resetTestingModule(); expect(stop).toHaveBeenCalledOnce();

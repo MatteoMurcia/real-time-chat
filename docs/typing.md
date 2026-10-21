@@ -46,6 +46,11 @@ the browser ignores its own user's other tabs. Stop signals carry no user data.
 - A disconnected view clears received state. Reconnection does not replay typing
   or broadcast a retained draft; fresh input is required after subscription.
 
+Visibility comes from the workspace's existing `ActivityService.visible` signal;
+the conversation does not register another document visibility listener. The
+unchanged responsive E2E checks listener counts across twenty channel changes,
+closing the view and leaving/returning to the workspace.
+
 Both directions use [Socket.IO volatile events](https://socket.io/docs/v4/emitting-events/#volatile-events):
 signals may be dropped while the transport is busy. In particular,
 [offline events must not be buffered](https://socket.io/docs/v4/client-offline-behavior/).
