@@ -14,7 +14,8 @@ export function loadOptions(args) {
   const { users, connections, rate, seconds, warmup } = options;
   if (![users, connections, seconds, warmup].every(Number.isInteger) || users < 1 || users > 50
     || connections < 1 || connections > 5 || users * connections > 100 || !Number.isFinite(rate) || rate < .1 || rate > 3
-    || seconds < 5 || seconds > 120 || warmup < 0 || warmup > 30 || Math.floor(seconds * rate) < 1) throw new Error('Invalid bounded load parameters');
+    || seconds < 5 || seconds > 120 || warmup < 0 || warmup > 30 || Math.floor(seconds * rate) < 1
+    || (warmup > 0 && Math.floor(warmup * rate) < 1)) throw new Error('Invalid bounded load parameters');
   return options;
 }
 

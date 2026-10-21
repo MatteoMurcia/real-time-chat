@@ -36,9 +36,11 @@ test('load refuses remote Docker transports before provisioning any resources', 
 test('load parameters are bounded and reject unknown flags, incomplete samples and excessive connections', () => {
   assert.deepEqual(loadOptions([]), { users: 8, connections: 2, rate: 1, seconds: 30, warmup: 5 });
   assert.equal(loadOptions(['--users', '4', '--connections', '3', '--rate', '0.5']).rate, .5);
+  assert.equal(loadOptions(['--rate', '.1', '--warmup', '10']).rate, .1);
   for (const args of [['--url', 'http://remote'], ['--users', '0'], ['--users', '1.5'], ['--connections', '6'],
     ['--users', '50', '--connections', '5'], ['--rate', 'NaN'], ['--rate', '4'], ['--seconds', '121'],
-    ['--seconds', '5', '--rate', '.1'], ['--warmup', '-1'], ['--users']]) assert.throws(() => loadOptions(args));
+    ['--seconds', '5', '--rate', '.1'], ['--rate', '.1'], ['--warmup', '1', '--rate', '.5'],
+    ['--warmup', '-1'], ['--users']]) assert.throws(() => loadOptions(args));
 });
 
 test('nearest-rank percentiles preserve small samples, null for none, and do not mutate observations', () => {

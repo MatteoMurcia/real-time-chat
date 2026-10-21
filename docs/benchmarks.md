@@ -56,9 +56,16 @@ npm run benchmark -- --users 8 --connections 2 --rate 1 --seconds 30 --warmup 5
 | `connections` | Subscribed WebSockets per user/session | 2 | 1–5; at most 100 total |
 | `rate` | Scheduled messages per second **per connection** | 1 | 0.1–3 |
 | `seconds` | Measurement send window | 30 | 5–120; at least one slot per connection |
-| `warmup` | Separate warm-up send window | 5 | 0–30 |
+| `warmup` | Separate warm-up send window | 5 | 0–30; at least one slot per connection if enabled |
 
-All users join one channel. Each message has a new UUID and a 128-byte ASCII
+At very low rates increase warm-up accordingly (for example `--rate 0.1
+--warmup 10`) or disable it with `--warmup 0`. An enabled window with no
+scheduled message is rejected before provisioning, rather than reported as a
+failed load after an empty warm-up.
+
+Each window schedules `floor(seconds × rate)` sends per connection; the report
+shows the resulting planned and actual offered counts. All users join one
+channel. Each message has a new UUID and a 128-byte ASCII
 body, with no application retry. This deliberately exercises one hot channel's
 transactional serialization, session revalidation and fanout. The default has
 16 connections, 80 warm-up messages and 480 measured messages. Each successful
