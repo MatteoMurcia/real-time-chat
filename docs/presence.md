@@ -91,7 +91,7 @@ The five-second optional presence timeout does not close the chat connection.
 Queries are serialized and start at least two seconds apart, coalescing hints,
 focus and author-list changes. Failures clear labels and retry after ten seconds.
 The existing activity service supplies visibility, focus and fifteen-second
-periodic repair; there is no additional browser listener or polling interval.
+periodic repair; there is no additional DOM listener or polling interval.
 The server's shared quota still applies across sessions: many open views may
 receive rate-limit errors and show unknown until a later successful retry.
 Presence remains a best-effort observation; this UI adds no delivery or latency SLA.

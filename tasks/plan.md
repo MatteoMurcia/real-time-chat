@@ -698,7 +698,7 @@ Resultado (2026-10-09): **superado** sobre main `07bc90c`, sin cambios de aplica
   - Aceptación: “sin conexión” no se confunde con “todavía no sabemos”; cambios de canal limpian usuarios anteriores.
   - Verificar: navegador con dos pestañas y reconexión.
   - Archivos: store actividad, plantilla/estilos chat, `e2e/presence.spec.ts`.
-  - Resultado (2026-10-21): texto Online/Offline/Presence unknown para autores cargados (hasta 100 IDs recientes). Confirmaciones retenidas durante refrescos; desconocido ante errores, reconexión, ocultación y cambio de canal. Consultas agrupadas/serializadas, mínimo 2 s y reintento de error a los 10 s; reutiliza ActivityService sin listeners nuevos. Angular y Chromium/Docker verificados; [contrato y límites](../docs/presence.md). CI del head exacto y revisión/merge manual en [PR #65](https://github.com/MatteoMurcia/real-time-chat/pull/65). Siguiente **Checkpoint CP6-B**, sin iniciarlo aquí.
+  - Resultado (2026-10-21): texto Online/Offline/Presence unknown para autores cargados (hasta 100 IDs recientes). Confirmaciones retenidas durante refrescos; desconocido ante errores, reconexión, ocultación y cambio de canal. Consultas agrupadas/serializadas, mínimo 2 s y reintento de error a los 10 s; reutiliza ActivityService sin listeners DOM nuevos. Angular y Chromium/Docker verificados; [contrato y límites](../docs/presence.md). CI del head exacto y revisión/merge manual en [PR #65](https://github.com/MatteoMurcia/real-time-chat/pull/65). Siguiente **Checkpoint CP6-B**, sin iniciarlo aquí.
 
 **Checkpoint CP6-B:** eventos efímeros autorizados y limpios; volver a ejecutar conversación/reconexión para detectar regresiones.
 
