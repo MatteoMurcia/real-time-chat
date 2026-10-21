@@ -40,8 +40,9 @@
   @if (activity.readError()?.channelId === channel().id) { <p role="status">{{ activity.readError()?.message }}</p> }
   <button class="latest" type="button" (click)="scrollToLatest()">{{ hasNewMessages() ? 'New messages — show latest' : following() ? 'Scroll to latest message' : 'Show latest messages' }}</button>
   <form (submit)="$event.preventDefault(); send()">
+    <p class="typing" role="status" aria-atomic="true">{{ typing.notice() }}</p>
     <label for="message-body">Message</label>
-    <textarea id="message-body" rows="3" [formControl]="draft" aria-describedby="message-help" (keydown)="onKey($event)" (compositionstart)="composing = true" (compositionend)="composing = false"></textarea>
+    <textarea id="message-body" rows="3" [formControl]="draft" aria-describedby="message-help" (input)="typing.input(draft.value)" (blur)="typing.stop()" (keydown)="onKey($event)" (compositionstart)="composing = true" (compositionend)="composing = false"></textarea>
     <p id="message-help" class="field-help">1–2,000 characters. Enter to send; Shift+Enter for a new line. Confirmation retries once automatically after 5 seconds. Drafts stay here while reconnecting.</p>
     <button type="submit" [disabled]="!store.ready() || !draft.value.trim()">Send message</button>
   </form>

@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { Chat } from './chat';
 import { ChatStore } from './chat.store';
 import { ActivityService } from '../../core/activity.service';
+import { TypingStore } from './typing.store';
 
 const store = {
   open: vi.fn(), send: vi.fn(() => true), retry: vi.fn(), recover: vi.fn(), loadHistory: vi.fn(),
@@ -12,6 +13,7 @@ const store = {
   snapshotCursor: signal('snapshot'), syncCursor: signal('djE6Y2hhbm5lbDoxMDoxMA'), recoveredSequence: signal('10'), syncLoading: signal(false), syncError: signal(''),
 };
 const activity = { revision: signal(0), visible: signal(true), readError: signal(null), mark: vi.fn() };
+const typing = { open: vi.fn(), input: vi.fn(), stop: vi.fn(), notice: signal('') };
 let intersect: IntersectionObserverCallback;
 const channel = (id: string) => ({ id, name: id, slug: id, isMember: true, createdAt: '2026-10-18T00:00:00Z' });
 beforeEach(() => {
@@ -19,7 +21,7 @@ beforeEach(() => {
   vi.clearAllMocks(); store.messages.set([]); store.outgoing.set([]); store.liveNotice.set('');
   activity.visible.set(true); store.recoveredSequence.set('10');
   store.syncError.set(''); store.syncLoading.set(false);
-  TestBed.configureTestingModule({ imports: [Chat], providers: [{ provide: ActivityService, useValue: activity }] }).overrideComponent(Chat, { set: { providers: [{ provide: ChatStore, useValue: store }] } });
+  TestBed.configureTestingModule({ imports: [Chat], providers: [{ provide: ActivityService, useValue: activity }] }).overrideComponent(Chat, { set: { providers: [{ provide: ChatStore, useValue: store }, { provide: TypingStore, useValue: typing }] } });
 });
 afterEach(() => { TestBed.resetTestingModule(); vi.unstubAllGlobals(); });
 
@@ -85,4 +87,16 @@ it('returns focus to the composer after explicit button send and retry, and to t
   retry.focus(); retry.click(); expect(document.activeElement).toBe(composer);
   const recovery = Array.from(element.querySelectorAll('button')).find(button => button.textContent?.includes('Retry recovery'))!;
   recovery.focus(); recovery.click(); expect(document.activeElement).toBe(element.querySelector('[role=log]'));
+});
+
+it('connects accessible typing status to input, send and blur without replacing the draft', () => {
+  const { fixture, element, composer, fill } = setup();
+  typing.notice.set('Alice is typing…'); fixture.detectChanges();
+  expect(element.querySelector('.typing')?.getAttribute('role')).toBe('status');
+  expect(element.querySelector('.typing')?.textContent).toBe('Alice is typing…');
+  fill('a private draft'); expect(typing.input).toHaveBeenLastCalledWith('a private draft');
+  composer.dispatchEvent(new Event('blur')); expect(typing.stop).toHaveBeenCalled();
+  expect(composer.value).toBe('a private draft');
+  typing.stop.mockClear(); element.querySelector('form')!.dispatchEvent(new Event('submit', { cancelable: true }));
+  expect(typing.stop).toHaveBeenCalledOnce();
 });

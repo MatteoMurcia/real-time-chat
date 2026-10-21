@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Inject, UnauthorizedException } from '@nestjs/common';
 import { ConnectedSocket, MessageBody, SubscribeMessage, WebSocketGateway, WebSocketServer, type OnGatewayConnection, type OnGatewayInit } from '@nestjs/websockets';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Server, Socket } from 'socket.io';
@@ -16,6 +16,8 @@ import { RateLimitService } from '../security/rate-limit.service.js';
 import { randomUUID } from 'node:crypto';
 import { diagnostic, type Diagnostic } from '../logging/logger.js';
 import { ShutdownError, ShutdownState } from '../shutdown/shutdown-state.js';
+import { validateTyping } from '../activity/validate-typing.js';
+import type { TypingAck, TypingChanged } from '@real-time-chat/contracts/activity';
 
 @WebSocketGateway({ path: '/socket.io', serveClient: false, maxHttpBufferSize: 16384, transports: ['polling', 'websocket'] })
 export class ChatGateway implements OnGatewayInit, OnGatewayConnection {
@@ -28,6 +30,34 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection {
     let release = () => {};
     try { release = this.shutdown.enter(); await this.connections.add(socket); }
     catch { socket.conn.close(); }
+    finally { release(); }
+  }
+
+  @SubscribeMessage('typing:update')
+  async typing(@ConnectedSocket() socket: Socket, @MessageBody() body: unknown): Promise<TypingAck> {
+    let release = () => {};
+    try {
+      release = this.shutdown.enter();
+      if (!socket.connected || typeof socket.data.userId !== 'string') throw new UnauthorizedException();
+      this.limits.consume('typing', socket.data.userId);
+      const input = validateTyping(body);
+      return await this.connections.withChannel(input.channelId, async () => {
+        const session = await this.sessions.authenticate(socket.request.headers.cookie);
+        if (!socket.connected || session.id !== socket.data.sessionId) throw new UnauthorizedException();
+        await this.db.$transaction(async tx => {
+          await this.access.lockChannel(tx, input.channelId);
+          await this.access.requireMember(session.user.id, input.channelId, tx);
+        });
+        if (!socket.connected || socket.data.channelId !== input.channelId) throw new ForbiddenException();
+        if (input.typing) {
+          socket.data.typingChannelId = input.channelId;
+          const event: TypingChanged = { channelId: input.channelId, connectionId: socket.id,
+            user: { id: session.user.id, displayName: session.user.displayName } };
+          await this.emitToChannel(input.channelId, 'typing:changed', event, socket);
+        } else this.connections.stopTyping(socket);
+        return { ok: true, data: { channelId: input.channelId } };
+      });
+    } catch (error) { return { ok: false, error: socketError(error) }; }
     finally { release(); }
   }
 
@@ -63,8 +93,12 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection {
   private async publish(message: PublicMessage): Promise<void> {
     const members = await this.db.membership.findMany({ where: { channelId: message.channelId }, select: { userId: true } });
     this.connections.activityChanged(members.map(member => member.userId));
+    await this.emitToChannel(message.channelId, 'message:created', message);
+  }
+
+  private async emitToChannel(channelId: string, event: 'message:created' | 'typing:changed', payload: PublicMessage | TypingChanged, sender?: Socket): Promise<void> {
     const namespace = this.server.of('/');
-    const sockets = [...(namespace.adapter.rooms.get(`channel:${message.channelId}`) ?? [])]
+    const sockets = [...(namespace.adapter.rooms.get(`channel:${channelId}`) ?? [])]
       .map(id => namespace.sockets.get(id)).filter((socket): socket is Socket => !!socket);
     if (!sockets.length) return;
     const sessions = await this.db.session.findMany({
@@ -72,8 +106,13 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection {
       select: { id: true, expiresAt: true },
     });
     const valid = new Set(sessions.filter(session => session.expiresAt.getTime() > Date.now()).map(session => session.id));
-    for (const socket of sockets) if (socket.connected && socket.rooms.has(`channel:${message.channelId}`)
-      && valid.has(socket.data.sessionId as string)) socket.emit('message:created', message);
+    if (sender && (!sender.connected || Number(sender.data.expiresAt) <= Date.now()
+      || sender.data.typingChannelId !== channelId || !valid.has(sender.data.sessionId as string))) return;
+    for (const socket of sockets) if (socket !== sender && socket.connected && socket.rooms.has(`channel:${channelId}`)
+      && valid.has(socket.data.sessionId as string)) {
+      if (event === 'typing:changed') socket.volatile.emit(event, payload);
+      else socket.emit(event, payload);
+    }
   }
 
   @SubscribeMessage('channel:subscribe')

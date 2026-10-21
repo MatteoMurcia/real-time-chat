@@ -7,7 +7,8 @@ persistence, authorized channels, idempotent retries and bounded recovery.
 The [P0 acceptance review](docs/checkpoints/cp5-b.md) maps all eighteen scenarios
 to executed evidence, including clean Docker installation and two-user recovery.
 The supported delivery is local and uses one API instance. Private unread counts
-sync between tabs; typing/presence and capacity measurement remain later work.
+sync between tabs; [ephemeral typing](docs/typing.md) expires without a stop event.
+Presence and capacity measurement remain later work.
 
 ## Quick start
 
@@ -120,7 +121,7 @@ There is **no exactly-once delivery, durable offline queue or offline-first mode
 Drafts/unconfirmed messages live only in the current view and can be lost on
 reload. No outbox, Redis, multiple API replicas or load-capacity claim is included.
 [Read progress and unread counts](docs/read-cursors.md) persist per user/channel;
-only other people's messages count. Typing and presence are later work. Private chats, attachments,
+only other people's messages count. Typing indicators are ephemeral; presence is later work. Private chats, attachments,
 search and video are outside the initial scope. Remote deployment needs a separate
 security/operations review; this loopback setup is not a production deployment.
 
