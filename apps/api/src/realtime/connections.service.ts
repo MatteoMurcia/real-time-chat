@@ -26,6 +26,7 @@ export class ConnectionsService implements OnModuleDestroy {
     session.sockets.add(socket);
     this.sessions.set(sessionId, session);
     socket.once('disconnect', () => {
+      this.stopTyping(socket);
       sockets.delete(socket);
       if (!sockets.size) this.users.delete(userId);
       session.sockets.delete(socket);
@@ -82,6 +83,7 @@ export class ConnectionsService implements OnModuleDestroy {
 
   subscribe(socket: Socket, channelId: string): void {
     if (!socket.connected) return;
+    if (socket.data.channelId !== channelId) this.stopTyping(socket);
     // The installed in-memory adapter changes rooms synchronously, without network I/O.
     if (socket.data.channelId) void socket.leave(`channel:${socket.data.channelId}`);
     void socket.join(`channel:${channelId}`);
@@ -89,8 +91,21 @@ export class ConnectionsService implements OnModuleDestroy {
   }
 
   unsubscribe(socket: Socket, channelId: string): void {
+    if (socket.data.typingChannelId === channelId) this.stopTyping(socket);
     void socket.leave(`channel:${channelId}`);
     if (socket.data.channelId === channelId) delete socket.data.channelId;
+  }
+
+  stopTyping(socket: Socket): void {
+    const channelId = socket.data.typingChannelId as string | undefined;
+    delete socket.data.typingChannelId;
+    if (!channelId) return;
+    for (const sockets of this.users.values()) for (const recipient of sockets) {
+      if (recipient !== socket && recipient.connected && Number(recipient.data.expiresAt) > Date.now()
+        && recipient.rooms.has(`channel:${channelId}`)) {
+        recipient.volatile.emit('typing:changed', { channelId, connectionId: socket.id, user: null });
+      }
+    }
   }
 
   revokeChannel(userId: string, channelId: string): void {
