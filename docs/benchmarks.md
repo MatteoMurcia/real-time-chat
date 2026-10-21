@@ -181,5 +181,5 @@ local Docker transports, percentile calculations, scheduling/error denominators,
 extra/missing delivery and malformed or mismatched payloads. `npm test` includes
 them through the existing script-test glob. Runtime behavior is checked with
 real Docker runs; final Quality, Integration and Containers CI is linked from
-the task PR. The [implementation plan](../tasks/plan.md) records incremental
+[PR #67](https://github.com/MatteoMurcia/real-time-chat/pull/67). The [implementation plan](../tasks/plan.md) records incremental
 commits, development checks, retained evidence and the separate CP6-C status.
