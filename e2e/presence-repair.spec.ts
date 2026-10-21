@@ -64,10 +64,9 @@ test('repairs lost presence hints and membership omission through the real timer
     expect((await sender.timeout(5000).emitWithAck('message:send', { channelId: channel.id, clientMessageId: randomUUID(), body: 'Repair presence without replaying messages' })).ok).toBe(true);
     const badge = page.getByRole('log').locator('.presence');
     await expect(badge).toHaveText('Online');
-    await expect.poll(() => pending.size).toBe(0);
     // Let read-triggered refreshes finish before excluding focus and invalidation triggers.
-    await expect.poll(() => Date.now() - lastQuery, { timeout: 10000 }).toBeGreaterThan(2500);
-    await expect.poll(() => pendingPresence.size).toBe(0);
+    await expect.poll(() => pending.size === 0 && pendingPresence.size === 0 && Date.now() - lastQuery > 2500,
+      { timeout: 10000 }).toBe(true);
     const eventsBefore = await triggers(), queriesBefore = queries, writesBefore = readWrites;
     drop = true; sender.disconnect();
     await expect.poll(() => dropped).toBeGreaterThan(0);
