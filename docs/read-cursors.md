@@ -82,6 +82,9 @@ The channel list shows a labeled count or “All caught up” without stealing f
 or announcing every counter change. Failed count refreshes hide the cached counts
 and offer the existing Refresh channels action. Membership changes cancel older
 background directory reads, so a late response cannot undo a confirmed leave.
+If a concurrent insert displaces a displayed row from its slug page, counts
+become explicitly unavailable until Refresh channels rebuilds that page;
+background refresh preserves row order and focus.
 An authenticated directory 401 uses the shared session-ending flow, preserving
 an in-flight explicit logout and its cookie cleanup. A late 401 after sign-out
 cannot replace the intended sign-out result with a session-expired redirect.
@@ -142,6 +145,10 @@ a durable notification guarantee.
   exclusion, another channel, reload, hidden reception, save failure/retry and
   scrolling above new arrivals. Headless Chromium keeps pages visible, so this
   scenario explicitly controls the browser's document-visibility boundary.
+- [Independent-session scenario](../e2e/read-consistency.spec.ts): separate
+  login cookies for one reader, another user's isolated cursor, stale advances,
+  reload/logout isolation and real interval repair after activity frames are
+  dropped without focus, visibility change or reconnection.
 - [Activity client](../apps/web/src/app/core/activity.service.spec.ts),
   [conversation](../apps/web/src/app/features/chat/chat.spec.ts) and
   [directory](../apps/web/src/app/features/channels/channel-list.spec.ts): queued
@@ -157,6 +164,9 @@ a durable notification guarantee.
 Run the [isolated database suite](local-development.md#reproducible-integration-in-containers)
 and [browser checks](../README.md#browser-verification) with their documented
 disposable projects. Do not migrate or reset the ordinary development database
-as part of test execution. New UI/count behavior remains separate work.
+as part of test execution.
 
-[PR #60](https://github.com/MatteoMurcia/real-time-chat/pull/60) records the final branch CI and review results.
+[PR #60](https://github.com/MatteoMurcia/real-time-chat/pull/60) records cursor
+storage/API verification; [PR #61](https://github.com/MatteoMurcia/real-time-chat/pull/61)
+records the UI/count implementation. [CP6-A](checkpoints/cp6-a.md) reviews the
+combined guarantees and the additional cross-session/timer evidence.
