@@ -95,7 +95,7 @@ outgoing Engine.IO frames; it observes real 25s/20s heartbeat detection without 
 fake clock or an injected disconnect. Its five-second scheduling allowance is a
 test bound, not an additional production guarantee.
 
-The [plan](../tasks/plan.md) records executed commands and links the task PR for final CI status.
+The [plan](../tasks/plan.md) records executed commands; [PR #64](https://github.com/MatteoMurcia/real-time-chat/pull/64) records final CI status on its exact head.
 One API process is supported. Shared presence/accounting and cross-instance
 revocation are required before adding replicas. No remote deployment, load
 benchmark, idle/away state, last-seen history or visual presence indicator is
