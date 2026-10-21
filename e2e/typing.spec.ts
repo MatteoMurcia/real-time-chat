@@ -15,7 +15,7 @@ test('shows ephemeral typing without sharing drafts, expires an offline writer a
   try {
     const csrf = async () => ({ origin, 'x-csrf-token': (await (await writer.request.get('/api/auth/session/csrf', { headers: { origin } })).json()).csrfToken });
     const preauth = { origin, 'x-csrf-token': (await (await writer.request.get('/api/auth/csrf', { headers: { origin } })).json()).csrfToken };
-    const account = { email: `typing-${randomUUID()}@example.test`, password: 'an ephemeral writing passphrase', displayName: 'Typing Writer' };
+    const account = { email: `typing-${randomUUID()}@example.test`, password: 'an ephemeral writing passphrase', displayName: 'TypingWriter'.repeat(6) };
     expect((await writer.request.post('/api/auth/register', { headers: preauth, data: account })).status()).toBe(201);
     expect((await writer.request.post('/api/auth/login', { headers: preauth, data: { email: account.email, password: account.password } })).status()).toBe(200);
     expect((await writer.request.put(`/api/channels/${channel.id}/membership`, { headers: await csrf() })).status()).toBe(200);
@@ -26,9 +26,12 @@ test('shows ephemeral typing without sharing drafts, expires an offline writer a
     }
     const composer = tab.getByRole('textbox', { name: 'Message', exact: true });
     await composer.fill('A private draft that must never cross the network');
-    await expect(page.locator('.typing')).toHaveText('Typing Writer is typing…');
+    await expect(page.locator('.typing')).toHaveText(`${account.displayName} is typing…`);
     await expect(tab.locator('.typing')).toBeEmpty();
     await page.screenshot({ path: 'test-results/typing-desktop.png', fullPage: true });
+    await page.setViewportSize({ width: 375, height: 812 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.screenshot({ path: 'test-results/typing-mobile.png', fullPage: true });
     // The server may need its heartbeat timeout to detect this loss; the receiver must expire independently.
     await writer.setOffline(true);
     await expect(page.locator('.typing')).toBeEmpty({ timeout: 7000 });
@@ -37,13 +40,13 @@ test('shows ephemeral typing without sharing drafts, expires an offline writer a
     await expect(composer).toHaveValue('A private draft that must never cross the network');
     await expect(page.locator('.typing')).toBeEmpty();
     await composer.fill('New input after reconnection');
-    await expect(page.locator('.typing')).toHaveText('Typing Writer is typing…');
+    await expect(page.locator('.typing')).toHaveText(`${account.displayName} is typing…`);
     await tab.getByRole('button', { name: 'Close conversation', exact: true }).click();
     await expect(page.locator('.typing')).toBeEmpty();
     await tab.getByRole('button', { name: `Open chat ${channel.name}`, exact: true }).click();
     await expect(tab.getByText('Live conversation ready.', { exact: true })).toBeVisible();
     await composer.fill('A confirmed message');
-    await expect(page.locator('.typing')).toHaveText('Typing Writer is typing…');
+    await expect(page.locator('.typing')).toHaveText(`${account.displayName} is typing…`);
     await tab.getByRole('button', { name: 'Send message', exact: true }).click();
     await expect(page.getByRole('log').getByText('A confirmed message', { exact: true })).toBeVisible();
     await expect(page.locator('.typing')).toBeEmpty();
