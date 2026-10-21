@@ -22,6 +22,22 @@ beforeEach(() => {
   TestBed.configureTestingModule({ providers: [RealtimeConnection, { provide: SessionStore, useValue: { session, end } }] });
 });
 
+it('never buffers presence while offline or accepts a reply from the previous socket', async () => {
+  const connection = TestBed.inject(RealtimeConnection), input = { channelId: 'channel', userIds: ['user'] };
+  await expect(connection.presence(input)).rejects.toThrow('Disconnected');
+  expect(fake.emitWithAck).not.toHaveBeenCalled();
+  fake.connected = true;
+  let resolve!: (value: unknown) => void;
+  fake.emitWithAck.mockImplementationOnce(() => new Promise(done => { resolve = done; }));
+  const pending = connection.presence(input);
+  expect(fake.timeout).toHaveBeenCalledWith(5000);
+  fake.id = 'replacement-socket'; resolve({ ok: true });
+  await expect(pending).rejects.toThrow('Disconnected');
+  fake.emitWithAck.mockRejectedValueOnce(new Error('timeout'));
+  await expect(connection.presence(input)).rejects.toThrow('timeout');
+  expect(fake.disconnect).not.toHaveBeenCalled();
+});
+
 it('drops offline typing and uses a volatile emission without acknowledgement or replay', () => {
   const connection = TestBed.inject(RealtimeConnection);
   const input = { channelId: 'channel', typing: true };

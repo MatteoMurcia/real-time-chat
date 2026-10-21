@@ -4,7 +4,7 @@ import { isApiError } from '@real-time-chat/contracts';
 import type { ChannelSubscriptionAck } from '@real-time-chat/contracts/channels';
 import type { SendMessageAck, SendMessageRequest } from '@real-time-chat/contracts/messages';
 import { SessionStore } from './session.store';
-import type { TypingRequest } from '@real-time-chat/contracts/activity';
+import type { PresenceAck, PresenceRequest, TypingRequest } from '@real-time-chat/contracts/activity';
 
 @Injectable()
 export class RealtimeConnection {
@@ -14,13 +14,21 @@ export class RealtimeConnection {
   readonly status = this.phase.asReadonly();
   private subscriptions: Promise<unknown> = Promise.resolve();
 
-  listen(event: 'message:created' | 'channel:access-revoked' | 'activity:changed' | 'typing:changed', listener: (payload: unknown) => void): () => void {
+  listen(event: 'message:created' | 'channel:access-revoked' | 'activity:changed' | 'typing:changed' | 'presence:changed', listener: (payload: unknown) => void): () => void {
     this.socket.on(event, listener);
     return () => { this.socket.off(event, listener); };
   }
 
   typing(input: TypingRequest): void {
     if (this.socket.connected) this.socket.volatile.emit('typing:update', input);
+  }
+
+  async presence(input: PresenceRequest): Promise<PresenceAck> {
+    if (!this.socket.connected) throw new Error('Disconnected');
+    const socketId = this.socket.id;
+    const response = await this.socket.timeout(5000).emitWithAck('presence:get', input) as PresenceAck;
+    if (!this.socket.connected || this.socket.id !== socketId) throw new Error('Disconnected');
+    return response;
   }
 
   subscription(channelId: string, subscribed: boolean): Promise<ChannelSubscriptionAck> {
