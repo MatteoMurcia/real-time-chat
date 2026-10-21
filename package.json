@@ -23,7 +23,8 @@
     "test:docker": "node --test docker/*.test.mjs",
     "test:integration": "docker compose -p real-time-chat-integration -f compose.test.yaml run --build --rm integration",
     "test:e2e": "playwright test",
-    "lint": "eslint . --max-warnings=0"
+    "lint": "eslint . --max-warnings=0",
+    "benchmark": "node scripts/load-test.mjs"
   },
   "overrides": {
     "@prisma/config": {

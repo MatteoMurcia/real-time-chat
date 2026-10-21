@@ -47,6 +47,11 @@ ENV NODE_ENV=test
 USER node
 CMD ["sh", "-c", "exec node --import ./docker/test-env.mjs --test apps/api/dist-test/test/integration/*.spec.js"]
 
+FROM dependencies AS benchmark
+COPY scripts/load-client.mjs scripts/load-metrics.mjs ./scripts/
+USER node
+ENTRYPOINT ["node", "scripts/load-client.mjs"]
+
 FROM dependencies AS migrate
 # Download the migration engine at build time, before entering the internal network.
 RUN node node_modules/@prisma/engines/scripts/postinstall.js

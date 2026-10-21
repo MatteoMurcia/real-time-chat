@@ -1,4 +1,11 @@
 import { parseArgs } from 'node:util';
+import { createHash } from 'node:crypto';
+
+export function validateLocalDocker(endpoint) {
+  if (typeof endpoint !== 'string' || !(/^unix:\/\/\/[^?#]+$/.test(endpoint) || /^npipe:\/\/\/\/\.\/pipe\/[\w.-]+$/.test(endpoint))) {
+    throw new Error('LOCAL_DOCKER_REQUIRED');
+  }
+}
 
 export function loadOptions(args) {
   const defaults = { users: 8, connections: 2, rate: 1, seconds: 30, warmup: 5 };
@@ -13,6 +20,23 @@ export function loadOptions(args) {
 
 export function percentile(values, fraction) {
   return values.length ? [...values].sort((a, b) => a - b)[Math.ceil(values.length * fraction) - 1] : null;
+}
+
+export function deliveryAudit(received, acknowledged) {
+  let missing = 0, unacknowledged = 0, mismatched = 0;
+  for (const ids of received) {
+    for (const [id, fingerprint] of acknowledged) {
+      if (!ids.has(id)) missing++;
+      else if (ids.get(id) !== fingerprint) mismatched++;
+    }
+    for (const id of ids.keys()) if (!acknowledged.has(id)) unacknowledged++;
+  }
+  return { expected: received.length * acknowledged.size, received: received.reduce((sum, ids) => sum + ids.size, 0), missing, unacknowledged, mismatched };
+}
+
+export function messageFingerprint(message) {
+  return createHash('sha256').update(JSON.stringify([message.id, message.channelId, message.clientMessageId,
+    message.sequence, message.body, message.author?.id, message.author?.displayName, message.createdAt])).digest('hex');
 }
 
 export function summarize({ planned, sent, latencyMs, errors, lagMs, elapsedMs }) {

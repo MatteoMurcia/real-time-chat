@@ -1,6 +1,27 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { loadOptions, percentile, summarize } from './load-metrics.mjs';
+import { loadOptions, percentile, summarize, validateLocalDocker, deliveryAudit, messageFingerprint } from './load-metrics.mjs';
+
+test('delivery detects extra broadcasts even when total received equals the expected count', () => {
+  assert.deepEqual(deliveryAudit([new Map([['one', 'good']]), new Map([['extra', 'good']])], new Map([['one', 'good']])),
+    { expected: 2, received: 2, missing: 1, unacknowledged: 1, mismatched: 0 });
+  assert.deepEqual(deliveryAudit([new Map([['one', 'bad']])], new Map([['one', 'good']])),
+    { expected: 1, received: 1, missing: 0, unacknowledged: 0, mismatched: 1 });
+});
+
+test('event fingerprints cover canonical payload fields, independent of object key order', () => {
+  const message = { id: 'id', channelId: 'channel', clientMessageId: 'client', sequence: '1', body: 'hello', author: { id: 'user', displayName: 'User' }, createdAt: '2026-10-21T00:00:00Z' };
+  const signature = messageFingerprint(message);
+  assert.equal(messageFingerprint({ ...message, author: { displayName: 'User', id: 'user' } }), signature);
+  for (const change of [{ body: 'wrong' }, { sequence: '2' }, { clientMessageId: 'wrong' }, { author: { id: 'other', displayName: 'User' } }]) {
+    assert.notEqual(messageFingerprint({ ...message, ...change }), signature);
+  }
+});
+
+test('load refuses remote Docker transports before provisioning any resources', () => {
+  for (const value of ['unix:///var/run/docker.sock', 'npipe:////./pipe/dockerDesktopLinuxEngine']) assert.doesNotThrow(() => validateLocalDocker(value));
+  for (const value of [undefined, 'ssh://server', 'tcp://127.0.0.1:2375', 'unix://server/run/docker.sock', 'npipe:////server/pipe/docker', 'unix:///socket?override=1']) assert.throws(() => validateLocalDocker(value));
+});
 
 test('load parameters are bounded and reject unknown flags, incomplete samples and excessive connections', () => {
   assert.deepEqual(loadOptions([]), { users: 8, connections: 2, rate: 1, seconds: 30, warmup: 5 });
