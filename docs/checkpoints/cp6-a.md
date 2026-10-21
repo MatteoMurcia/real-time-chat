@@ -73,7 +73,8 @@ the new scenario, both unread scenarios and responsive/lifecycle scenario
 passed **4/4**. The final local Angular suite passed **118/118** and lint passed
 without warnings. These are automated Chromium checks, not human usability tests.
 
-The checkpoint PR is the record for final combined-branch CI on its exact head,
+The [checkpoint PR #62](https://github.com/MatteoMurcia/real-time-chat/pull/62)
+is the record for final combined-branch CI on its exact head,
 including the newly added scenario in the complete browser suite. Temporary
 database credentials stayed outside versioned files. The QA database identity,
 mounted volume and Compose ownership were checked before removing the disposable
