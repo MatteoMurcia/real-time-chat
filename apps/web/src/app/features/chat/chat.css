@@ -12,3 +12,6 @@ time, small { color: var(--muted); font-size: .875rem; }
 textarea { box-sizing: border-box; display: block; width: 100%; min-height: 7rem; resize: vertical; margin-top: .5rem; padding: .75rem; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--muted); border-radius: .25rem; }
 .read-marker { display: block; }
 .typing { min-height: 1.5em; margin-block: .5rem; color: var(--muted); overflow-wrap: anywhere; }
+.author { min-width: 0; }
+.presence { display: inline-block; min-inline-size: 8.5rem; }
+.presence-notice { min-height: 1.5em; color: var(--muted); }

@@ -4,6 +4,7 @@
     <button type="button" (click)="closed.emit()">Close conversation</button>
   </div>
   <p role="status">{{ store.notice() }}</p>
+  <p class="presence-notice" role="status" aria-atomic="true">{{ presence.notice() }}</p>
   <p class="visually-hidden" role="status">{{ store.liveNotice() }}</p>
   <p class="visually-hidden" role="status" aria-atomic="true">{{ store.outgoingNotice() }}</p>
   @if (!store.ready()) { <p>Sending is paused until the live subscription is ready.</p> }
@@ -17,7 +18,7 @@
     @if (store.snapshotCursor() && !store.historyLoading() && !store.messages().length && !store.outgoing().length) { <p>No messages yet. Say hello.</p> }
     @for (message of store.messages(); track message.id) {
       <article class="message" [attr.data-message-id]="message.id">
-        <div class="meta"><strong>{{ message.author.displayName }}</strong> <time [attr.datetime]="message.createdAt">{{ message.createdAt | date:'short' }}</time></div>
+        <div class="meta"><span class="author"><strong>{{ message.author.displayName }}</strong>{{ ' ' }}<small class="presence" [attr.data-presence-user]="message.author.id">{{ presence.label(message.author.id) }}</small></span> <time [attr.datetime]="message.createdAt">{{ message.createdAt | date:'short' }}</time></div>
         <p class="body">{{ message.body }}</p>
         <small class="read-marker" [attr.data-read-sequence]="message.sequence" [attr.data-read-channel]="message.channelId">Confirmed</small>
       </article>

@@ -5,7 +5,7 @@ session** for a user in this API process. It does not mean attention, visible ta
 recent input or message delivery. Tabs and independent sessions are counted
 internally; the public response exposes only a boolean, not connection counts,
 session identifiers, names, email or last-seen timestamps. No presence is stored
-in PostgreSQL. The UI is a separate task, **6.3b**.
+in PostgreSQL. The conversation shows accessible text beside saved-message authors.
 
 ## Authorized snapshots
 
@@ -68,8 +68,33 @@ that socket closes, but it cannot read a snapshot after revocation. There is no
 durable invalidation queue, membership roster or ordered snapshot/event stream.
 A consumer must refresh on subscription/reconnect/focus, coalesce invalidations
 while a query is pending, and periodically repair a missed hint or membership
-change. Disconnected, loading, omitted or failed results must remain unknown;
-they must not be rendered as offline. These consumer behaviors belong to 6.3b.
+change. Disconnected, initially loading, omitted or failed results must remain unknown;
+they must not be rendered as offline. The browser implements these rules below.
+
+## Conversation indicators
+
+The conversation displays **Online**, **Offline** or **Presence unknown** next to
+saved-message authors, with a single accessible status for loading or failure.
+It queries at most the **100 most recent unique valid author IDs** in the loaded
+history, not a membership roster. Other authors and omitted members remain
+unknown. Labels do not announce individually or move focus or message scrolling;
+reserved label/status space reduces layout movement.
+
+A routine refresh retains the last confirmed labels until a valid new snapshot
+arrives. An invalidation received while a query is pending discards that reply
+and schedules one follow-up. Disconnect, a hidden document, channel change,
+malformed/failed reply or omitted user clears the relevant confirmed state to
+unknown. Reconnecting waits for the channel subscription to be acknowledged;
+late replies from another connection or conversation cannot restore old state.
+The five-second optional presence timeout does not close the chat connection.
+
+Queries are serialized and start at least two seconds apart, coalescing hints,
+focus and author-list changes. Failures clear labels and retry after ten seconds.
+The existing activity service supplies visibility, focus and fifteen-second
+periodic repair; there is no additional DOM listener or polling interval.
+The server's shared quota still applies across sessions: many open views may
+receive rate-limit errors and show unknown until a later successful retry.
+Presence remains a best-effort observation; this UI adds no delivery or latency SLA.
 
 ## Silent network loss
 
@@ -95,8 +120,17 @@ outgoing Engine.IO frames; it observes real 25s/20s heartbeat detection without 
 fake clock or an injected disconnect. Its five-second scheduling allowance is a
 test bound, not an additional production guarantee.
 
-The [plan](../tasks/plan.md) records executed commands; [PR #64](https://github.com/MatteoMurcia/real-time-chat/pull/64) records final CI status on its exact head.
+[Browser-store tests](../apps/web/src/app/features/chat/presence.store.spec.ts)
+cover unknown/offline separation, malformed responses, bounded batches,
+invalidation coalescing, cleanup and stale-channel rejection. The
+[view test](../apps/web/src/app/features/chat/presence-view.spec.ts) checks text
+association and subscription changes; [Chromium scenarios](../e2e/presence.spec.ts)
+exercise two writer tabs, reader reconnect/draft preservation, offline versus
+omitted members, delayed refresh, channel changes and desktop/mobile layouts.
+
+The [plan](../tasks/plan.md) records executed commands. Backend [PR #64](https://github.com/MatteoMurcia/real-time-chat/pull/64)
+and UI [PR #65](https://github.com/MatteoMurcia/real-time-chat/pull/65) record CI status
+on their exact heads.
 One API process is supported. Shared presence/accounting and cross-instance
 revocation are required before adding replicas. No remote deployment, load
-benchmark, idle/away state, last-seen history or visual presence indicator is
-part of this task.
+benchmark, idle/away state or last-seen history is part of this task.
