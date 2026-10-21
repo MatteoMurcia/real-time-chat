@@ -128,7 +128,9 @@ association and subscription changes; [Chromium scenarios](../e2e/presence.spec.
 exercise two writer tabs, reader reconnect/draft preservation, offline versus
 omitted members, delayed refresh, channel changes and desktop/mobile layouts.
 
-The [plan](../tasks/plan.md) records executed commands; [PR #64](https://github.com/MatteoMurcia/real-time-chat/pull/64) records final CI status on its exact head.
+The [plan](../tasks/plan.md) records executed commands. Backend [PR #64](https://github.com/MatteoMurcia/real-time-chat/pull/64)
+and UI [PR #65](https://github.com/MatteoMurcia/real-time-chat/pull/65) record CI status
+on their exact heads.
 One API process is supported. Shared presence/accounting and cross-instance
 revocation are required before adding replicas. No remote deployment, load
 benchmark, idle/away state or last-seen history is part of this task.
