@@ -52,8 +52,16 @@ stable directory pagination during inserts.
 
 The [read contract](../read-cursors.md) no longer describes the implemented UI
 and counts as future work. No Critical or Required finding remains. There are
-no schema, dependency, transport or deployment changes, and no assertion,
-threshold or retry setting was weakened.
+no schema, transport or deployment changes, and no assertion, threshold or
+retry setting was weakened.
+
+Final CI exposed a newly published development-tool vulnerability:
+[GHSA-587h-7wmj-h5pm](https://github.com/advisories/GHSA-587h-7wmj-h5pm).
+The root override pins Vite to the [patched 8.3.3 release](https://github.com/vitejs/vite/releases/tag/v8.3.3);
+the generated lockfile updates Vite and its required Rolldown packages. Angular
+build 22.2.2 still pins Vite 8.3.0, so this deliberately overrides its exact
+tooling dependency. Revisit the override when Angular pins a patched release.
+No direct dependency was added and the audit threshold remains unchanged.
 
 ## Recorded execution
 
@@ -72,6 +80,11 @@ baseline application. After rebuilding the pagination correction in `dab5ccd`,
 the new scenario, both unread scenarios and responsive/lifecycle scenario
 passed **4/4**. The final local Angular suite passed **118/118** and lint passed
 without warnings. These are automated Chromium checks, not human usability tests.
+
+On 2026-10-21, after the tooling patch, a clean dependency install completed.
+Lint, typecheck, all unit/reset tests, Docker tests and production builds passed
+locally; the dependency audit reported **zero vulnerabilities**. The final CI
+record below also checks the patched toolchain against the full browser suite.
 
 The [checkpoint PR #62](https://github.com/MatteoMurcia/real-time-chat/pull/62)
 is the record for final combined-branch CI on its exact head,
