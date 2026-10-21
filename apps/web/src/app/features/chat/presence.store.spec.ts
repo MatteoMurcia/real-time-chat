@@ -55,11 +55,21 @@ it('clears on disconnect and waits for a fresh acknowledged subscription after r
   store.select('channel', true, [first]); await vi.advanceTimersByTimeAsync(0);
   expect(store.label(first)).toBe('Online');
 });
+it('keeps known authors stable when the loaded history introduces another author', async () => {
+  const store = await setup();
+  store.select('channel', true, [first, second]);
+  expect(store.label(first)).toBe('Online'); expect(store.label(second)).toBe('Presence unknown');
+  presence.mockResolvedValue(response('channel', [{ userId: first, online: true }, { userId: second, online: false }]));
+  await vi.advanceTimersByTimeAsync(2000);
+  expect(store.label(first)).toBe('Online'); expect(store.label(second)).toBe('Offline');
+});
 it('rejects late channel responses and clears users not retained by the new conversation', async () => {
   const pending = deferred(); presence.mockReturnValueOnce(pending.promise);
   const store = await setup(); store.select('other', true, [second]);
   presence.mockResolvedValue(response('other', [{ userId: second, online: false }]));
-  pending.resolve(response()); await vi.advanceTimersByTimeAsync(2000);
+  pending.resolve(response()); await vi.advanceTimersByTimeAsync(0);
+  expect(store.label(first)).toBe('Presence unknown'); expect(store.label(second)).toBe('Presence unknown');
+  await vi.advanceTimersByTimeAsync(2000);
   expect(store.label(first)).toBe('Presence unknown'); expect(store.label(second)).toBe('Offline');
 });
 it('treats malformed, wrong-channel, duplicate and unrequested responses as unknown, then repairs through activity refresh', async () => {
