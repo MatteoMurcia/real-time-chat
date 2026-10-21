@@ -8,8 +8,9 @@ The [P0 acceptance review](docs/checkpoints/cp5-b.md) maps all eighteen scenario
 to executed evidence, including clean Docker installation and two-user recovery.
 The supported delivery is local and uses one API instance. Private unread counts
 sync between tabs; [ephemeral typing](docs/typing.md) expires without a stop event.
-[Authorized presence snapshots](docs/presence.md) are available over Socket.IO;
-visual presence indicators and capacity measurement remain later work.
+[Presence indicators](docs/presence.md) distinguish online, offline and unknown
+beside message authors, retaining confirmed status during background refresh.
+Capacity measurement remains later work.
 
 ## Quick start
 
@@ -123,7 +124,8 @@ Drafts/unconfirmed messages live only in the current view and can be lost on
 reload. No outbox, Redis, multiple API replicas or load-capacity claim is included.
 [Read progress and unread counts](docs/read-cursors.md) persist per user/channel;
 only other people's messages count. Typing indicators are ephemeral; presence is
-currently API-only, with its UI planned in 6.3b. Private chats, attachments,
+scoped to shared-channel message authors and becomes unknown while reconnecting.
+Private chats, attachments,
 search and video are outside the initial scope. Remote deployment needs a separate
 security/operations review; this loopback setup is not a production deployment.
 
