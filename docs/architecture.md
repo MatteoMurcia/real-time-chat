@@ -94,6 +94,7 @@ commit boundary, and [message contracts](messages.md) define cursors and UI race
 | Logout/expiry close affected sockets | [socket sessions](../apps/api/test/integration/socket-session.ts), [browser revocation](../e2e/session-revocation.spec.ts) | Local notifications/timers; transmitted data cannot be recalled |
 | Presence stays online while a valid tab/session remains and is scoped to shared members | [presence integration](../apps/api/test/integration/presence.ts), [contract](presence.md) | One API; silent-link detection uses a 25s/20s heartbeat; UI distinguishes unknown from offline; background refresh retains confirmed labels |
 | Lost presence invalidations repair without focus or reconnect | [real-timer E2E](../e2e/presence-repair.spec.ts), [CP6-B](checkpoints/cp6-b.md) | Visible channel; shared 15-second activity interval; no delivery SLA |
+| A bounded message workload has repeatable local measurements | [load methodology and raw results](benchmarks.md) | Single API, direct WebSockets and fresh PostgreSQL volume; not maximum capacity or a production SLA |
 | Membership authorizes history, sends and subscription | [membership](../apps/api/test/integration/membership.ts), [subscriptions](../apps/api/test/integration/subscriptions.ts) | Channels are open to registered users; membership is not confidentiality |
 | Retried keys resolve once in persistence or conflict | [concurrent idempotency](../apps/api/test/integration/message-idempotency.ts) | Key is scoped to author; authorization still applies; not exactly-once delivery |
 | Sequence reflects per-channel transactional commits | [message writes](../apps/api/test/integration/messages.ts), [commit/rollback races](../apps/api/test/integration/message-sync-races.ts) | Supported write path and immutable messages; no cross-channel total order |
@@ -125,7 +126,7 @@ One API instance and the synchronous in-memory Socket.IO adapter are supported.
 Queues/rooms, rate buckets, CSRF keys and revocation events are process-local.
 PostgreSQL availability is required for authenticated work. Local bootstrap DB
 credentials are not a least-privilege deployment configuration. HTTPS, distributed
-state, backups and capacity measurement need separate work before remote hosting.
+state, backups and production capacity planning need separate work before remote hosting.
 
 There is no outbox, durable offline queue, offline-first mode, exactly-once network
 delivery in the current implementation. [Typing](typing.md) is an
