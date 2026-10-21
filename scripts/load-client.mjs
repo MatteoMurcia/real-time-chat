@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { io } from 'socket.io-client';
-import { loadOptions, summarize, deliveryAudit, messageFingerprint, isLoadMessage } from './load-metrics.mjs';
+import { loadOptions, summarize, deliveryAudit, messageFingerprint, isLoadMessage, isLoadAck } from './load-metrics.mjs';
 
 if (process.env.BENCHMARK_DISPOSABLE !== 'chat_benchmark') throw new Error('Dedicated benchmark container required');
 const options = loadOptions(process.argv.slice(2));
@@ -63,12 +63,12 @@ async function phase(seconds) {
     lagMs.push(lag); sent++; actor.pending++;
     const input = { channelId, clientMessageId: randomUUID(), body: 'x'.repeat(128) }, before = performance.now();
     const operation = actor.socket.timeout(5000).emitWithAck('message:send', input).then(ack => {
-      if (!ack?.ok) {
+      if (ack?.ok === false) {
         const code = /^[A-Z_]+$/.test(ack?.error?.code ?? '') ? ack.error.code : 'MALFORMED_ACK';
         errors[code] = (errors[code] ?? 0) + 1; return;
       }
-      const message = ack.data;
-      if (!isLoadMessage(message) || message.channelId !== channelId || message.clientMessageId !== input.clientMessageId
+      const message = ack?.data;
+      if (!isLoadAck(ack) || message.channelId !== channelId || message.clientMessageId !== input.clientMessageId
         || message.author?.id !== actor.userId || message.body !== input.body || acknowledged.has(message.id)) {
         errors.INVALID_ACK = (errors.INVALID_ACK ?? 0) + 1; return;
       }

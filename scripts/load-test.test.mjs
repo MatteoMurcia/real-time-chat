@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { loadOptions, percentile, summarize, validateLocalDocker, deliveryAudit, messageFingerprint, isLoadMessage } from './load-metrics.mjs';
+import { loadOptions, percentile, summarize, validateLocalDocker, deliveryAudit, messageFingerprint, isLoadMessage, isLoadAck } from './load-metrics.mjs';
 
 test('matching malformed ACKs and events cannot count as valid canonical messages', () => {
   const id = '11111111-1111-4111-8111-111111111111';
   const message = { id, channelId: id, clientMessageId: id, sequence: '1', body: 'hello', author: { id, displayName: 'User' }, createdAt: '2026-10-21T00:00:00.000Z' };
   assert.equal(isLoadMessage(message), true);
+  assert.equal(isLoadAck({ ok: true, data: message }), true);
+  for (const ok of ['true', 'false', 1, {}, null, false]) assert.equal(isLoadAck({ ok, data: message }), false);
   for (const change of [{ sequence: undefined }, { sequence: '0' }, { sequence: '9223372036854775808' }, { createdAt: 'invalid' },
     { createdAt: 42 }, { id: 'bad' }, { author: { id, displayName: undefined } }, { author: { id, displayName: ' ' } }]) {
     assert.equal(isLoadMessage({ ...message, ...change }), false);

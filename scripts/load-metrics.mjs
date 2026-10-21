@@ -48,6 +48,8 @@ export function isLoadMessage(message) {
     && typeof message.createdAt === 'string' && Number.isFinite(Date.parse(message.createdAt)) && new Date(message.createdAt).toISOString() === message.createdAt;
 }
 
+export function isLoadAck(ack) { return ack?.ok === true && isLoadMessage(ack.data); }
+
 export function summarize({ planned, sent, latencyMs, errors, lagMs, elapsedMs }) {
   const failed = Object.values(errors).reduce((sum, count) => sum + count, 0);
   return { planned, sent, acknowledged: latencyMs.length, errors, skipped: planned - sent,
