@@ -126,7 +126,8 @@ credentials are not a least-privilege deployment configuration. HTTPS, distribut
 state, backups and capacity measurement need separate work before remote hosting.
 
 There is no outbox, durable offline queue, offline-first mode, exactly-once network
-delivery, typing or presence in the current implementation.
+delivery or presence in the current implementation. [Typing](typing.md) is an
+authorized, volatile hint with a five-second receiver TTL, without persistence.
 Live events are best-effort and recovery does not prove a recipient read a message.
 Browser evidence is Chromium, without a physical-device or exhaustive accessibility
 audit. [Operations](operations.md) covers safe logs, readiness/liveness and shutdown.

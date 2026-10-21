@@ -7,6 +7,7 @@ not add timestamps.
 | Operation | Default | Identity | Environment variable |
 | --- | --- | --- | --- |
 | `message:send` | 30 attempts / 10 seconds | User, across every socket and session | `SEND_LIMIT` |
+| `typing:update` | 10 attempts / 10 seconds | User, across every socket and session | `TYPING_LIMIT` |
 | `POST /auth/login` | 10 attempts / minute | Client IP | `LOGIN_LIMIT` |
 | `POST /auth/register` | 5 attempts / hour | Client IP | `REGISTER_LIMIT` |
 | `POST /channels` | 10 attempts / hour | Authenticated user, across sessions | `CHANNEL_CREATE_LIMIT` |
@@ -19,6 +20,9 @@ operations; public HTTP/socket adapters enforce the quotas.
 
 Message attempts consume budget using the server's handshake identity before
 payload validation, channel queueing or another database authentication read.
+Typing follows the same ordering with its own budget; start, stop and invalid
+attempts all count. Typing is optional and the browser does not await or retry
+its ack. Rejected/dropped updates disappear through the [five-second TTL](typing.md).
 Malformed messages, conflicts and idempotent retries consume budget too. Live
 session/membership authorization still runs for accepted operations. Login and
 registration count before CSRF, input validation and password hashing; channel
