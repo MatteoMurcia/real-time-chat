@@ -8,6 +8,7 @@ const fake = vi.hoisted(() => ({
   listeners: new Map<string, (error?: unknown) => void>(), active: false, connected: false, id: 'socket-1',
   connect: vi.fn(), disconnect: vi.fn(), removeAllListeners: vi.fn(),
   on: vi.fn(), off: vi.fn(), timeout: vi.fn(), emitWithAck: vi.fn(),
+  volatile: { emit: vi.fn() },
 }));
 vi.mock('socket.io-client', () => ({ io: () => fake }));
 const session = signal<object | null>(null);
@@ -19,6 +20,15 @@ beforeEach(() => {
   fake.on.mockImplementation((name: string, listener: (error?: unknown) => void) => fake.listeners.set(name, listener));
   fake.disconnect.mockImplementation(() => { fake.active = false; fake.connected = false; fake.listeners.get('disconnect')?.(); });
   TestBed.configureTestingModule({ providers: [RealtimeConnection, { provide: SessionStore, useValue: { session, end } }] });
+});
+
+it('drops offline typing and uses a volatile emission without acknowledgement or replay', () => {
+  const connection = TestBed.inject(RealtimeConnection);
+  const input = { channelId: 'channel', typing: true };
+  connection.typing(input); expect(fake.volatile.emit).not.toHaveBeenCalled();
+  fake.connected = true; connection.typing(input);
+  expect(fake.volatile.emit).toHaveBeenCalledExactlyOnceWith('typing:update', input);
+  expect(fake.emitWithAck).not.toHaveBeenCalled();
 });
 
 it('serializes room changes across channels and removes exactly the registered listener', async () => {

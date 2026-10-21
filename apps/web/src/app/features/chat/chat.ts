@@ -5,11 +5,12 @@ import type { PublicChannel } from '@real-time-chat/contracts/channels';
 import { ChatStore } from './chat.store';
 import type { Outgoing } from './message.reducer';
 import { ActivityService } from '../../core/activity.service';
+import { TypingStore } from './typing.store';
 
 @Component({
   selector: 'app-chat',
   imports: [DatePipe, ReactiveFormsModule],
-  providers: [ChatStore],
+  providers: [ChatStore, TypingStore],
   templateUrl: './chat.html',
   styleUrl: './chat.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -19,6 +20,7 @@ export class Chat {
   readonly closed = output<void>();
   protected readonly store = inject(ChatStore);
   protected readonly activity = inject(ActivityService);
+  protected readonly typing = inject(TypingStore);
   protected readonly draft = new FormControl('', { nonNullable: true });
   protected readonly following = signal(true);
   protected readonly hasNewMessages = signal(false);
@@ -28,6 +30,10 @@ export class Chat {
   private lastLiveNotice = '';
 
   constructor() {
+    effect(() => {
+      const channelId = this.channel().id, ready = this.store.ready();
+      untracked(() => this.typing.open(channelId, ready));
+    });
     const observer = new IntersectionObserver(entries => {
       if (!this.activity.visible() || !this.store.ready() || this.store.syncLoading() || this.store.historyLoading()) return;
       const recovered = this.store.recoveredSequence();
@@ -80,6 +86,7 @@ export class Chat {
 
   protected send(): void {
     if (!this.composing && this.store.send(this.draft.value)) {
+      this.typing.stop();
       this.draft.reset(); this.focusComposer();
     }
   }
