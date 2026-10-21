@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { io } from 'socket.io-client';
-import { loadOptions, summarize, deliveryAudit, messageFingerprint } from './load-metrics.mjs';
+import { loadOptions, summarize, deliveryAudit, messageFingerprint, isLoadMessage } from './load-metrics.mjs';
 
 if (process.env.BENCHMARK_DISPOSABLE !== 'chat_benchmark') throw new Error('Dedicated benchmark container required');
 const options = loadOptions(process.argv.slice(2));
@@ -32,7 +32,7 @@ async function account(index) {
     sockets.push({ socket, userId: user.id, pending: 0 });
     const ids = new Map(); received.push(ids);
     socket.on('message:created', message => {
-      if (message?.channelId !== channelId || typeof message.id !== 'string') { invalidEvents++; return; }
+      if (!isLoadMessage(message) || message.channelId !== channelId) { invalidEvents++; return; }
       if (ids.has(message.id)) duplicates++;
       ids.set(message.id, messageFingerprint(message));
     });
@@ -68,7 +68,7 @@ async function phase(seconds) {
         errors[code] = (errors[code] ?? 0) + 1; return;
       }
       const message = ack.data;
-      if (!message || typeof message.id !== 'string' || message.channelId !== channelId || message.clientMessageId !== input.clientMessageId
+      if (!isLoadMessage(message) || message.channelId !== channelId || message.clientMessageId !== input.clientMessageId
         || message.author?.id !== actor.userId || message.body !== input.body || acknowledged.has(message.id)) {
         errors.INVALID_ACK = (errors.INVALID_ACK ?? 0) + 1; return;
       }

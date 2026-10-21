@@ -39,6 +39,14 @@ export function messageFingerprint(message) {
     message.sequence, message.body, message.author?.id, message.author?.displayName, message.createdAt])).digest('hex');
 }
 
+export function isLoadMessage(message) {
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+  return !!message && [message.id, message.channelId, message.clientMessageId, message.author?.id].every(id => typeof id === 'string' && uuid.test(id))
+    && typeof message.body === 'string' && typeof message.author?.displayName === 'string' && !!message.author.displayName.trim() && message.author.displayName.length <= 160
+    && typeof message.sequence === 'string' && /^[1-9]\d{0,18}$/.test(message.sequence) && BigInt(message.sequence) <= 9223372036854775807n
+    && typeof message.createdAt === 'string' && Number.isFinite(Date.parse(message.createdAt)) && new Date(message.createdAt).toISOString() === message.createdAt;
+}
+
 export function summarize({ planned, sent, latencyMs, errors, lagMs, elapsedMs }) {
   const failed = Object.values(errors).reduce((sum, count) => sum + count, 0);
   return { planned, sent, acknowledged: latencyMs.length, errors, skipped: planned - sent,
