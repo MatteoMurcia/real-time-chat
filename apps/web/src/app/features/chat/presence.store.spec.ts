@@ -55,6 +55,14 @@ it('clears on disconnect and waits for a fresh acknowledged subscription after r
   store.select('channel', true, [first]); await vi.advanceTimersByTimeAsync(0);
   expect(store.label(first)).toBe('Online');
 });
+it('repairs a missed hint when the shared periodic activity revision advances', async () => {
+  const store = await setup();
+  expect(store.label(first)).toBe('Online');
+  presence.mockResolvedValue(response('channel', [{ userId: first, online: false }]));
+  revision.update(value => value + 1); TestBed.tick();
+  await vi.advanceTimersByTimeAsync(2000);
+  expect(store.label(first)).toBe('Offline'); expect(presence).toHaveBeenCalledTimes(2);
+});
 it('keeps known authors stable when the loaded history introduces another author', async () => {
   const store = await setup();
   store.select('channel', true, [first, second]);
