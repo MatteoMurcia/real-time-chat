@@ -7,6 +7,8 @@ test('keeps a user online across tabs, distinguishes reconnecting and omitted me
   const origin = process.env.E2E_BASE_URL!, { channel } = chatAccount;
   const writer = await browser.newContext({ baseURL: origin });
   const errors: string[] = [];
+  let readerSocket: WebSocketRoute | undefined;
+  await page.routeWebSocket('**/socket.io/**', socket => { readerSocket = socket; socket.connectToServer(); });
   page.on('pageerror', error => errors.push(error.message));
   try {
     const headers = { origin, 'x-csrf-token': (await (await writer.request.get('/api/auth/csrf', { headers: { origin } })).json()).csrfToken };
@@ -34,7 +36,10 @@ test('keeps a user online across tabs, distinguishes reconnecting and omitted me
     await page.screenshot({ path: 'test-results/presence-mobile.png', fullPage: true });
     const composer = page.getByRole('textbox', { name: 'Message', exact: true });
     await composer.fill('Keep my draft across reconnection');
+    await expect.poll(() => !!readerSocket).toBe(true);
     await context.setOffline(true);
+    await readerSocket!.close({ code: 1001, reason: 'Test network interruption' });
+    await expect(page.getByText('Connection interrupted. Reconnecting…', { exact: true })).toBeVisible();
     await expect(badge).toHaveText('Presence unknown', { timeout: 10000 });
     await context.setOffline(false);
     await expect(page.getByText('Live conversation ready.', { exact: true })).toBeVisible({ timeout: 15000 });
