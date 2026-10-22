@@ -54,6 +54,8 @@ test('guides a first conversation and resets only the marked disposable demo', a
     await alice.setViewportSize({ width: 1280, height: 900 });
     await alice.getByRole('link', { name: 'Sign in to the demo', exact: true }).click();
     const login = async (page: typeof alice, name: 'alice' | 'bob', password: string, open = true) => {
+      // Let route autofocus finish before fill focuses the first input.
+      await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeFocused();
       await page.getByLabel('Email address', { exact: true }).fill(`${name}@demo.example.test`);
       await page.getByLabel('Password', { exact: true }).fill(password);
       await page.getByRole('button', { name: 'Sign in', exact: true }).click();
