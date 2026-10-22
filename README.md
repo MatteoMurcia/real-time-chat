@@ -116,6 +116,8 @@ instructions and the limits of the demonstration.
 | Messaging | Per-channel committed order, idempotency by author/key, retries and bounded recovery: [message decision](docs/decisions/004-message-guarantees.md) |
 | Transport | HTTP for identity/discovery/history; Socket.IO for sends/events: [transport decision](docs/decisions/002-socket-io-transport.md) |
 | Quality | Keyboard/responsive interaction, security checks, diagnostics and bounded shutdown: [QA](docs/qa.md), [operations](docs/operations.md) |
+| Activity | Monotonic read progress, private unread counts, expiring typing and authorized presence: [read cursors](docs/read-cursors.md), [typing](docs/typing.md), [presence](docs/presence.md) |
+| Local measurements | Configurable isolated Docker workload, repeated ACK/resource measurements and explicit limits: [benchmarks](docs/benchmarks.md) |
 
 See the [architecture diagram, module boundaries and guarantee/test matrix](docs/architecture.md).
 There is one API process. Live events are best-effort; commit can precede a lost
@@ -143,6 +145,7 @@ security/operations review; this loopback setup is not a production deployment.
 | Run isolated database checks without host Node | [Container integration](docs/local-development.md#reproducible-integration-in-containers) |
 | Inspect browser tests and CI artifacts | [Browser verification](#browser-verification), [E2E diagnostics](docs/e2e-ci.md) |
 | Review security/input boundaries | [Security](docs/security-boundaries.md), [traffic limits](docs/traffic-limits.md) |
+| Review activity and measured message traffic | [Read consistency review](docs/checkpoints/cp6-a.md), [ephemeral activity review](docs/checkpoints/cp6-b.md), [load methodology/results](docs/benchmarks.md) |
 | Contribute or follow delivery progress | [Contributing](CONTRIBUTING.md), [implementation plan](tasks/plan.md) |
 
 The public documentation is in English; planning/product records are in Spanish.
@@ -481,13 +484,16 @@ and [decompression exhaustion](https://github.com/advisories/GHSA-rgwj-5xj2-c3m3
 Remove these overrides when a stable Prisma release includes corrected versions;
 regenerate the lockfile and verify generation/migrations before doing so.
 
-### Remaining delivery work
+### Local delivery status
 
-Functional P0 has passed CP4-C; the optional demo seed is available above.
-Demo access and guarded reset are documented in [the demo guide](docs/demo.md).
-Installation and architecture are documented here and in [the architecture guide](docs/architecture.md).
-Presentation and final delivery verification remain in the plan.
-Remote hosting is outside the current delivery scope.
+P0 passed the [final local acceptance review](docs/checkpoints/cp5-b.md), including
+clean installation, demo, presentation assets and persistence/recovery checks.
+Read/unread state, typing, presence and the bounded local load runner are also
+implemented. The [implementation plan](tasks/plan.md) records their evidence and
+checkpoint status; historical captures show the P0 conversation/recovery flow,
+not a demonstration of every later activity feature.
+Remote hosting, published images, multiple API instances and maximum-capacity
+certification remain outside the current delivery scope.
 
 ## Account registration API
 
