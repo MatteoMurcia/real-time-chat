@@ -146,6 +146,7 @@ security/operations review; this loopback setup is not a production deployment.
 | Inspect browser tests and CI artifacts | [Browser verification](#browser-verification), [E2E diagnostics](docs/e2e-ci.md) |
 | Review security/input boundaries | [Security](docs/security-boundaries.md), [traffic limits](docs/traffic-limits.md) |
 | Review activity and measured message traffic | [Read consistency review](docs/checkpoints/cp6-a.md), [ephemeral activity review](docs/checkpoints/cp6-b.md), [load methodology/results](docs/benchmarks.md) |
+| Review the final local delivery with all stage 6 additions | [CP6-C evidence and limits](docs/checkpoints/cp6-c.md) |
 | Contribute or follow delivery progress | [Contributing](CONTRIBUTING.md), [implementation plan](tasks/plan.md) |
 
 The public documentation is in English; planning/product records are in Spanish.
@@ -492,6 +493,8 @@ Read/unread state, typing, presence and the bounded local load runner are also
 implemented. The [implementation plan](tasks/plan.md) records their evidence and
 checkpoint status; historical captures show the P0 conversation/recovery flow,
 not a demonstration of every later activity feature.
+The [CP6-C review](docs/checkpoints/cp6-c.md) records the final Compose/image
+verification and the remaining local-delivery limits.
 Remote hosting, published images, multiple API instances and maximum-capacity
 certification remain outside the current delivery scope.
 
