@@ -74,6 +74,6 @@ horizontal overflow. These checks do not prove screen-reader behavior.
 
 There is no database model, migration, durable activity queue, HTTP typing
 endpoint or recovery history. Connection markers/rooms are process-local;
-multiple API instances and capacity benchmarks remain separate work. The
+multiple API instances and capacity benchmarks for activity traffic remain separate work. The
 [presence indicators](presence.md) use separate authorized snapshots and distinguish
 unknown from offline.

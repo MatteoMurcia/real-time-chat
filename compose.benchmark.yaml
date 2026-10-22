@@ -1,0 +1,47 @@
+name: chat-benchmark
+
+services:
+  db:
+    image: postgres:18.6-bookworm
+    command: [postgres, -c, log_error_verbosity=terse, -c, log_min_error_statement=panic]
+    environment: &database
+      POSTGRES_DB: chat_benchmark
+      POSTGRES_USER: benchmark_local
+      POSTGRES_PASSWORD: ${BENCHMARK_PASSWORD:?Use npm run benchmark}
+    volumes: [benchmark_data:/var/lib/postgresql]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U benchmark_local -d chat_benchmark]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  migrate:
+    build: { context: ., dockerfile: apps/api/Dockerfile, target: migrate }
+    environment: *database
+    depends_on: { db: { condition: service_healthy } }
+  api:
+    build: { context: ., dockerfile: apps/api/Dockerfile, target: runtime }
+    environment:
+      <<: *database
+      APP_ORIGIN: http://localhost:8080
+      REGISTER_LIMIT: 1000
+      LOGIN_LIMIT: 1000
+      CHANNEL_CREATE_LIMIT: 1000
+    init: true
+    depends_on: { migrate: { condition: service_completed_successfully } }
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/api/health/ready').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  load:
+    build: { context: ., dockerfile: apps/api/Dockerfile, target: benchmark }
+    environment: { BENCHMARK_DISPOSABLE: chat_benchmark }
+    init: true
+    profiles: [tools]
+    depends_on: { api: { condition: service_healthy } }
+
+networks:
+  default: { internal: true }
+
+volumes:
+  benchmark_data:

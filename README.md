@@ -10,7 +10,8 @@ The supported delivery is local and uses one API instance. Private unread counts
 sync between tabs; [ephemeral typing](docs/typing.md) expires without a stop event.
 [Presence indicators](docs/presence.md) distinguish online, offline and unknown
 beside message authors, retaining confirmed status during background refresh.
-Capacity measurement remains later work.
+A [reproducible local load baseline](docs/benchmarks.md) records message ACK
+latency, errors and sampled resource usage.
 
 ## Quick start
 
@@ -121,7 +122,7 @@ There is one API process. Live events are best-effort; commit can precede a lost
 ack/event. Retrying the same key or reading bounded recovery repairs the view.
 There is **no exactly-once delivery, durable offline queue or offline-first mode**.
 Drafts/unconfirmed messages live only in the current view and can be lost on
-reload. No outbox, Redis, multiple API replicas or load-capacity claim is included.
+reload. No outbox, Redis, multiple API replicas or maximum-capacity claim is included.
 [Read progress and unread counts](docs/read-cursors.md) persist per user/channel;
 only other people's messages count. Typing indicators are ephemeral; presence is
 scoped to shared-channel message authors and becomes unknown while reconnecting.
